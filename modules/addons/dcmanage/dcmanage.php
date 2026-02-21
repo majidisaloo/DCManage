@@ -69,6 +69,8 @@ function dcmanage_output(array $vars): void
         return;
     }
 
+    Schema::migrate();
+
     $moduleLink = 'addonmodules.php?module=dcmanage';
     $lang = I18n::resolveCurrentLanguage();
     $isRtl = $lang === 'fa';
@@ -90,7 +92,7 @@ function dcmanage_output(array $vars): void
         'servers' => I18n::t('tab_servers', $lang),
         'ports' => I18n::t('tab_ports', $lang),
         'ilos' => 'iLOs',
-        'prtg' => 'PRTG',
+        'monitoring' => I18n::t('tab_monitoring', $lang),
         'packages' => I18n::t('tab_packages', $lang),
         'scope' => I18n::t('tab_scope', $lang),
         'traffic' => I18n::t('tab_traffic', $lang),
@@ -111,12 +113,12 @@ function dcmanage_output(array $vars): void
     echo '<div class="card mt-3 border-0 shadow-sm"><div class="card-body">';
 
     if ($activeTab === 'dashboard') {
-        echo '<div id="dcmanage-dashboard" data-module-link="' . $moduleLink . '" data-api-base="' . $moduleLink . '&dcmanage_api=1&endpoint="></div>';
-        echo '<div id="dcmanage-version" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1&endpoint="></div>';
-        echo '<div id="dcmanage-cron" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1&endpoint="></div>';
-        echo '<div class="alert alert-info mt-3 mb-0">' . htmlspecialchars(I18n::t('dashboard_info', $lang)) . '</div>';
+        echo '<div class="dcmanage-header mb-3"><h2 class="mb-1">' . htmlspecialchars(I18n::t('title', $lang)) . '</h2><p class="text-muted mb-0">' . htmlspecialchars(I18n::t('subtitle', $lang)) . ' - v' . htmlspecialchars(DCManage\Version::CURRENT) . '</p></div>';
+        echo '<div id="dcmanage-dashboard" data-module-link="' . $moduleLink . '" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
+        echo '<div id="dcmanage-version" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
+        echo '<div id="dcmanage-cron" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
     } elseif ($activeTab === 'traffic') {
-        echo '<div id="dcmanage-traffic" data-api-base="' . $moduleLink . '&dcmanage_api=1&endpoint="></div>';
+        echo '<div id="dcmanage-traffic" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
         echo '<div style="height:340px"><canvas id="dcmanage-traffic-chart" height="120"></canvas></div>';
     } elseif ($activeTab === 'settings') {
         dcmanage_render_settings_form($lang);
@@ -128,6 +130,8 @@ function dcmanage_output(array $vars): void
         dcmanage_render_servers($lang);
     } elseif ($activeTab === 'logs') {
         dcmanage_render_logs($lang);
+    } elseif ($activeTab === 'monitoring') {
+        dcmanage_render_monitoring($lang);
     } else {
         echo '<div class="alert alert-secondary mb-0">';
         echo htmlspecialchars(I18n::t('crud_placeholder_prefix', $lang)) . ' <strong>' . htmlspecialchars($tabs[$activeTab] ?? I18n::t('section', $lang)) . '</strong> ' . htmlspecialchars(I18n::t('crud_placeholder_suffix', $lang));
@@ -153,6 +157,19 @@ function dcmanage_handle_actions(string $lang): string
     try {
         if ($action === 'settings_save') {
             dcmanage_handle_settings_save();
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'monitoring_save') {
+            $provider = strtolower(trim((string) ($_POST['monitoring_provider'] ?? 'prtg')));
+            if ($provider === '') {
+                $provider = 'prtg';
+            }
+            Capsule::table('mod_dcmanage_meta')->updateOrInsert(
+                ['meta_key' => 'monitoring.provider'],
+                ['meta_value' => $provider, 'updated_at' => date('Y-m-d H:i:s')]
+            );
+
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
@@ -182,6 +199,65 @@ function dcmanage_handle_actions(string $lang): string
             }
 
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('created', $lang)) . '</div>';
+        }
+
+        if ($action === 'datacenter_update') {
+            $id = (int) ($_POST['dc_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid datacenter');
+            }
+
+            Capsule::table('mod_dcmanage_datacenters')->where('id', $id)->update([
+                'name' => trim((string) ($_POST['name'] ?? '')),
+                'location' => trim((string) ($_POST['location'] ?? '')),
+                'notes' => trim((string) ($_POST['notes'] ?? '')),
+            ]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'datacenter_delete') {
+            $id = (int) ($_POST['dc_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid datacenter');
+            }
+
+            $rackIds = Capsule::table('mod_dcmanage_racks')->where('dc_id', $id)->pluck('id')->toArray();
+            if ($rackIds !== []) {
+                Capsule::table('mod_dcmanage_rack_units')->whereIn('rack_id', $rackIds)->delete();
+                Capsule::table('mod_dcmanage_servers')->whereIn('rack_id', $rackIds)->update(['rack_id' => null]);
+                Capsule::table('mod_dcmanage_switches')->whereIn('rack_id', $rackIds)->update(['rack_id' => null]);
+                Capsule::table('mod_dcmanage_racks')->whereIn('id', $rackIds)->delete();
+            }
+
+            Capsule::table('mod_dcmanage_networks')->where('dc_id', $id)->delete();
+            Capsule::table('mod_dcmanage_switches')->where('dc_id', $id)->delete();
+            Capsule::table('mod_dcmanage_servers')->where('dc_id', $id)->delete();
+            Capsule::table('mod_dcmanage_datacenters')->where('id', $id)->delete();
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'rack_unit_set') {
+            $rackId = (int) ($_POST['rack_id'] ?? 0);
+            $uNo = (int) ($_POST['u_no'] ?? 0);
+            $type = trim((string) ($_POST['unit_type'] ?? 'blank'));
+            $label = trim((string) ($_POST['label'] ?? ''));
+
+            if ($rackId <= 0 || $uNo <= 0) {
+                throw new RuntimeException('Invalid rack unit selection');
+            }
+
+            if ($type === 'blank') {
+                Capsule::table('mod_dcmanage_rack_units')->where('rack_id', $rackId)->where('u_no', $uNo)->delete();
+            } else {
+                Capsule::table('mod_dcmanage_rack_units')->updateOrInsert(
+                    ['rack_id' => $rackId, 'u_no' => $uNo],
+                    ['unit_type' => $type, 'label' => $label === '' ? null : $label, 'updated_at' => date('Y-m-d H:i:s')]
+                );
+            }
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
         if ($action === 'switch_create') {
@@ -315,7 +391,7 @@ function dcmanage_cron_status(): array
             if ($ts !== null) {
                 $nextAt = date('Y-m-d H:i:s', $ts + (int) $def['interval']);
                 $age = time() - $ts;
-                if (str_contains((string) $last->message, 'completed') && $age <= ((int) $def['interval'] * 2)) {
+                if (strpos((string) $last->message, 'completed') !== false && $age <= ((int) $def['interval'] * 2)) {
                     $status = 'ok';
                 } else {
                     $status = 'warning';
@@ -399,14 +475,35 @@ function dcmanage_render_settings_form(string $lang): void
     echo '</tbody></table></div>';
 }
 
+function dcmanage_render_monitoring(string $lang): void
+{
+    $provider = Capsule::table('mod_dcmanage_meta')->where('meta_key', 'monitoring.provider')->value('meta_value');
+    $provider = strtolower(trim((string) ($provider ?: 'prtg')));
+
+    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('tab_monitoring', $lang)) . '</h5>';
+    echo '<form method="post" action="" class="dcmanage-form-card">';
+    echo '<input type="hidden" name="dcmanage_action" value="monitoring_save">';
+    echo '<div class="form-group mb-3"><label>' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . '</label>';
+    echo '<select name="monitoring_provider" class="form-control dcmanage-input">';
+    echo '<option value="">' . htmlspecialchars(I18n::t('monitoring_select', $lang)) . '</option>';
+    $opts = ['prtg' => 'PRTG', 'cacti' => 'Cacti', 'solarwinds' => 'SolarWinds'];
+    foreach ($opts as $value => $label) {
+        $selected = $provider === $value ? ' selected' : '';
+        echo '<option value="' . htmlspecialchars($value) . '"' . $selected . '>' . htmlspecialchars($label) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+    echo '</form>';
+}
+
 function dcmanage_render_datacenters(string $lang): void
 {
     $rows = Capsule::table('mod_dcmanage_datacenters as d')
         ->leftJoin('mod_dcmanage_racks as r', 'r.dc_id', '=', 'd.id')
-        ->groupBy('d.id', 'd.name', 'd.code', 'd.location', 'd.created_at')
+        ->groupBy('d.id', 'd.name', 'd.location', 'd.notes', 'd.created_at')
         ->orderBy('d.id', 'desc')
         ->get([
-            'd.id', 'd.name', 'd.code', 'd.location', 'd.created_at',
+            'd.id', 'd.name', 'd.location', 'd.notes', 'd.created_at',
             Capsule::raw('COUNT(r.id) as rack_count'),
         ]);
 
@@ -424,47 +521,117 @@ function dcmanage_render_datacenters(string $lang): void
     echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</label><input type="number" min="0" name="rack_count" value="0" class="form-control dcmanage-input"></div>';
     echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('datacenter_rack_units', $lang)) . '</label><input type="number" min="1" name="rack_units" value="42" class="form-control dcmanage-input"></div>';
     echo '</div>';
-    echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="2"></textarea></div>';
+    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><textarea name="notes" class="form-control dcmanage-input" rows="2"></textarea></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_datacenter', $lang)) . '</button>';
     echo '</form>';
     echo '</div>';
 
-    echo '<div class="table-responsive mb-4"><table class="table table-sm table-striped">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</th></tr></thead><tbody>';
+    echo '<div class="table-responsive mb-4"><table class="table table-sm table-striped dcmanage-dc-table">';
+    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
-        echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->name) . '</td><td>' . htmlspecialchars((string) $row->location) . '</td><td>' . (int) $row->rack_count . '</td></tr>';
+        echo '<tr>';
+        echo '<td>' . (int) $row->id . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->name) . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->location) . '</td>';
+        echo '<td>' . (int) $row->rack_count . '</td>';
+        echo '<td>';
+        echo '<button class="btn btn-sm btn-outline-info mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-racks-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_racks', $lang)) . '</button>';
+        echo '<button class="btn btn-sm btn-outline-secondary mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-networks-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_networks', $lang)) . '</button>';
+        echo '<button class="btn btn-sm btn-outline-primary mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-servers-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_servers', $lang)) . '</button>';
+        echo '<button class="btn btn-sm btn-outline-warning mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
+        echo '<form method="post" style="display:inline" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('delete_confirm_datacenter', $lang), ENT_QUOTES, 'UTF-8') . '\')">';
+        echo '<input type="hidden" name="dcmanage_action" value="datacenter_delete"><input type="hidden" name="dc_id" value="' . (int) $row->id . '">';
+        echo '<button class="btn btn-sm btn-outline-danger mb-1" type="submit">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button>';
+        echo '</form>';
+        echo '</td>';
+        echo '</tr>';
+
+        echo '<tr class="collapse" id="dc-edit-' . (int) $row->id . '"><td colspan="5">';
+        echo '<form method="post" class="dcmanage-form-card">';
+        echo '<input type="hidden" name="dcmanage_action" value="datacenter_update"><input type="hidden" name="dc_id" value="' . (int) $row->id . '">';
+        echo '<div class="form-row">';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_name', $lang)) . '</label><input name="name" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_location', $lang)) . '</label><input name="location" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->location) . '"></div>';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input name="notes" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->notes) . '"></div>';
+        echo '</div><button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></form>';
+        echo '</td></tr>';
+
+        $networks = Capsule::table('mod_dcmanage_networks')->where('dc_id', (int) $row->id)->get(['name', 'vlan', 'purpose']);
+        echo '<tr class="collapse" id="dc-networks-' . (int) $row->id . '"><td colspan="5"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>' . htmlspecialchars(I18n::t('label_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_vlan', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_purpose', $lang)) . '</th></tr></thead><tbody>';
+        foreach ($networks as $n) {
+            echo '<tr><td>' . htmlspecialchars((string) $n->name) . '</td><td>' . htmlspecialchars((string) $n->vlan) . '</td><td>' . htmlspecialchars((string) $n->purpose) . '</td></tr>';
+        }
+        if (count($networks) === 0) {
+            echo '<tr><td colspan="3">-</td></tr>';
+        }
+        echo '</tbody></table></div></td></tr>';
+
+        $servers = Capsule::table('mod_dcmanage_servers as s')
+            ->leftJoin('mod_dcmanage_racks as r', 'r.id', '=', 's.rack_id')
+            ->where('s.dc_id', (int) $row->id)
+            ->get(['s.hostname', 'r.name as rack_name', 's.u_start', 's.u_height']);
+        echo '<tr class="collapse" id="dc-servers-' . (int) $row->id . '"><td colspan="5"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>' . htmlspecialchars(I18n::t('label_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_u', $lang)) . '</th></tr></thead><tbody>';
+        foreach ($servers as $s) {
+            echo '<tr><td>' . htmlspecialchars((string) $s->hostname) . '</td><td>' . htmlspecialchars((string) ($s->rack_name ?? '-')) . '</td><td>' . htmlspecialchars(((string) ($s->u_start ?? '-')) . '/' . (string) ($s->u_height ?? 1)) . '</td></tr>';
+        }
+        if (count($servers) === 0) {
+            echo '<tr><td colspan="3">-</td></tr>';
+        }
+        echo '</tbody></table></div></td></tr>';
+
+        echo '<tr class="collapse" id="dc-racks-' . (int) $row->id . '"><td colspan="5">';
+        dcmanage_render_rack_cards((int) $row->id, $lang);
+        echo '</td></tr>';
     }
     echo '</tbody></table></div>';
+}
 
-    foreach ($rows as $row) {
-        $racks = Capsule::table('mod_dcmanage_racks')->where('dc_id', (int) $row->id)->orderBy('name')->get();
-        echo '<div class="dcmanage-rack-block mb-4">';
-        echo '<h6>' . htmlspecialchars((string) $row->name) . ' - ' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . ': ' . (int) $row->rack_count . '</h6>';
-        echo '<div class="row">';
-        foreach ($racks as $rack) {
-            $units = max(1, (int) $rack->total_u);
-            $usage = dcmanage_rack_usage((int) $rack->id, $units);
-            echo '<div class="col-lg-4 col-md-6 mb-3">';
-            echo '<div class="card"><div class="card-body">';
-            echo '<h6 class="mb-2">' . htmlspecialchars((string) $rack->name) . ' (' . $units . 'U)</h6>';
-            echo '<div class="dcmanage-rack-grid">';
-            for ($u = $units; $u >= 1; $u--) {
-                $cell = $usage[$u] ?? '';
-                $cls = $cell === '' ? 'blank' : (strpos($cell, 'SW:') === 0 ? 'switch' : 'server');
-                echo '<div class="dcmanage-rack-u ' . $cls . '"><span class="u-num">U' . $u . '</span><span class="u-item">' . htmlspecialchars($cell === '' ? '-' : $cell) . '</span></div>';
-            }
-            echo '</div>';
-            echo '</div></div>';
-            echo '</div>';
+function dcmanage_render_rack_cards(int $dcId, string $lang): void
+{
+    $racks = Capsule::table('mod_dcmanage_racks')->where('dc_id', $dcId)->orderBy('name')->get();
+    echo '<div class="row">';
+    foreach ($racks as $rack) {
+        $units = max(1, (int) $rack->total_u);
+        $usage = dcmanage_rack_usage((int) $rack->id, $units);
+        echo '<div class="col-lg-4 col-md-6 mb-3">';
+        echo '<div class="card"><div class="card-body">';
+        echo '<h6 class="mb-2">' . htmlspecialchars((string) $rack->name) . ' (' . $units . 'U)</h6>';
+        echo '<div class="dcmanage-rack-grid">';
+        for ($u = $units; $u >= 1; $u--) {
+            $cell = $usage[$u] ?? ['kind' => 'blank', 'label' => '-'];
+            echo '<div class="dcmanage-rack-u ' . htmlspecialchars((string) $cell['kind']) . '"><span class="u-num">U' . $u . '</span><span class="u-item">' . htmlspecialchars((string) $cell['label']) . '</span></div>';
         }
         echo '</div>';
+
+        echo '<form method="post" class="mt-2">';
+        echo '<input type="hidden" name="dcmanage_action" value="rack_unit_set">';
+        echo '<input type="hidden" name="rack_id" value="' . (int) $rack->id . '">';
+        echo '<div class="form-row">';
+        echo '<div class="col-3"><input type="number" min="1" max="' . $units . '" name="u_no" class="form-control form-control-sm dcmanage-input" placeholder="U"></div>';
+        echo '<div class="col-4"><select name="unit_type" class="form-control form-control-sm dcmanage-input"><option value="blank">' . htmlspecialchars(I18n::t('unit_blank', $lang)) . '</option><option value="reserved">' . htmlspecialchars(I18n::t('unit_reserved', $lang)) . '</option><option value="cable">' . htmlspecialchars(I18n::t('unit_cable', $lang)) . '</option><option value="air">' . htmlspecialchars(I18n::t('unit_air', $lang)) . '</option></select></div>';
+        echo '<div class="col-5"><input name="label" class="form-control form-control-sm dcmanage-input" placeholder="' . htmlspecialchars(I18n::t('label_name', $lang)) . '"></div>';
         echo '</div>';
+        echo '<button class="btn btn-sm btn-outline-primary mt-2" type="submit">' . htmlspecialchars(I18n::t('set_unit', $lang)) . '</button>';
+        echo '</form>';
+
+        echo '</div></div></div>';
     }
+    echo '</div>';
 }
 
 function dcmanage_rack_usage(int $rackId, int $totalU): array
 {
     $usage = [];
+
+    $units = Capsule::table('mod_dcmanage_rack_units')->where('rack_id', $rackId)->get(['u_no', 'unit_type', 'label']);
+    foreach ($units as $u) {
+        $label = trim((string) ($u->label ?? ''));
+        if ($label === '') {
+            $label = strtoupper((string) $u->unit_type);
+        }
+        $usage[(int) $u->u_no] = ['kind' => (string) $u->unit_type, 'label' => $label];
+    }
+
     $servers = Capsule::table('mod_dcmanage_servers')->where('rack_id', $rackId)->get(['hostname', 'u_start', 'u_height']);
     foreach ($servers as $s) {
         $start = (int) ($s->u_start ?? 0);
@@ -475,7 +642,7 @@ function dcmanage_rack_usage(int $rackId, int $totalU): array
         for ($i = 0; $i < $height; $i++) {
             $u = $start + $i;
             if ($u >= 1 && $u <= $totalU) {
-                $usage[$u] = 'SRV:' . (string) $s->hostname;
+                $usage[$u] = ['kind' => 'server', 'label' => 'SRV:' . (string) $s->hostname];
             }
         }
     }
@@ -490,7 +657,7 @@ function dcmanage_rack_usage(int $rackId, int $totalU): array
         for ($i = 0; $i < $height; $i++) {
             $u = $start + $i;
             if ($u >= 1 && $u <= $totalU) {
-                $usage[$u] = 'SW:' . (string) $s->name;
+                $usage[$u] = ['kind' => 'switch', 'label' => 'SW:' . (string) $s->name];
             }
         }
     }

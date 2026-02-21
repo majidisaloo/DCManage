@@ -3,6 +3,24 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.7] - 2026-02-21
+### Changed
+- Persian UI navigation now renders from the right side consistently in module tabs.
+- PRTG tab was renamed to Monitoring, with provider selection designed for future extensions.
+- Datacenter grid now uses tighter action layout and aligned table cells for clearer column placement.
+
+### Added
+- Monitoring provider selector now supports `PRTG`, `Cacti`, and `SolarWinds` options (with current implementation on PRTG).
+- Datacenter rows now include operational actions: view Racks, Networks, Servers, Edit, and Delete.
+- Rack view now includes U-level operational marking (`Reserved`, `Cable Mgmt`, `Airflow`, `Blank`) per unit.
+- Added `mod_dcmanage_rack_units` migration for persistent rack unit annotations.
+
+### Fixed
+- Fixed dashboard API URL handling to prevent malformed endpoint calls.
+- Fixed unhandled dashboard promise failures by hardening JSON response parsing and error handling.
+- Fixed server listing under datacenter details to show rack name instead of raw rack ID.
+- Fixed duplicate module heading/version rendering outside dashboard-focused view.
+
 ## [0.1.6] - 2026-02-21
 ### Changed
 - Removed duplicate module heading/version line from non-dashboard pages.

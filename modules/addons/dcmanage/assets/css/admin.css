@@ -22,11 +22,17 @@
 }
 
 .dcmanage-shell.dcmanage-rtl .dcmanage-tabs {
+  direction: rtl;
   justify-content: flex-end;
 }
 
 .dcmanage-shell.dcmanage-ltr .dcmanage-tabs {
   justify-content: flex-start;
+}
+
+.dcmanage-shell table th,
+.dcmanage-shell table td {
+  vertical-align: middle;
 }
 
 .dcmanage-shell .dcmanage-tabs .nav-link {
@@ -93,6 +99,17 @@
 .dcmanage-shell .table thead th {
   background: #f1f5ff;
   border-bottom: 0;
+}
+
+.dcmanage-shell .dcmanage-dc-table th,
+.dcmanage-shell .dcmanage-dc-table td {
+  text-align: inherit;
+  white-space: nowrap;
+}
+
+.dcmanage-shell .dcmanage-dc-table th:last-child,
+.dcmanage-shell .dcmanage-dc-table td:last-child {
+  width: 360px;
 }
 
 .dcmanage-shell code {

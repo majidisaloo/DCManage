@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.6)
+## Features in this release (v0.1.7)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -41,6 +41,8 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Switch create supports Datacenter -> Rack dependent selection.
   - Switch create supports optional U position for rack placement.
   - Server create supports Datacenter -> Rack dependent selection and U position fields.
+  - Datacenter rows now expose direct actions: Racks, Networks, Servers, Edit, Delete.
+  - Rack map now supports per-U marking for reserved/cable/airflow/blank planning.
 - Logs:
   - package purchase logs are now visible inside Logs tab.
 
@@ -110,6 +112,7 @@ The admin shell uses Bootstrap 4-compatible markup and responsive layout.
 - Saved locale is honored first, then session/system language is used as fallback.
 - If the account/session language is Persian, module UI labels load in Persian.
 - If the account/session language is English, module UI labels load in English.
+- Persian menu/tabs are rendered RTL and start from the right side.
 - Optional override for testing: add `&lang=fa` or `&lang=en` to addon URL.
 
 ## Next implementation phases

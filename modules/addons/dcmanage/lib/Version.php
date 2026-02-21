@@ -6,7 +6,7 @@ namespace DCManage;
 
 final class Version
 {
-    public const CURRENT = '0.1.6';
+    public const CURRENT = '0.1.7';
 
     private function __construct()
     {
