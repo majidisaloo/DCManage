@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.27] - 2026-02-21
+### Changed
+- Datacenters section spacing was normalized on all sides.
+- Added consistent inner padding between section borders and content.
+
+### Fixed
+- Fixed cramped alignment where action button and table appeared too close to border lines.
+
 ## [0.1.26] - 2026-02-21
 ### Changed
 - Increased top spacing in Datacenters action bar.

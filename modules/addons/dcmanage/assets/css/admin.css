@@ -401,7 +401,33 @@
 }
 
 .dcmanage-dc-topbar {
-  margin-top: 14px;
+  margin-top: 20px;
+  padding-inline: 6px;
+}
+
+.dcmanage-dc-add-wrap {
+  padding-inline: 4px;
+}
+
+.dcmanage-dc-table-wrap {
+  border: 1px solid #d9e3fb;
+  border-radius: 14px;
+  background: #fcfdff;
+  padding: 12px;
+}
+
+.dcmanage-dc-table-wrap .table-responsive {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dcmanage-dc-table-wrap .table {
+  margin-bottom: 0;
+}
+
+.dcmanage-dc-table th,
+.dcmanage-dc-table td {
+  padding: .72rem .86rem;
 }
 
 .dcmanage-btn-soft-primary,

@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.26)
+## Features in this release (v0.1.27)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -49,6 +49,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Datacenter create supports auto rack generation by count + rack unit size.
   - Datacenters page no longer repeats a secondary `Datacenters` heading below tabs.
   - Datacenters action row has increased top margin for cleaner spacing above `Add Datacenter`.
+  - Datacenters block now has balanced top/bottom/left/right spacing from border lines.
   - Datacenter add form is opened by Add button (collapsed by default).
   - Datacenter page shows rack U-level maps and occupancy.
   - Switch create supports Datacenter -> Rack dependent selection.

@@ -760,11 +760,11 @@ function dcmanage_render_datacenters(string $lang): void
             Capsule::raw('COUNT(r.id) as rack_count'),
         ]);
 
-    echo '<div class="d-flex justify-content-end align-items-center mb-3 dcmanage-dc-topbar">';
+    echo '<div class="d-flex justify-content-end align-items-center mb-4 dcmanage-dc-topbar">';
     echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-dc-add">' . htmlspecialchars(I18n::t('datacenter_add', $lang)) . '</button>';
     echo '</div>';
 
-    echo '<div class="collapse mb-4" id="dcmanage-dc-add">';
+    echo '<div class="collapse mb-4 dcmanage-dc-add-wrap" id="dcmanage-dc-add">';
     echo '<form method="post" action="" class="dcmanage-form-card">';
     echo '<input type="hidden" name="dcmanage_action" value="datacenter_create">';
     echo '<div class="form-row">';
@@ -778,7 +778,7 @@ function dcmanage_render_datacenters(string $lang): void
     echo '</form>';
     echo '</div>';
 
-    echo '<div class="table-responsive mb-4"><table class="table table-sm table-striped dcmanage-dc-table">';
+    echo '<div class="dcmanage-dc-table-wrap mb-4"><div class="table-responsive"><table class="table table-sm table-striped dcmanage-dc-table">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
         echo '<tr>';
@@ -826,7 +826,7 @@ function dcmanage_render_datacenters(string $lang): void
         dcmanage_render_rack_cards((int) $row->id, $lang);
         echo '</td></tr>';
     }
-    echo '</tbody></table></div>';
+    echo '</tbody></table></div></div>';
 }
 
 function dcmanage_render_rack_cards(int $dcId, string $lang): void
