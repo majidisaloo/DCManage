@@ -2106,14 +2106,16 @@ function dcmanage_render_switches(string $lang): void
         echo '<tr class="collapse" id="sw-ports-' . (int) $row->id . '"><td colspan="7">';
         echo '<div class="dcmanage-form-card dcmanage-switch-ports-card">';
         echo '<h6 class="mb-2">' . htmlspecialchars(I18n::t('switch_ports_vlans', $lang)) . '</h6>';
-        echo '<div class="table-responsive"><table class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_if_speed', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+        echo '<div class="form-group mb-2"><input type="text" class="form-control form-control-sm dcmanage-input dcmanage-port-search" data-target-table="dcmanage-port-table-' . (int) $row->id . '" placeholder="' . htmlspecialchars(I18n::t('switch_port_search_placeholder', $lang)) . '"></div>';
+        echo '<div class="table-responsive"><table id="dcmanage-port-table-' . (int) $row->id . '" class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_if_speed', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
         foreach ($ports as $p) {
             $adminStatus = strtolower(trim((string) $p->admin_status));
             $canShut = $adminStatus !== 'down';
             $canNoShut = $adminStatus !== 'up';
 
             $speedLabel = dcmanage_port_speed_label(isset($p->speed_mbps) ? (int) $p->speed_mbps : null, (string) ($p->speed_mode ?? ''), $lang);
-            echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . dcmanage_render_port_admin_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_port_oper_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
+            $searchText = strtolower(trim((string) $p->if_name . ' ' . (string) ($p->if_desc ?? '') . ' ' . (string) ($p->vlan ?? '')));
+            echo '<tr data-search="' . htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') . '"><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . dcmanage_render_port_admin_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_port_oper_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_check"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-info" type="submit" name="dcmanage_action_btn" value="switch_port_check">' . htmlspecialchars(I18n::t('switch_port_check', $lang)) . '</button></form>';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_shut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_shut"' . ($canShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_shut', $lang)) . '</button></form>';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_noshut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-success" type="submit" name="dcmanage_action_btn" value="switch_port_noshut"' . ($canNoShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_no_shut', $lang)) . '</button></form>';
@@ -2129,9 +2131,10 @@ function dcmanage_render_switches(string $lang): void
     echo '</tbody></table></div>';
 
     echo '<script>';
-    echo '(function(){var dc=document.getElementById("dcmanage-switch-dc");var rack=document.getElementById("dcmanage-switch-rack");if(!dc||!rack){return;}';
-    echo 'function filter(){var v=dc.value;for(var i=0;i<rack.options.length;i++){var o=rack.options[i];if(!o.value){o.hidden=false;continue;}o.hidden=(v!==""&&o.getAttribute("data-dc-id")!==v);}if(rack.selectedIndex>0&&rack.options[rack.selectedIndex].hidden){rack.selectedIndex=0;}}';
-    echo 'dc.addEventListener("change",filter);filter();})();';
+    echo '(function(){var dc=document.getElementById("dcmanage-switch-dc");var rack=document.getElementById("dcmanage-switch-rack");';
+    echo 'if(dc&&rack){function filter(){var v=dc.value;for(var i=0;i<rack.options.length;i++){var o=rack.options[i];if(!o.value){o.hidden=false;continue;}o.hidden=(v!==""&&o.getAttribute("data-dc-id")!==v);}if(rack.selectedIndex>0&&rack.options[rack.selectedIndex].hidden){rack.selectedIndex=0;}}dc.addEventListener("change",filter);filter();}';
+    echo 'var inputs=document.querySelectorAll(".dcmanage-port-search");for(var s=0;s<inputs.length;s++){inputs[s].addEventListener("input",function(){var q=String(this.value||"").toLowerCase().trim();var tableId=this.getAttribute("data-target-table")||"";if(!tableId){return;}var table=document.getElementById(tableId);if(!table){return;}var rows=table.querySelectorAll("tbody tr");for(var r=0;r<rows.length;r++){var row=rows[r];var hay=(row.getAttribute("data-search")||"").toLowerCase();row.style.display=(q===""||hay.indexOf(q)!==-1)?"":"none";}});}';
+    echo '})();';
     echo '</script>';
 }
 

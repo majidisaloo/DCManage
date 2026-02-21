@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.44] - 2026-02-21
+### Added
+- Added live search input in each switch ports panel.
+- Search now filters by `Interface`, `Description`, and `VLAN` in real-time.
+
+### Fixed
+- Improved port lookup workflow for large switch interface lists by enabling immediate in-table filtering.
+
 ## [0.1.43] - 2026-02-21
 ### Changed
 - Port speed normalization now handles oversized/non-standard SNMP raw values.
