@@ -164,6 +164,13 @@
       return;
     }
 
+    var text = String(message || '').trim();
+    if (text === '') {
+      node.className = 'mt-3 dcmanage-update-msg is-info d-none';
+      node.innerHTML = '';
+      return;
+    }
+
     var cls = 'is-info';
     if (kind === 'success') {
       cls = 'is-success';
@@ -174,7 +181,7 @@
     }
 
     node.className = 'mt-3 dcmanage-update-msg ' + cls;
-    node.innerHTML = safeText(message);
+    node.innerHTML = safeText(text);
   }
 
   function renderDashboard(base, moduleLink) {
@@ -272,7 +279,7 @@
         '<button type="button" class="btn btn-outline-primary btn-sm dcmanage-check-btn" id="dcmanage-check-update">' + safeText(T.checkUpdate) + '</button>' +
         '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">' + safeText(T.applyUpdate) + '</button>' +
         '</div>' +
-        '<div id="dcmanage-update-msg" class="mt-3 dcmanage-update-msg is-info"></div>' +
+        '<div id="dcmanage-update-msg" class="mt-3 dcmanage-update-msg is-info d-none"></div>' +
         '</div>';
 
       bindVersionActions(base);
@@ -298,7 +305,7 @@
       var label = d.overall === 'ok' ? T.ok : (d.overall === 'fail' ? T.fail : T.warn);
       var rows = d.items || [];
       var html = '<div class="p-3 dcmanage-version-card">';
-      html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+      html += '<div class="dcmanage-cron-head">';
       html += '<h5 class="mb-0">' + safeText(T.cronHealth) + '</h5>';
       html += '<span class="badge badge-' + cls + '">' + safeText(label) + '</span>';
       html += '</div>';

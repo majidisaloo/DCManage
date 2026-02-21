@@ -3,6 +3,16 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.30] - 2026-02-21
+### Changed
+- Refined dashboard spacing in Version/Cron panels for cleaner and consistent padding.
+- Improved action row alignment for update controls (Auto Update + buttons) across desktop and mobile.
+- Cron header now uses a dedicated responsive layout for correct spacing of title and status badge.
+
+### Fixed
+- Removed the empty update message placeholder gap by hiding the message box until text is present.
+- Fixed cramped mobile spacing where update controls and status blocks appeared stuck to borders.
+
 ## [0.1.29] - 2026-02-21
 ### Added
 - Added `Bulk Create Servers` form in Servers tab to create hostname ranges (example: `MDP-301` to `MDP-399`).
