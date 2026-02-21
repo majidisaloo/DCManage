@@ -184,6 +184,20 @@ function dcmanage_handle_actions(string $lang): string
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
+        if ($action === 'logs_clear') {
+            $scope = strtolower(trim((string) ($_POST['scope'] ?? 'system')));
+            if ($scope === 'purchase') {
+                Capsule::table('mod_dcmanage_purchases')->delete();
+            } elseif ($scope === 'all') {
+                Capsule::table('mod_dcmanage_logs')->delete();
+                Capsule::table('mod_dcmanage_purchases')->delete();
+            } else {
+                Capsule::table('mod_dcmanage_logs')->delete();
+            }
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
         if ($action === 'monitoring_save') {
             $provider = strtolower(trim((string) ($_POST['monitoring_provider'] ?? 'prtg')));
             if ($provider === '') {
@@ -1693,8 +1707,25 @@ function dcmanage_snmp_parse_vlan(string $raw): string
         return '';
     }
 
-    if (preg_match('/\d+/', $value, $m)) {
-        return (string) $m[0];
+    if (preg_match('/\((\d+)\)/', $value, $m) === 1) {
+        return (string) ((int) $m[1]);
+    }
+
+    if (preg_match('/^\d+$/', $value) === 1) {
+        return (string) ((int) $value);
+    }
+
+    // Hex-style VLAN values like "00 0A" or "0x000A".
+    if (preg_match('/^0x([0-9a-fA-F]+)$/', $value, $m) === 1) {
+        return (string) hexdec($m[1]);
+    }
+    if (preg_match('/^(?:[0-9a-fA-F]{2}\s+)+[0-9a-fA-F]{2}$/', $value) === 1) {
+        $hex = str_replace(' ', '', $value);
+        return (string) hexdec($hex);
+    }
+
+    if (preg_match('/\d+/', $value, $m) === 1) {
+        return (string) ((int) $m[0]);
     }
 
     return '';
@@ -1907,6 +1938,10 @@ function dcmanage_probe_single_switch_port(string $host, string $community, int 
     $ifSpeedRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.2.2.1.5.' . $ifIndex, $timeout, $retries);
     $autoNegRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.26.5.1.1.1.' . $ifIndex, $timeout, $retries);
     $pvidRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $ifIndex, $timeout, $retries);
+    $vlan = dcmanage_snmp_parse_vlan($pvidRaw);
+    if ($vlan === '') {
+        $vlan = dcmanage_snmp_resolve_vlan_by_ifindex($target, $community, $ifIndex, $timeout, $retries);
+    }
 
     $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value($ifNameRaw));
     if ($ifName === '') {
@@ -1918,12 +1953,46 @@ function dcmanage_probe_single_switch_port(string $host, string $community, int 
         'message' => 'Port checked',
         'if_name' => $ifName,
         'if_desc' => dcmanage_snmp_parse_typed_value($ifDescRaw),
-        'vlan' => dcmanage_snmp_parse_vlan($pvidRaw),
+        'vlan' => $vlan,
         'speed_mbps' => dcmanage_snmp_speed_mbps_from_raw($ifHighSpeedRaw, $ifSpeedRaw),
         'speed_mode' => dcmanage_snmp_autoneg_mode_from_raw($autoNegRaw),
         'admin_status' => dcmanage_snmp_status_from_raw($adminRaw, 'admin'),
         'oper_status' => dcmanage_snmp_status_from_raw($operRaw, 'oper'),
     ];
+}
+
+function dcmanage_snmp_resolve_vlan_by_ifindex(string $target, string $community, int $ifIndex, int $timeoutMicros, int $retries): string
+{
+    if ($ifIndex <= 0) {
+        return '';
+    }
+
+    $directRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $ifIndex, $timeoutMicros, $retries);
+    $direct = dcmanage_snmp_parse_vlan($directRaw);
+    if ($direct !== '') {
+        return $direct;
+    }
+
+    $bridgeIfIndexMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.17.1.4.1.2', $timeoutMicros, $retries));
+    $pvidRawMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1', $timeoutMicros, $retries));
+
+    if ($bridgeIfIndexMap === [] || $pvidRawMap === []) {
+        return '';
+    }
+
+    foreach ($bridgeIfIndexMap as $bridgePort => $rawIfIndex) {
+        $mappedIfIndex = (int) preg_replace('/[^0-9]/', '', dcmanage_snmp_parse_typed_value((string) $rawIfIndex));
+        if ($mappedIfIndex !== $ifIndex) {
+            continue;
+        }
+        $candidateRaw = (string) ($pvidRawMap[(int) $bridgePort] ?? '');
+        $candidate = dcmanage_snmp_parse_vlan($candidateRaw);
+        if ($candidate !== '') {
+            return $candidate;
+        }
+    }
+
+    return '';
 }
 
 function dcmanage_discover_switch_ports(string $host, string $community, int $port = 161): array
@@ -2327,6 +2396,11 @@ function dcmanage_render_switches(string $lang): void
         echo '<div class="dcmanage-form-card dcmanage-switch-ports-card">';
         echo '<h6 class="mb-2">' . htmlspecialchars(I18n::t('switch_ports_vlans', $lang)) . '</h6>';
         echo '<div class="form-group mb-2"><input type="text" class="form-control form-control-sm dcmanage-input dcmanage-port-search" data-target-table="dcmanage-port-table-' . (int) $row->id . '" placeholder="' . htmlspecialchars(I18n::t('switch_port_search_placeholder', $lang)) . '"></div>';
+        echo '<div class="dcmanage-table-pager mb-2" data-target-table="dcmanage-port-table-' . (int) $row->id . '" data-page-size="25">';
+        echo '<button type="button" class="btn btn-sm btn-outline-secondary dcmanage-page-prev">' . htmlspecialchars(I18n::t('pagination_prev', $lang)) . '</button>';
+        echo '<span class="dcmanage-page-info">1/1</span>';
+        echo '<button type="button" class="btn btn-sm btn-outline-secondary dcmanage-page-next">' . htmlspecialchars(I18n::t('pagination_next', $lang)) . '</button>';
+        echo '</div>';
         echo '<div class="table-responsive"><table id="dcmanage-port-table-' . (int) $row->id . '" class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_if_speed', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
         foreach ($ports as $p) {
             $adminStatus = strtolower(trim((string) $p->admin_status));
@@ -2334,7 +2408,7 @@ function dcmanage_render_switches(string $lang): void
             $canNoShut = $adminStatus !== 'up';
 
             $speedLabel = dcmanage_port_speed_label(isset($p->speed_mbps) ? (int) $p->speed_mbps : null, (string) ($p->speed_mode ?? ''), $lang);
-            $searchText = strtolower(trim((string) $p->if_name . ' ' . (string) ($p->if_desc ?? '') . ' ' . (string) ($p->vlan ?? '')));
+            $searchText = strtolower(trim((string) $p->if_name . ' ' . (string) ($p->if_desc ?? '') . ' ' . (string) ($p->vlan ?? '') . ' ' . (string) ($p->admin_status ?? '') . ' ' . (string) ($p->oper_status ?? '') . ' ' . $speedLabel));
             echo '<tr data-search="' . htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') . '"><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . dcmanage_render_port_admin_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_port_oper_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_check"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-info" type="submit" name="dcmanage_action_btn" value="switch_port_check">' . htmlspecialchars(I18n::t('switch_port_check', $lang)) . '</button></form>';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_shut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_shut"' . ($canShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_shut', $lang)) . '</button></form>';
@@ -2353,7 +2427,9 @@ function dcmanage_render_switches(string $lang): void
     echo '<script>';
     echo '(function(){var dc=document.getElementById("dcmanage-switch-dc");var rack=document.getElementById("dcmanage-switch-rack");';
     echo 'if(dc&&rack){function filter(){var v=dc.value;for(var i=0;i<rack.options.length;i++){var o=rack.options[i];if(!o.value){o.hidden=false;continue;}o.hidden=(v!==""&&o.getAttribute("data-dc-id")!==v);}if(rack.selectedIndex>0&&rack.options[rack.selectedIndex].hidden){rack.selectedIndex=0;}}dc.addEventListener("change",filter);filter();}';
-    echo 'var inputs=document.querySelectorAll(".dcmanage-port-search");for(var s=0;s<inputs.length;s++){inputs[s].addEventListener("input",function(){var q=String(this.value||"").toLowerCase().trim();var tableId=this.getAttribute("data-target-table")||"";if(!tableId){return;}var table=document.getElementById(tableId);if(!table){return;}var rows=table.querySelectorAll("tbody tr");for(var r=0;r<rows.length;r++){var row=rows[r];var hay=(row.getAttribute("data-search")||"").toLowerCase();row.style.display=(q===""||hay.indexOf(q)!==-1)?"":"none";}});}';
+    echo 'function applyPager(tableId){var table=document.getElementById(tableId);if(!table){return;}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\'"+tableId+"\']");if(!pager){return;}var pageSize=parseInt(pager.getAttribute("data-page-size")||"25",10);if(!pageSize||pageSize<1){pageSize=25;}if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset && rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var x=0;x<rows.length;x++){rows[x].style.display=(rows[x].dataset&&rows[x].dataset.filtered==="1")?"none":"";}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var y=0;y<visible.length;y++){visible[y].style.display=(y>=start&&y<end)?"":"none";}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
+    echo 'var pagers=document.querySelectorAll(".dcmanage-table-pager");for(var p=0;p<pagers.length;p++){(function(pg){var t=pg.getAttribute("data-target-table")||"";var prev=pg.querySelector(".dcmanage-page-prev");var next=pg.querySelector(".dcmanage-page-next");if(prev){prev.addEventListener("click",function(){pg._page=(pg._page||1)-1;applyPager(t);});}if(next){next.addEventListener("click",function(){pg._page=(pg._page||1)+1;applyPager(t);});}applyPager(t);})(pagers[p]);}';
+    echo 'var inputs=document.querySelectorAll(".dcmanage-port-search");for(var s=0;s<inputs.length;s++){inputs[s].addEventListener("input",function(){var q=String(this.value||"").toLowerCase().trim();var tableId=this.getAttribute("data-target-table")||"";if(!tableId){return;}var table=document.getElementById(tableId);if(!table){return;}var rows=table.querySelectorAll("tbody tr");for(var r=0;r<rows.length;r++){var row=rows[r];var hay=(row.getAttribute("data-search")||"").toLowerCase();row.dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\'"+tableId+"\']");if(pager){pager._page=1;}applyPager(tableId);});}';
     echo '})();';
     echo '</script>';
 }
@@ -2370,7 +2446,6 @@ function dcmanage_render_servers(string $lang): void
         ->leftJoin('mod_dcmanage_racks as r', 'r.id', '=', 's.rack_id')
         ->leftJoin('mod_dcmanage_ilos as il', 'il.id', '=', 's.ilo_id')
         ->orderBy('s.id', 'desc')
-        ->limit(200)
         ->get([
             's.id', 's.dc_id', 's.hostname', 's.asset_tag', 's.serial', 's.u_start', 's.u_height', 's.ilo_id',
             'd.name as dc_name', 'r.name as rack_name',
@@ -2530,7 +2605,13 @@ function dcmanage_render_servers(string $lang): void
     echo '</div>';
 
     echo '<div class="col-lg-7">';
-    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
+    echo '<div class="form-group mb-2"><input type="text" id="dcmanage-server-table-search" class="form-control form-control-sm dcmanage-input" placeholder="' . htmlspecialchars(I18n::t('table_search', $lang)) . ': ID / Hostname / DC / Rack / iLO / Port / Sensor / U"></div>';
+    echo '<div class="dcmanage-table-pager mb-2" id="dcmanage-server-table-pager" data-target-table="dcmanage-server-table" data-page-size="25">';
+    echo '<button type="button" class="btn btn-sm btn-outline-secondary dcmanage-page-prev">' . htmlspecialchars(I18n::t('pagination_prev', $lang)) . '</button>';
+    echo '<span class="dcmanage-page-info">1/1</span>';
+    echo '<button type="button" class="btn btn-sm btn-outline-secondary dcmanage-page-next">' . htmlspecialchars(I18n::t('pagination_next', $lang)) . '</button>';
+    echo '</div>';
+    echo '<div class="table-responsive dcmanage-table-wrap"><table id="dcmanage-server-table" class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('server_ilo', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_sensor_count', $lang)) . '</th><th>U</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
         $serverId = (int) $row->id;
@@ -2554,8 +2635,9 @@ function dcmanage_render_servers(string $lang): void
         $iloLabel = trim((string) ($row->ilo_host ?? '')) !== ''
             ? htmlspecialchars((string) $row->ilo_host) . '<br><small class="text-muted">' . htmlspecialchars((string) ($row->ilo_type ?? 'iLO')) . '</small>'
             : '-';
-        echo '<tr><td>' . $serverId . '</td><td>' . htmlspecialchars((string) $row->hostname) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . $iloLabel . '</td><td>' . $portLabel . '</td><td>' . $sensorLabel . '</td><td>' . htmlspecialchars($u) . '</td><td class="dcmanage-action-buttons"><button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-server-map-toggle" data-target="' . htmlspecialchars($mapFormId) . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button><form method="post" style="display:inline" onsubmit="return confirm(\'Delete server?\')"><input type="hidden" name="dcmanage_action" value="server_delete"><input type="hidden" name="server_id" value="' . $serverId . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="server_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td></tr>';
-        echo '<tr id="' . htmlspecialchars($mapFormId) . '" class="dcmanage-server-map-row" style="display:none;"><td colspan="9">';
+        $searchText = strtolower(trim((string) $serverId . ' ' . (string) $row->hostname . ' ' . (string) $row->dc_name . ' ' . (string) $row->rack_name . ' ' . strip_tags($iloLabel) . ' ' . strip_tags($portLabel) . ' ' . strip_tags($sensorLabel) . ' ' . $u));
+        echo '<tr class="dcmanage-server-item" data-server-id="' . $serverId . '" data-search="' . htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') . '"><td>' . $serverId . '</td><td>' . htmlspecialchars((string) $row->hostname) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . $iloLabel . '</td><td>' . $portLabel . '</td><td>' . $sensorLabel . '</td><td>' . htmlspecialchars($u) . '</td><td class="dcmanage-action-buttons"><button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-server-map-toggle" data-target="' . htmlspecialchars($mapFormId) . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button><form method="post" style="display:inline" onsubmit="return confirm(\'Delete server?\')"><input type="hidden" name="dcmanage_action" value="server_delete"><input type="hidden" name="server_id" value="' . $serverId . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="server_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td></tr>';
+        echo '<tr id="' . htmlspecialchars($mapFormId) . '" class="dcmanage-server-map-row" data-server-id="' . $serverId . '" style="display:none;"><td colspan="9">';
         echo '<form method="post" class="dcmanage-form-card dcmanage-server-map" data-dc-id="' . (int) $row->dc_id . '">';
         echo '<input type="hidden" name="dcmanage_action" value="server_link_update">';
         echo '<input type="hidden" name="server_id" value="' . $serverId . '">';
@@ -2613,6 +2695,9 @@ function dcmanage_render_servers(string $lang): void
     echo 'function syncDcState(){var hasDc=dc.value!=="";rack.disabled=!hasDc;sw.disabled=!hasDc;if(!hasDc){rack.value="";sw.value="";}filterByDc(rack,dc.value);filterByDc(sw,dc.value);clearSwitchPorts(swp);if(hasDc&&sw.value!==""){loadSwitchPorts(swp,sw.value,dc.value,"");}}';
     echo 'dc.addEventListener("change",syncDcState);';
     echo 'sw.addEventListener("change",function(){loadSwitchPorts(swp,sw.value,dc.value,"");});';
+    echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var pageSize=parseInt(pager.getAttribute("data-page-size")||"25",10);if(!pageSize||pageSize<1){pageSize=25;}if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){var row=rows[r];var sid=row.getAttribute("data-server-id")||"";var detail=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\'"+sid+"\']");if(row.dataset&&row.dataset.filtered==="1"){row.style.display="none";if(detail){detail.style.display="none";}}else{row.style.display="";}}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){var mainRow=visible[x];var sid2=mainRow.getAttribute("data-server-id")||"";var detailRow=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\'"+sid2+"\']");var show=(x>=start&&x<end);mainRow.style.display=show?\"\":\"none\";if(!show&&detailRow){detailRow.style.display=\"none\";}}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+\"/\"+String(pages);}var prev=pager.querySelector(\".dcmanage-page-prev\");var next=pager.querySelector(\".dcmanage-page-next\");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
+    echo 'var serverSearch=document.getElementById("dcmanage-server-table-search");if(serverSearch){serverSearch.addEventListener("input",function(){var q=String(this.value||\"\").toLowerCase().trim();var rows=document.querySelectorAll("#dcmanage-server-table tbody tr.dcmanage-server-item");for(var i=0;i<rows.length;i++){var hay=String(rows[i].getAttribute(\"data-search\")||\"\").toLowerCase();rows[i].dataset.filtered=(q!==\"\"&&hay.indexOf(q)===-1)?\"1\":\"0\";}var pager=document.getElementById("dcmanage-server-table-pager");if(pager){pager._page=1;}applyServerPager();});}';
+    echo 'var serverPager=document.getElementById("dcmanage-server-table-pager");if(serverPager){var p=serverPager.querySelector(".dcmanage-page-prev");var n=serverPager.querySelector(".dcmanage-page-next");if(p){p.addEventListener("click",function(){serverPager._page=(serverPager._page||1)-1;applyServerPager();});}if(n){n.addEventListener("click",function(){serverPager._page=(serverPager._page||1)+1;applyServerPager();});}}';
     echo 'var mapRows=document.querySelectorAll(".dcmanage-server-map");';
     echo 'for(var m=0;m<mapRows.length;m++){(function(form){';
     echo 'var dcId=form.getAttribute("data-dc-id")||"";var swSel=form.querySelector(".dcmanage-map-switch");var portSel=form.querySelector(".dcmanage-map-port");var prtgSel=form.querySelector(".dcmanage-map-prtg");var sensorSearch=form.querySelector(".dcmanage-map-sensor-search");var loadBtn=form.querySelector(".dcmanage-map-load-sensors");var sensorSel=form.querySelector(".dcmanage-map-sensor-select");var sensorStatus=form.querySelector(".dcmanage-map-sensor-status");var sensorDefault=form.querySelector(".dcmanage-map-default-sensors");';
@@ -2622,35 +2707,138 @@ function dcmanage_render_servers(string $lang): void
     echo 'setStatus("' . addslashes(I18n::t('loading', $lang)) . '");';
     echo 'fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(sensorSearch?sensorSearch.value:""),limit:250}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];var defaults=String(sensorDefault?sensorDefault.value:"").split(",").map(function(v){return v.trim();}).filter(function(v){return v!=="";});sensorSel.innerHTML="";for(var x=0;x<items.length;x++){var it=items[x]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.id||"")+" | "+String(it.name||"");if(it.device){label+=" ["+String(it.device)+"]";}opt.textContent=label;if(defaults.indexOf(opt.value)!==-1){opt.selected=true;}sensorSel.appendChild(opt);}setStatus(items.length+" ' . addslashes(I18n::t('server_traffic_sensors', $lang)) . '");}).catch(function(){setStatus("' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '");});}';
     echo 'filterSwitches();if(portSel){loadSwitchPorts(portSel,swSel?swSel.value:"",dcId,portSel.getAttribute("data-selected")||"");}if(swSel){swSel.addEventListener("change",function(){loadSwitchPorts(portSel,swSel.value,dcId,"");});}if(loadBtn){loadBtn.addEventListener("click",loadSensors);}if(prtgSel){prtgSel.addEventListener("change",loadSensors);}})(mapRows[m]);}';
-    echo 'var toggles=document.querySelectorAll(".dcmanage-server-map-toggle");for(var t=0;t<toggles.length;t++){toggles[t].addEventListener("click",function(){var target=document.getElementById(this.getAttribute("data-target"));if(!target){return;}target.style.display=(target.style.display==="none"||target.style.display==="")?"table-row":"none";});}';
+    echo 'var toggles=document.querySelectorAll(".dcmanage-server-map-toggle");for(var t=0;t<toggles.length;t++){toggles[t].addEventListener("click",function(){var target=document.getElementById(this.getAttribute("data-target"));if(!target){return;}var main=target.previousElementSibling;if(main&&main.style.display==="none"){return;}target.style.display=(target.style.display==="none"||target.style.display==="")?"table-row":"none";});}';
     echo 'syncDcState();';
+    echo 'applyServerPager();';
     echo '})();';
     echo '</script>';
 }
 
+function dcmanage_render_simple_pagination(string $baseUrl, int $page, int $perPage, int $total, string $lang, string $pageParam): string
+{
+    $pages = max(1, (int) ceil($total / max(1, $perPage)));
+    if ($pages <= 1) {
+        return '';
+    }
+
+    $page = max(1, min($page, $pages));
+    $prevPage = max(1, $page - 1);
+    $nextPage = min($pages, $page + 1);
+
+    $html = '<div class="dcmanage-table-pager mt-2">';
+    $html .= '<a class="btn btn-sm btn-outline-secondary' . ($page <= 1 ? ' disabled' : '') . '" href="' . htmlspecialchars($baseUrl . '&' . $pageParam . '=' . $prevPage) . '">' . htmlspecialchars(I18n::t('pagination_prev', $lang)) . '</a>';
+    $html .= '<span class="dcmanage-page-info">' . $page . '/' . $pages . '</span>';
+    $html .= '<a class="btn btn-sm btn-outline-secondary' . ($page >= $pages ? ' disabled' : '') . '" href="' . htmlspecialchars($baseUrl . '&' . $pageParam . '=' . $nextPage) . '">' . htmlspecialchars(I18n::t('pagination_next', $lang)) . '</a>';
+    $html .= '</div>';
+
+    return $html;
+}
+
 function dcmanage_render_logs(string $lang): void
 {
-    $purchaseRows = Capsule::table('mod_dcmanage_purchases as p')
-        ->leftJoin('mod_dcmanage_packages as pk', 'pk.id', '=', 'p.package_id')
+    $q = trim((string) ($_GET['log_q'] ?? ''));
+    $level = strtolower(trim((string) ($_GET['log_level'] ?? '')));
+    $source = trim((string) ($_GET['log_source'] ?? ''));
+    $sort = strtolower(trim((string) ($_GET['log_sort'] ?? 'id_desc')));
+
+    $purchasePage = max(1, (int) ($_GET['purchase_page'] ?? 1));
+    $logPage = max(1, (int) ($_GET['log_page'] ?? 1));
+    $perPagePurchase = 25;
+    $perPageLogs = 50;
+
+    $purchaseQuery = Capsule::table('mod_dcmanage_purchases as p')
+        ->leftJoin('mod_dcmanage_packages as pk', 'pk.id', '=', 'p.package_id');
+    $purchaseTotal = (int) $purchaseQuery->count();
+    $purchaseRows = $purchaseQuery
         ->orderBy('p.id', 'desc')
-        ->limit(200)
+        ->offset(($purchasePage - 1) * $perPagePurchase)
+        ->limit($perPagePurchase)
         ->get(['p.id', 'p.whmcs_serviceid', 'p.userid', 'p.size_gb', 'p.price', 'p.invoiceid', 'p.created_at', 'pk.name as package_name']);
 
-    $logRows = Capsule::table('mod_dcmanage_logs')->orderBy('id', 'desc')->limit(200)->get(['id', 'level', 'source', 'message', 'created_at']);
+    $query = Capsule::table('mod_dcmanage_logs');
+    if ($q !== '') {
+        $query->where(static function ($w) use ($q): void {
+            $w->where('message', 'like', '%' . $q . '%')
+                ->orWhere('source', 'like', '%' . $q . '%')
+                ->orWhere('level', 'like', '%' . $q . '%');
+        });
+    }
+    if (in_array($level, ['info', 'warning', 'error'], true)) {
+        $query->where('level', $level);
+    }
+    if ($source !== '') {
+        $query->where('source', $source);
+    }
 
-    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('purchase_logs', $lang)) . '</h5>';
-    echo '<div class="table-responsive mb-4 dcmanage-table-wrap"><table class="table table-sm table-striped">';
+    if ($sort === 'level_asc') {
+        $query->orderByRaw("FIELD(level,'error','warning','info') ASC")->orderBy('id', 'desc');
+    } elseif ($sort === 'level_desc') {
+        $query->orderByRaw("FIELD(level,'error','warning','info') DESC")->orderBy('id', 'desc');
+    } elseif ($sort === 'date_asc') {
+        $query->orderBy('created_at', 'asc');
+    } elseif ($sort === 'id_asc') {
+        $query->orderBy('id', 'asc');
+    } else {
+        $query->orderBy('id', 'desc');
+    }
+
+    $totalLogs = (int) $query->count();
+    $sources = Capsule::table('mod_dcmanage_logs')->select('source')->distinct()->orderBy('source')->pluck('source')->toArray();
+    $logRows = $query->offset(($logPage - 1) * $perPageLogs)->limit($perPageLogs)->get(['id', 'level', 'source', 'message', 'created_at']);
+
+    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('logs_system', $lang)) . '</h5>';
+    echo '<form method="get" class="dcmanage-form-card mb-3">';
+    echo '<input type="hidden" name="module" value="dcmanage"><input type="hidden" name="tab" value="logs">';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('logs_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input" name="log_q" value="' . htmlspecialchars($q) . '"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('logs_level', $lang)) . '</label><select class="form-control dcmanage-input" name="log_level"><option value="">All</option><option value="error"' . ($level === 'error' ? ' selected' : '') . '>error</option><option value="warning"' . ($level === 'warning' ? ' selected' : '') . '>warning</option><option value="info"' . ($level === 'info' ? ' selected' : '') . '>info</option></select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('logs_source', $lang)) . '</label><select class="form-control dcmanage-input" name="log_source"><option value="">All</option>';
+    foreach ($sources as $s) {
+        $sv = (string) $s;
+        echo '<option value="' . htmlspecialchars($sv) . '"' . ($source === $sv ? ' selected' : '') . '>' . htmlspecialchars($sv) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('logs_sort', $lang)) . '</label><select class="form-control dcmanage-input" name="log_sort">';
+    $sortOptions = ['id_desc' => 'Newest', 'id_asc' => 'Oldest', 'level_asc' => 'Level (high->low)', 'level_desc' => 'Level (low->high)', 'date_asc' => 'Date asc'];
+    foreach ($sortOptions as $k => $v) {
+        echo '<option value="' . htmlspecialchars($k) . '"' . ($sort === $k ? ' selected' : '') . '>' . htmlspecialchars($v) . '</option>';
+    }
+    echo '</select></div>';
+    echo '</div>';
+    echo '<div class="dcmanage-form-actions d-flex flex-wrap">';
+    echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('logs_apply_filter', $lang)) . '</button>';
+    echo '<a class="btn btn-outline-secondary btn-sm" href="addonmodules.php?module=dcmanage&tab=logs">' . htmlspecialchars(I18n::t('logs_reset_filter', $lang)) . '</a>';
+    echo '</div>';
+    echo '</form>';
+
+    echo '<div class="dcmanage-form-actions d-flex flex-wrap mb-3">';
+    echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="system"><button class="btn btn-outline-danger btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_system', $lang)) . '</button></form>';
+    echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="purchase"><button class="btn btn-outline-warning btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_purchase', $lang)) . '</button></form>';
+    echo '<form method="post" style="display:inline" onsubmit="return confirm(\'Clear all logs?\')"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="all"><button class="btn btn-danger btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_all', $lang)) . '</button></form>';
+    echo '</div>';
+
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
+    echo '<thead><tr><th>ID</th><th>Level</th><th>Source</th><th>Message</th><th>Date</th></tr></thead><tbody>';
+    foreach ($logRows as $row) {
+        $lv = strtolower((string) $row->level);
+        $badge = $lv === 'error' ? 'danger' : ($lv === 'warning' ? 'warning' : 'info');
+        echo '<tr><td>' . (int) $row->id . '</td><td><span class="badge badge-' . $badge . '">' . htmlspecialchars((string) $row->level) . '</span></td><td>' . htmlspecialchars((string) $row->source) . '</td><td>' . htmlspecialchars((string) $row->message) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
+    }
+    if (count($logRows) === 0) {
+        echo '<tr><td colspan="5">-</td></tr>';
+    }
+    echo '</tbody></table></div>';
+    echo dcmanage_render_simple_pagination('addonmodules.php?module=dcmanage&tab=logs&log_q=' . urlencode($q) . '&log_level=' . urlencode($level) . '&log_source=' . urlencode($source) . '&log_sort=' . urlencode($sort) . '&purchase_page=' . $purchasePage, $logPage, $perPageLogs, $totalLogs, $lang, 'log_page');
+
+    echo '<h5 class="mt-4 mb-3">' . htmlspecialchars(I18n::t('purchase_logs', $lang)) . '</h5>';
+    echo '<div class="table-responsive mb-2 dcmanage-table-wrap"><table class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>Service</th><th>User</th><th>Package</th><th>GB</th><th>Price</th><th>Invoice</th><th>Date</th></tr></thead><tbody>';
     foreach ($purchaseRows as $row) {
         echo '<tr><td>' . (int) $row->id . '</td><td>' . (int) $row->whmcs_serviceid . '</td><td>' . (int) $row->userid . '</td><td>' . htmlspecialchars((string) $row->package_name) . '</td><td>' . htmlspecialchars((string) $row->size_gb) . '</td><td>' . htmlspecialchars((string) $row->price) . '</td><td>' . htmlspecialchars((string) $row->invoiceid) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
     }
-    echo '</tbody></table></div>';
-
-    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('logs_system', $lang)) . '</h5>';
-    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
-    echo '<thead><tr><th>ID</th><th>Level</th><th>Source</th><th>Message</th><th>Date</th></tr></thead><tbody>';
-    foreach ($logRows as $row) {
-        echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->level) . '</td><td>' . htmlspecialchars((string) $row->source) . '</td><td>' . htmlspecialchars((string) $row->message) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
+    if (count($purchaseRows) === 0) {
+        echo '<tr><td colspan="8">-</td></tr>';
     }
     echo '</tbody></table></div>';
+    echo dcmanage_render_simple_pagination('addonmodules.php?module=dcmanage&tab=logs&log_q=' . urlencode($q) . '&log_level=' . urlencode($level) . '&log_source=' . urlencode($source) . '&log_sort=' . urlencode($sort) . '&log_page=' . $logPage, $purchasePage, $perPagePurchase, $purchaseTotal, $lang, 'purchase_page');
 }

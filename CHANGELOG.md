@@ -3,6 +3,17 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.49] - 2026-02-21
+### Added
+- Logs page now has search, level/source filters, level/date sorting, and clear actions (system/purchase/all).
+- Added pagination for system logs and purchase logs.
+- Added live search + pagination for Servers table.
+- Added live search + pagination for Switch Ports table.
+
+### Fixed
+- Improved VLAN parsing for hex-formatted SNMP values.
+- Added bridge-port fallback VLAN resolution for single-port SNMP check.
+
 ## [0.1.48] - 2026-02-21
 ### Fixed
 - Fixed inconsistent padding/margin in settings and form cards.

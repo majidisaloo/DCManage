@@ -499,6 +499,28 @@
   margin: 0;
 }
 
+.dcmanage-table-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dcmanage-shell.dcmanage-rtl .dcmanage-table-pager {
+  justify-content: flex-start;
+}
+
+.dcmanage-shell.dcmanage-ltr .dcmanage-table-pager {
+  justify-content: flex-end;
+}
+
+.dcmanage-page-info {
+  font-weight: 700;
+  font-size: 12px;
+  color: #2a416f;
+  min-width: 64px;
+  text-align: center;
+}
+
 .dcmanage-shell .form-control:focus {
   border-color: #75a7ff;
   box-shadow: 0 0 0 .2rem rgba(30, 94, 255, .12);
