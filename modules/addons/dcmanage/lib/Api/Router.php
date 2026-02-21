@@ -77,7 +77,7 @@ final class Router
                 'racks' => Capsule::table('mod_dcmanage_racks')->count(),
                 'switches' => Capsule::table('mod_dcmanage_switches')->count(),
                 'servers' => Capsule::table('mod_dcmanage_servers')->count(),
-                'ports' => Capsule::table('mod_dcmanage_server_ports')->count(),
+                'ports' => self::totalPortCount(),
                 'jobs_pending' => Capsule::table('mod_dcmanage_jobs')->where('status', 'pending')->count(),
                 'usage_breaches_today' => Capsule::table('mod_dcmanage_usage_state')->where('last_status', 'blocked')->count(),
             ],
@@ -302,5 +302,23 @@ final class Router
         }
 
         return $out;
+    }
+
+    private static function totalPortCount(): int
+    {
+        $total = 0;
+
+        try {
+            if (Capsule::schema()->hasTable('mod_dcmanage_server_ports')) {
+                $total += (int) Capsule::table('mod_dcmanage_server_ports')->count();
+            }
+            if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports')) {
+                $total += (int) Capsule::table('mod_dcmanage_switch_ports')->count();
+            }
+        } catch (\Throwable $e) {
+            return $total;
+        }
+
+        return $total;
     }
 }

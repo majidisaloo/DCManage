@@ -207,6 +207,112 @@
   font-weight: 600;
 }
 
+.dcmanage-btn-soft-primary,
+.dcmanage-btn-soft-info,
+.dcmanage-btn-soft-warning,
+.dcmanage-btn-soft-success,
+.dcmanage-btn-soft-danger {
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font-weight: 700;
+  transition: all .2s ease;
+}
+
+.dcmanage-btn-soft-primary {
+  color: #0f4fd0;
+  background: #e6efff;
+  border-color: #bfd4ff;
+}
+
+.dcmanage-btn-soft-info {
+  color: #0f6c8b;
+  background: #e5f6ff;
+  border-color: #b9e8ff;
+}
+
+.dcmanage-btn-soft-warning {
+  color: #8a5700;
+  background: #fff3da;
+  border-color: #ffe0a2;
+}
+
+.dcmanage-btn-soft-success {
+  color: #176742;
+  background: #e5f9ef;
+  border-color: #c2edd7;
+}
+
+.dcmanage-btn-soft-danger {
+  color: #8f2631;
+  background: #ffe8eb;
+  border-color: #ffc5ce;
+}
+
+.dcmanage-btn-soft-primary:hover,
+.dcmanage-btn-soft-info:hover,
+.dcmanage-btn-soft-warning:hover,
+.dcmanage-btn-soft-success:hover,
+.dcmanage-btn-soft-danger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(14, 45, 109, .12);
+}
+
+.dcmanage-switch-table > tbody > tr > td {
+  background: #fff;
+}
+
+.dcmanage-switch-ports-card {
+  background: linear-gradient(180deg, #fdfefe, #f5f9ff);
+}
+
+.dcmanage-port-table tbody td {
+  border-top-color: #e8eefb;
+}
+
+.dcmanage-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  letter-spacing: .2px;
+}
+
+.dcmanage-status-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.dcmanage-status-pill.is-up {
+  background: #ddf8ea;
+  color: #0e8a4a;
+}
+
+.dcmanage-status-pill.is-down {
+  background: #ffe5e8;
+  color: #bc213f;
+}
+
+.dcmanage-status-pill.is-unknown {
+  background: #fff2da;
+  color: #925a00;
+}
+
+.dcmanage-status-pill.is-untested {
+  background: #fff2da;
+  color: #925a00;
+}
+
+.dcmanage-port-upsert .form-control,
+.dcmanage-port-upsert .btn {
+  min-height: 36px;
+}
+
 .dcmanage-shell code {
   color: #1a4bb5;
 }
@@ -428,5 +534,14 @@
 
   .dcmanage-update-actions {
     align-items: stretch;
+  }
+
+  .dcmanage-action-buttons {
+    gap: 4px;
+  }
+
+  .dcmanage-action-buttons .btn {
+    font-size: 12px;
+    padding: 4px 8px;
   }
 }

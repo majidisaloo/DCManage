@@ -3,6 +3,20 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.18] - 2026-02-21
+### Changed
+- Switches tab UI was modernized with cleaner action buttons, improved visual hierarchy, and clearer ports panel layout.
+- Port upsert form now uses explicit field labels (Interface/VLAN/Admin/Oper) to avoid RTL/LTR input confusion.
+
+### Added
+- Added `Discover Ports` action on each switch to auto-import interfaces/statuses via SNMP walk.
+- Added status pill components for switch SNMP state and per-port Admin/Oper state.
+
+### Fixed
+- Fixed dashboard `Ports` counter to include both server ports and switch ports.
+- Fixed interface name normalization for manual port save (`Ethernet 1/1` => `Ethernet1/1`).
+- Replaced gray UP/DOWN badges with explicit green/red status pills for clearer online/offline visibility.
+
 ## [0.1.17] - 2026-02-21
 ### Fixed
 - Hardened shell argument quoting in cron command generation to prevent fatal errors on hosts with restricted/disabled `escapeshellarg`.
