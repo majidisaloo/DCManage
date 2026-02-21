@@ -21,15 +21,51 @@
       .replace(/'/g, '&#39;');
   }
 
-  var dashboard = document.getElementById('dcmanage-dashboard');
-  if (dashboard) {
-    var base = dashboard.getAttribute('data-api-base') || '';
+  var isFa = (document.documentElement.getAttribute('dir') || '').toLowerCase() === 'rtl';
+  var T = isFa ? {
+    dc: 'دیتاسنتر',
+    racks: 'رک',
+    switches: 'سوییچ',
+    servers: 'سرور',
+    ports: 'پورت',
+    breaches: 'تخلف',
+    queue: 'صف',
+    cronHealth: 'وضعیت کرون',
+    ok: 'سالم',
+    warn: 'هشدار',
+    fail: 'خراب',
+    versionCenter: 'مرکز نسخه و آپدیت',
+    currentVersion: 'نسخه فعلی',
+    latestRelease: 'آخرین ریلیز',
+    checkUpdate: 'بررسی آپدیت',
+    applyUpdate: 'اعمال آپدیت',
+    autoUpdate: 'آپدیت خودکار'
+  } : {
+    dc: 'Datacenters',
+    racks: 'Racks',
+    switches: 'Switches',
+    servers: 'Servers',
+    ports: 'Ports',
+    breaches: 'Breaches',
+    queue: 'Queue',
+    cronHealth: 'Cron Health',
+    ok: 'OK',
+    warn: 'Warning',
+    fail: 'Fail',
+    versionCenter: 'Version & Update Center',
+    currentVersion: 'Current Version',
+    latestRelease: 'Latest Release',
+    checkUpdate: 'Check Update',
+    applyUpdate: 'Apply Update',
+    autoUpdate: 'Auto Update'
+  };
 
-    loadDashboardHealth(base);
-    loadVersionPanel(base);
-  }
+  function renderDashboard(base, moduleLink) {
+    var dashboard = document.getElementById('dcmanage-dashboard');
+    if (!dashboard) {
+      return;
+    }
 
-  function loadDashboardHealth(base) {
     getJson(base + 'dashboard/health').then(function (res) {
       if (!res.ok) {
         dashboard.innerHTML = '<div class="alert alert-danger">' + safeText(res.error || 'API error') + '</div>';
@@ -37,19 +73,31 @@
       }
 
       var c = res.data.counts || {};
-      dashboard.innerHTML = '' +
-        '<div class="row dcmanage-kpi">' +
-        '<div class="col-md-2 col-6 mb-3"><div class="card"><div class="card-body"><small>DC</small><h4>' + (c.datacenters || 0) + '</h4></div></div></div>' +
-        '<div class="col-md-2 col-6 mb-3"><div class="card"><div class="card-body"><small>Racks</small><h4>' + (c.racks || 0) + '</h4></div></div></div>' +
-        '<div class="col-md-2 col-6 mb-3"><div class="card"><div class="card-body"><small>Servers</small><h4>' + (c.servers || 0) + '</h4></div></div></div>' +
-        '<div class="col-md-2 col-6 mb-3"><div class="card"><div class="card-body"><small>Ports</small><h4>' + (c.ports || 0) + '</h4></div></div></div>' +
-        '<div class="col-md-2 col-6 mb-3"><div class="card"><div class="card-body"><small>Breaches</small><h4>' + (c.usage_breaches_today || 0) + '</h4></div></div></div>' +
-        '<div class="col-md-2 col-6 mb-3"><div class="card"><div class="card-body"><small>Queue</small><h4>' + (c.jobs_pending || 0) + '</h4></div></div></div>' +
-        '</div>';
+      var cards = [
+        { key: 'datacenters', label: T.dc, tab: 'datacenters' },
+        { key: 'racks', label: T.racks, tab: 'datacenters' },
+        { key: 'switches', label: T.switches, tab: 'switches' },
+        { key: 'servers', label: T.servers, tab: 'servers' },
+        { key: 'ports', label: T.ports, tab: 'ports' },
+        { key: 'usage_breaches_today', label: T.breaches, tab: 'traffic' },
+        { key: 'jobs_pending', label: T.queue, tab: 'automation' }
+      ];
+
+      var html = '<div class="row dcmanage-kpi">';
+      cards.forEach(function (k) {
+        html += '' +
+          '<div class="col-md-3 col-6 mb-3">' +
+          '<a href="' + moduleLink + '&tab=' + encodeURIComponent(k.tab) + '" class="text-decoration-none">' +
+          '<div class="card dcmanage-click-card"><div class="card-body"><small>' + safeText(k.label) + '</small><h4>' + (c[k.key] || 0) + '</h4></div></div>' +
+          '</a>' +
+          '</div>';
+      });
+      html += '</div>';
+      dashboard.innerHTML = html;
     });
   }
 
-  function loadVersionPanel(base) {
+  function renderVersion(base) {
     var versionBox = document.getElementById('dcmanage-version');
     if (!versionBox) {
       return;
@@ -69,25 +117,58 @@
         '<div class="p-3 dcmanage-version-card">' +
         '<div class="row align-items-center">' +
         '<div class="col-md-7 mb-2 mb-md-0">' +
-        '<h5 class="mb-2">Version & Update</h5>' +
-        '<div>Current Version: <strong>' + safeText(d.current_version || '-') + '</strong></div>' +
-        '<div>Latest Release: <strong>' + safeText(d.latest_tag || '-') + '</strong> (' + safeText(d.latest_version || '-') + ')</div>' +
+        '<h5 class="mb-2">' + safeText(T.versionCenter) + '</h5>' +
+        '<div>' + safeText(T.currentVersion) + ': <strong>' + safeText(d.current_version || '-') + '</strong></div>' +
+        '<div>' + safeText(T.latestRelease) + ': <strong>' + safeText(d.latest_tag || '-') + '</strong> (' + safeText(d.latest_version || '-') + ')</div>' +
         '<div class="mt-1">' + hasUpdate + '</div>' +
-        '<div class="small text-muted mt-1">Source: ' + safeText(d.repo || '-') + ' / ' + safeText(d.branch || '-') + '</div>' +
         '</div>' +
         '<div class="col-md-5 text-md-right">' +
         '<div class="custom-control custom-switch mb-2">' +
         '<input type="checkbox" class="custom-control-input" id="dcmanage-auto-update"' + autoChecked + '>' +
-        '<label class="custom-control-label" for="dcmanage-auto-update">Auto Update</label>' +
+        '<label class="custom-control-label" for="dcmanage-auto-update">' + safeText(T.autoUpdate) + '</label>' +
         '</div>' +
-        '<button type="button" class="btn btn-outline-primary btn-sm mr-2" id="dcmanage-check-update">Check Update</button>' +
-        '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">Apply Update</button>' +
+        '<button type="button" class="btn btn-outline-primary btn-sm mr-2" id="dcmanage-check-update">' + safeText(T.checkUpdate) + '</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">' + safeText(T.applyUpdate) + '</button>' +
         '</div>' +
         '</div>' +
         '<div id="dcmanage-update-msg" class="mt-2 small"></div>' +
         '</div>';
 
       bindVersionActions(base);
+    });
+  }
+
+  function renderCron(base, moduleLink) {
+    var box = document.getElementById('dcmanage-cron');
+    if (!box) {
+      return;
+    }
+
+    getJson(base + 'dashboard/cron').then(function (res) {
+      if (!res.ok) {
+        box.innerHTML = '<div class="alert alert-danger">' + safeText(res.error || 'Cron API error') + '</div>';
+        return;
+      }
+
+      var d = res.data || {};
+      var cls = d.overall === 'ok' ? 'success' : (d.overall === 'fail' ? 'danger' : 'warning');
+      var label = d.overall === 'ok' ? T.ok : (d.overall === 'fail' ? T.fail : T.warn);
+      var rows = d.items || [];
+      var html = '<div class="p-3 dcmanage-version-card">';
+      html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+      html += '<h5 class="mb-0">' + safeText(T.cronHealth) + '</h5>';
+      html += '<span class="badge badge-' + cls + '">' + safeText(label) + '</span>';
+      html += '</div>';
+      html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Task</th><th>Status</th><th>Last Run</th><th>Next Run</th></tr></thead><tbody>';
+      rows.forEach(function (r) {
+        var scls = r.status === 'ok' ? 'success' : (r.status === 'fail' ? 'danger' : 'warning');
+        var slbl = r.status === 'ok' ? T.ok : (r.status === 'fail' ? T.fail : T.warn);
+        html += '<tr><td>' + safeText(r.task) + '</td><td><span class="badge badge-' + scls + '">' + safeText(slbl) + '</span></td><td>' + safeText(r.last_run || '-') + '</td><td>' + safeText(r.next_run || '-') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      html += '<div class="mt-2"><a class="btn btn-sm btn-outline-secondary" href="' + moduleLink + '&tab=settings">Open Cron Settings</a></div>';
+      html += '</div>';
+      box.innerHTML = html;
     });
   }
 
@@ -108,7 +189,7 @@
 
           var d = res.data || {};
           msg.innerHTML = '<span class="text-success">Current: ' + safeText(d.current_version || '-') + ' | Latest: ' + safeText(d.latest_tag || '-') + '</span>';
-          loadVersionPanel(base);
+          renderVersion(base);
         });
       });
     }
@@ -124,7 +205,7 @@
 
           var d = res.data || {};
           msg.innerHTML = '<span class="text-success">Update status: ' + safeText(d.status || 'done') + '</span>';
-          loadVersionPanel(base);
+          renderVersion(base);
         });
       });
     }
@@ -138,10 +219,19 @@
             return;
           }
 
-          msg.innerHTML = '<span class="text-success">Auto Update ' + (autoToggle.checked ? 'enabled' : 'disabled') + '.</span>';
+          msg.innerHTML = '<span class="text-success">Auto update ' + (autoToggle.checked ? 'enabled' : 'disabled') + '.</span>';
         });
       });
     }
+  }
+
+  var dashboard = document.getElementById('dcmanage-dashboard');
+  if (dashboard) {
+    var base = dashboard.getAttribute('data-api-base') || '';
+    var moduleLink = dashboard.getAttribute('data-module-link') || 'addonmodules.php?module=dcmanage';
+    renderDashboard(base, moduleLink);
+    renderVersion(base);
+    renderCron(base, moduleLink);
   }
 
   var traffic = document.getElementById('dcmanage-traffic');

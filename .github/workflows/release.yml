@@ -21,6 +21,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist/modules/addons
           cp -R modules/addons/dcmanage dist/modules/addons/dcmanage
+          find dist -name '.DS_Store' -delete
           cd dist
           zip -r ../DCManage-${GITHUB_REF_NAME}.zip modules
 

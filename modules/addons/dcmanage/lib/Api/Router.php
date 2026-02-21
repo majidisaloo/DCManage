@@ -20,6 +20,7 @@ final class Router
             $data = match ($endpoint) {
                 'dashboard/health' => self::dashboardHealth(),
                 'dashboard/version' => self::dashboardVersion(),
+                'dashboard/cron' => self::dashboardCron(),
                 'update/check' => self::updateCheck(),
                 'update/apply' => self::updateApply(),
                 'update/set-auto' => self::updateSetAuto(),
@@ -42,6 +43,7 @@ final class Router
             'counts' => [
                 'datacenters' => Capsule::table('mod_dcmanage_datacenters')->count(),
                 'racks' => Capsule::table('mod_dcmanage_racks')->count(),
+                'switches' => Capsule::table('mod_dcmanage_switches')->count(),
                 'servers' => Capsule::table('mod_dcmanage_servers')->count(),
                 'ports' => Capsule::table('mod_dcmanage_server_ports')->count(),
                 'jobs_pending' => Capsule::table('mod_dcmanage_jobs')->where('status', 'pending')->count(),
@@ -58,6 +60,11 @@ final class Router
     private static function dashboardVersion(): array
     {
         return UpdateManager::checkLatestStatus();
+    }
+
+    private static function dashboardCron(): array
+    {
+        return self::cronStatusData();
     }
 
     private static function updateCheck(): array
@@ -176,6 +183,75 @@ final class Router
         return [
             'cached' => false,
             'payload' => $payload,
+        ];
+    }
+
+    private static function cronStatusData(): array
+    {
+        $tasks = [
+            ['task' => 'poll_usage', 'interval' => 300],
+            ['task' => 'enforce_queue', 'interval' => 60],
+            ['task' => 'graph_warm', 'interval' => 1800],
+            ['task' => 'cleanup', 'interval' => 86400],
+            ['task' => 'self_update', 'interval' => 86400],
+        ];
+
+        $result = [];
+        $ok = 0;
+        $fail = 0;
+
+        foreach ($tasks as $item) {
+            $task = $item['task'];
+            $interval = $item['interval'];
+            $last = Capsule::table('mod_dcmanage_logs')
+                ->where('source', 'cron')
+                ->where('message', 'like', 'task:' . $task . ' %')
+                ->orderBy('id', 'desc')
+                ->first(['message', 'created_at']);
+
+            $status = 'fail';
+            $lastAt = null;
+            $nextAt = null;
+
+            if ($last !== null) {
+                $lastAt = (string) $last->created_at;
+                $lastTs = strtotime($lastAt) ?: null;
+                if ($lastTs !== null) {
+                    $nextAt = date('Y-m-d H:i:s', $lastTs + $interval);
+                    $age = time() - $lastTs;
+                    if (str_contains((string) $last->message, 'completed') && $age <= ($interval * 2)) {
+                        $status = 'ok';
+                    } else {
+                        $status = 'warning';
+                    }
+                }
+            }
+
+            if ($status === 'ok') {
+                $ok++;
+            }
+            if ($status === 'fail') {
+                $fail++;
+            }
+
+            $result[] = [
+                'task' => $task,
+                'status' => $status,
+                'last_run' => $lastAt,
+                'next_run' => $nextAt,
+            ];
+        }
+
+        $overall = 'warning';
+        if ($ok === count($tasks)) {
+            $overall = 'ok';
+        } elseif ($fail === count($tasks)) {
+            $overall = 'fail';
+        }
+
+        return [
+            'overall' => $overall,
+            'items' => $result,
         ];
     }
 

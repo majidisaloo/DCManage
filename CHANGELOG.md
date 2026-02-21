@@ -3,6 +3,27 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.5] - 2026-02-21
+### Changed
+- UI direction is now language-aware: Persian renders RTL/right-aligned and English renders LTR/left-aligned.
+- Tab order was standardized to start from Dashboard and end at Logs; Racks tab removed from primary menu.
+- Dashboard KPI cards now include switches count and direct navigation to related sections.
+- Updater source is fully hardcoded to the project GitHub repository/branch policy.
+
+### Added
+- Added Datacenter creation flow with automatic rack generation by count and per-rack unit size.
+- Added Switch creation flow with dependent Datacenter -> Rack selection.
+- Added Server creation flow with dependent Datacenter -> Rack selection and U position fields.
+- Added Cron monitoring section with command list, status, last run, next run, and overall health state.
+- Added Dashboard cron health widget (green/yellow/red logic), version status, latest release, and one-click update actions.
+- Added package purchase log view in Logs tab.
+- Added migration step for `rack_id` support on switches.
+
+### Fixed
+- Locale default now falls back to detected session/system language instead of static default.
+- Added missing bilingual labels for newly introduced UI sections and actions.
+- Improved input styling and form readability with modernized controls.
+
 ## [0.1.4] - 2026-02-21
 ### Changed
 - GitHub update source is now hardcoded and no longer configurable by repo/branch fields.

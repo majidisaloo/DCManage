@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 1;
+    private const SCHEMA_VERSION = 2;
 
     public static function migrate(): void
     {
@@ -19,6 +19,11 @@ final class Schema
         if ($current < 1) {
             self::migrationV1();
             self::setCurrentVersion(1);
+        }
+
+        if ($current < 2) {
+            self::migrationV2();
+            self::setCurrentVersion(2);
         }
     }
 
@@ -332,6 +337,15 @@ final class Schema
                 $table->timestamp('started_at')->nullable();
                 $table->timestamp('finished_at')->nullable();
                 $table->timestamp('created_at')->nullable()->index();
+            });
+        }
+    }
+
+    private static function migrationV2(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_switches') && !Capsule::schema()->hasColumn('mod_dcmanage_switches', 'rack_id')) {
+            Capsule::schema()->table('mod_dcmanage_switches', static function (Blueprint $table): void {
+                $table->unsignedInteger('rack_id')->nullable()->after('dc_id')->index();
             });
         }
     }

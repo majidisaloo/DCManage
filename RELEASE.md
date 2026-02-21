@@ -2,7 +2,7 @@
 
 ## Versioning
 - Semantic Versioning is used: `MAJOR.MINOR.PATCH`.
-- Current release: `0.1.4`.
+- Current release: `0.1.5`.
 
 ## Release checklist
 1. Update `VERSION`.
