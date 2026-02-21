@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.11)
+## Features in this release (v0.1.12)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -27,7 +27,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Shows current installed version and latest GitHub release.
   - Supports one-click `Check Update` and one-click `Apply Update`.
   - Supports toggling Auto Update directly from dashboard.
-  - API response flow hardened for wider PHP compatibility so dashboard update buttons load reliably.
+  - API response extraction hardened for WHMCS-wrapped responses so dashboard update buttons load reliably.
 - Dashboard operation center:
   - Shows counts for Datacenters, total Racks, Switches, Servers, Ports, queue, and breaches.
   - KPI cards navigate directly to related module tabs.

@@ -3,6 +3,12 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.12] - 2026-02-21
+### Fixed
+- Fixed dashboard/API parsing when WHMCS wraps addon output with admin HTML.
+- Added explicit JSON markers in API responses and frontend fallback parser to reliably extract payloads.
+- Restored update/version/cron/dashboard widgets visibility when previous API fetches showed `Invalid API response`.
+
 ## [0.1.11] - 2026-02-21
 ### Fixed
 - Fixed dashboard API compatibility for servers running older PHP versions by replacing PHP 8-only syntax in API/service files.

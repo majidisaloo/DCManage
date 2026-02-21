@@ -19,9 +19,29 @@
     return fetch(url, { credentials: 'same-origin' }).then(function (r) {
       return r.text();
     }).then(function (raw) {
+      if (!raw) {
+        throw new Error('Empty API response');
+      }
+      raw = String(raw).replace(/^\uFEFF/, '').trim();
       try {
         return JSON.parse(raw);
       } catch (e) {
+        var start = raw.indexOf('DCMANAGE_JSON_START');
+        var end = raw.indexOf('DCMANAGE_JSON_END');
+        if (start !== -1 && end !== -1 && end > start) {
+          var body = raw.substring(start + 'DCMANAGE_JSON_START'.length, end).trim();
+          return JSON.parse(body);
+        }
+
+        var first = raw.indexOf('{');
+        var last = raw.lastIndexOf('}');
+        if (first !== -1 && last > first) {
+          try {
+            return JSON.parse(raw.substring(first, last + 1));
+          } catch (ignored) {
+          }
+        }
+
         throw new Error('Invalid API response');
       }
     });

@@ -10,6 +10,9 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 
 final class Router
 {
+    private const MARKER_START = 'DCMANAGE_JSON_START';
+    private const MARKER_END = 'DCMANAGE_JSON_END';
+
     public static function dispatch(string $endpoint): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -49,11 +52,21 @@ final class Router
                     throw new \RuntimeException('Endpoint not found: ' . $endpoint);
             }
 
-            echo json_encode(['ok' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
+            self::emit(['ok' => true, 'data' => $data]);
         } catch (\Throwable $e) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+            self::emit(['ok' => false, 'error' => $e->getMessage()]);
         }
+    }
+
+    private static function emit(array $payload): void
+    {
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            $json = '{"ok":false,"error":"json_encode_failed"}';
+        }
+
+        echo self::MARKER_START . "\n" . $json . "\n" . self::MARKER_END;
     }
 
     private static function dashboardHealth(): array
