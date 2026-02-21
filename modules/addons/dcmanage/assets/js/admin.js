@@ -89,6 +89,7 @@
     updateStateOutdated: 'آپدیت نشده',
     updateStateAvailable: 'آپدیت داریم',
     updateStateUpdated: 'آپدیت شد',
+    updateStateRemoteError: 'خطا در بررسی نسخه',
     checking: 'در حال بررسی نسخه...',
     applying: 'در حال اعمال آپدیت...',
     queued: 'آپدیت در صف قرار گرفت...',
@@ -123,6 +124,7 @@
     updateStateOutdated: 'Not Updated',
     updateStateAvailable: 'Update Available',
     updateStateUpdated: 'Updated',
+    updateStateRemoteError: 'Version Check Error',
     checking: 'Checking latest release...',
     applying: 'Applying update...',
     queued: 'Update queued...',
@@ -154,6 +156,10 @@
   }
 
   function updateStateMeta(data) {
+    if (data && data.remote_ok === false) {
+      return { cls: 'state-warning', text: T.updateStateRemoteError };
+    }
+
     var current = String(data.current_version || '');
     var latest = String(data.latest_version || '');
     var hasUpdate = !!data.has_update;
@@ -211,7 +217,7 @@
         { key: 'switches', label: T.switches, tab: 'switches' },
         { key: 'servers', label: T.servers, tab: 'servers' },
         { key: 'usage_breaches_today', label: T.breaches, tab: 'traffic' },
-        { key: 'jobs_pending', label: T.queue, tab: 'settings' }
+        { key: 'jobs_pending', label: T.queue, tab: 'queue' }
       ];
 
       var html = '<div class="row dcmanage-kpi">';
@@ -379,7 +385,7 @@
           }
         }).catch(function () {
         });
-      }, 2000);
+      }, 1000);
     }
 
     if (checkBtn) {
@@ -436,7 +442,9 @@
           }
 
           var d = res.data || {};
-          setUpdateMsg(msg, (T.updateStatus + ': ' + String(d.status || 'cancel-requested')), 'warning');
+          var cancelState = String(d.status || 'cancel-requested');
+          var cancelKind = cancelState === 'no-active-job' ? 'info' : 'warning';
+          setUpdateMsg(msg, (T.updateStatus + ': ' + cancelState), cancelKind);
           startStatusPoll();
         }).catch(function (e) {
           setUpdateMsg(msg, (e && e.message ? e.message : T.cancelError), 'danger');

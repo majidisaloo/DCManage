@@ -15,10 +15,11 @@ final class UpdateManager
     private const UPDATE_LOCK_KEY = 'update:apply';
     private const UPDATE_STATE_META_KEY = 'update.state';
     private const UPDATE_CANCEL_META_KEY = 'update.cancel_requested';
-    private const CONNECT_TIMEOUT = 20;
-    private const REQUEST_TIMEOUT = 300;
-    private const MAX_RETRIES = 5;
-    private const RETRY_DELAY_SECONDS = 2;
+    private const UPDATE_LATEST_CACHE_META_KEY = 'update.latest_release_cache';
+    private const CONNECT_TIMEOUT = 10;
+    private const REQUEST_TIMEOUT = 120;
+    private const MAX_RETRIES = 3;
+    private const RETRY_DELAY_SECONDS = 1;
 
     public static function autoUpdateIfNeeded(): array
     {
@@ -31,26 +32,63 @@ final class UpdateManager
 
     public static function checkLatestStatus(): array
     {
-        $latest = self::fetchLatestRelease();
-        $latestVersion = self::normalizeVersion((string) ($latest['tag_name'] ?? ''));
         $currentVersion = self::readInstalledModuleVersion();
+        $latestVersion = '';
+        $latestTag = '';
+        $releaseUrl = '';
+        $publishedAt = '';
+        $remoteError = '';
 
-        return [
+        try {
+            $latest = self::fetchLatestRelease();
+            $latestVersion = self::normalizeVersion((string) ($latest['tag_name'] ?? ''));
+            $latestTag = (string) ($latest['tag_name'] ?? '');
+            $releaseUrl = (string) ($latest['html_url'] ?? '');
+            $publishedAt = (string) ($latest['published_at'] ?? '');
+        } catch (\Throwable $e) {
+            $remoteError = $e->getMessage();
+            Logger::warning('update', 'Latest release check failed', ['error' => $remoteError]);
+            $cached = self::getCachedLatestRelease();
+            if (is_array($cached)) {
+                $latestVersion = self::normalizeVersion((string) ($cached['tag_name'] ?? ''));
+                $latestTag = (string) ($cached['tag_name'] ?? '');
+                $releaseUrl = (string) ($cached['html_url'] ?? '');
+                $publishedAt = (string) ($cached['published_at'] ?? '');
+            }
+        }
+
+        if ($latestVersion === '') {
+            $latestVersion = $currentVersion;
+            if ($latestTag === '') {
+                $latestTag = 'v' . $currentVersion;
+            }
+        }
+
+        $result = [
             'current_version' => $currentVersion,
             'latest_version' => $latestVersion,
-            'latest_tag' => (string) ($latest['tag_name'] ?? ''),
-            'has_update' => $latestVersion !== '' && version_compare($latestVersion, $currentVersion, '>'),
+            'latest_tag' => $latestTag,
+            'has_update' => version_compare($latestVersion, $currentVersion, '>'),
             'auto_update' => self::isAutoEnabled(),
             'repo' => self::GITHUB_REPO,
             'branch' => self::GITHUB_BRANCH,
-            'release_url' => (string) ($latest['html_url'] ?? ''),
-            'published_at' => (string) ($latest['published_at'] ?? ''),
+            'release_url' => $releaseUrl,
+            'published_at' => $publishedAt,
             'update_state' => self::getUpdateState(),
+            'remote_ok' => $remoteError === '',
         ];
+
+        if ($remoteError !== '') {
+            $result['remote_error'] = $remoteError;
+        }
+
+        return $result;
     }
 
     public static function queueApplyLatest(bool $force, bool $auto = false): array
     {
+        self::cleanupStaleUpdateJobs();
+
         $existing = Capsule::table('mod_dcmanage_jobs')
             ->where('type', 'update_apply')
             ->whereIn('status', ['pending', 'running'])
@@ -96,6 +134,8 @@ final class UpdateManager
 
     public static function cancelQueuedUpdate(): array
     {
+        self::cleanupStaleUpdateJobs();
+
         Capsule::table('mod_dcmanage_meta')->updateOrInsert(
             ['meta_key' => self::UPDATE_CANCEL_META_KEY],
             ['meta_value' => '1', 'updated_at' => date('Y-m-d H:i:s')]
@@ -109,6 +149,21 @@ final class UpdateManager
                 'finished_at' => date('Y-m-d H:i:s'),
                 'last_error' => 'Canceled by admin',
             ]);
+
+        $running = Capsule::table('mod_dcmanage_jobs')
+            ->where('type', 'update_apply')
+            ->where('status', 'running')
+            ->count();
+
+        if ((int) $affected === 0 && (int) $running === 0) {
+            self::clearCancelRequest();
+            self::setUpdateState([
+                'status' => 'idle',
+                'message' => 'No running update task to cancel',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            return ['status' => 'no-active-job', 'canceled_pending' => 0];
+        }
 
         self::setUpdateState([
             'status' => 'cancel-requested',
@@ -124,6 +179,8 @@ final class UpdateManager
 
     public static function getUpdateRuntimeStatus(): array
     {
+        self::cleanupStaleUpdateJobs();
+
         $active = Capsule::table('mod_dcmanage_jobs')
             ->where('type', 'update_apply')
             ->whereIn('status', ['pending', 'running'])
@@ -134,6 +191,10 @@ final class UpdateManager
             ->where('type', 'update_apply')
             ->orderBy('id', 'desc')
             ->first(['id', 'status', 'attempts', 'created_at', 'started_at', 'finished_at', 'last_error']);
+
+        if ($active === null && self::isCancelRequested()) {
+            self::clearCancelRequest();
+        }
 
         return [
             'state' => self::getUpdateState(),
@@ -232,6 +293,17 @@ final class UpdateManager
                 'tag' => $latestTag,
             ];
         } catch (\Throwable $e) {
+            if (stripos($e->getMessage(), 'canceled') !== false) {
+                self::setUpdateState([
+                    'status' => 'canceled',
+                    'message' => $e->getMessage(),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                self::clearCancelRequest();
+                Logger::warning('update', 'Update canceled', ['error' => $e->getMessage()]);
+                throw $e;
+            }
+
             self::setUpdateState([
                 'status' => 'failed',
                 'message' => $e->getMessage(),
@@ -276,6 +348,8 @@ final class UpdateManager
         if (!isset($json['tag_name'])) {
             throw new \RuntimeException('Latest release tag not found for ' . self::GITHUB_REPO);
         }
+
+        self::cacheLatestRelease($json);
 
         return $json;
     }
@@ -512,6 +586,66 @@ final class UpdateManager
         }
 
         throw new \RuntimeException('Updater request failed: ' . ($lastError !== '' ? $lastError : 'unknown error'));
+    }
+
+    private static function cleanupStaleUpdateJobs(): void
+    {
+        $staleRunningBefore = date('Y-m-d H:i:s', time() - 1800);
+        $stalePendingBefore = date('Y-m-d H:i:s', time() - 3600);
+
+        $staleRunningIds = Capsule::table('mod_dcmanage_jobs')
+            ->where('type', 'update_apply')
+            ->where('status', 'running')
+            ->where('started_at', '<', $staleRunningBefore)
+            ->pluck('id')
+            ->toArray();
+
+        if (!empty($staleRunningIds)) {
+            Capsule::table('mod_dcmanage_jobs')
+                ->whereIn('id', $staleRunningIds)
+                ->update([
+                    'status' => 'failed',
+                    'finished_at' => date('Y-m-d H:i:s'),
+                    'last_error' => 'Marked as stale running job',
+                ]);
+        }
+
+        $stalePendingIds = Capsule::table('mod_dcmanage_jobs')
+            ->where('type', 'update_apply')
+            ->where('status', 'pending')
+            ->where('created_at', '<', $stalePendingBefore)
+            ->pluck('id')
+            ->toArray();
+
+        if (!empty($stalePendingIds)) {
+            Capsule::table('mod_dcmanage_jobs')
+                ->whereIn('id', $stalePendingIds)
+                ->update([
+                    'status' => 'canceled',
+                    'finished_at' => date('Y-m-d H:i:s'),
+                    'last_error' => 'Canceled stale pending job',
+                ]);
+        }
+    }
+
+    private static function cacheLatestRelease(array $release): void
+    {
+        Capsule::table('mod_dcmanage_meta')->updateOrInsert(
+            ['meta_key' => self::UPDATE_LATEST_CACHE_META_KEY],
+            ['meta_value' => json_encode($release, JSON_UNESCAPED_UNICODE), 'updated_at' => date('Y-m-d H:i:s')]
+        );
+    }
+
+    private static function getCachedLatestRelease(): ?array
+    {
+        $raw = Capsule::table('mod_dcmanage_meta')
+            ->where('meta_key', self::UPDATE_LATEST_CACHE_META_KEY)
+            ->value('meta_value');
+        if (!is_string($raw) || trim($raw) === '') {
+            return null;
+        }
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : null;
     }
 
     private static function resolveReleaseZipUrl(array $latest): string

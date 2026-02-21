@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DCManage\Api;
 
 use DCManage\Integrations\PrtgClient;
+use DCManage\Jobs\JobQueue;
 use DCManage\Support\UpdateManager;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
@@ -119,7 +120,16 @@ final class Router
     private static function updateApply(): array
     {
         $force = (int) ($_GET['force'] ?? 0) === 1;
-        return UpdateManager::queueApplyLatest($force);
+        $result = UpdateManager::queueApplyLatest($force);
+        if (($result['status'] ?? '') === 'queued') {
+            try {
+                JobQueue::runBatch(1);
+            } catch (\Throwable $e) {
+                // Keep queued status for cron fallback when immediate execution fails.
+            }
+        }
+
+        return $result;
     }
 
     private static function updateStatus(): array

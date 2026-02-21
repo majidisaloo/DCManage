@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.50)
+## Features in this release (v0.1.51)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -29,12 +29,13 @@ DCManage is an API-first datacenter management core inside WHMCS.
     - yellow: update available
     - green: updated
   - API response extraction hardened for WHMCS-wrapped responses so dashboard update buttons load reliably.
-  - Improved visual hierarchy with modern cards, aligned metrics, and semantic feedback states.
+  - Improved visual hierarchy with modern cards, aligned metrics, larger KPI icons, and semantic feedback states.
   - Fixed spacing and alignment in dashboard Version/Cron cards and update controls on mobile and desktop.
   - Empty update message area is now hidden until an actual status message exists.
 - Dashboard operation center:
   - Shows counts for Datacenters, total Racks, Switches, Servers, Ports, queue, and breaches.
-  - KPI cards navigate directly to related module tabs (queue card routes to Settings).
+  - KPI cards navigate directly to related module tabs (queue card routes to Queue tab).
+  - Dedicated Queue tab for job operations: filter/search/pagination + cancel/retry/clear actions.
   - KPI cards now include dedicated vector-style icons per parameter.
   - Standalone `Ports` KPI card was removed to keep port management consolidated under `Switches`.
   - Shows cron overall status (`green/yellow/red`) and per-task status.
@@ -79,7 +80,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Fixed server edit JS crash caused by malformed escaping (`Invalid escape in identifier`).
   - Updater is now queue-based with live status polling and cancel support to prevent overlapping update tasks.
   - Updater validates release package completeness and version consistency before apply.
-  - Updater request timeouts/retries are tuned for slow networks to reduce partial/false updates.
+  - Updater now includes stale-job cleanup and fallback cached release metadata to avoid false 400 responses and stuck cancel states.
   - Form/card spacing is normalized across settings and admin forms (padding, row gaps, and action button spacing).
   - Logs now support search, level/source filters, level sorting, pagination, and clear actions.
   - Servers and Switch Ports tables now support live search and pagination for large datasets.

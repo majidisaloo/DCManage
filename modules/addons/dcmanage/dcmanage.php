@@ -104,6 +104,7 @@ function dcmanage_output(array $vars): void
         'packages' => I18n::t('tab_packages', $lang),
         'scope' => I18n::t('tab_scope', $lang),
         'traffic' => I18n::t('tab_traffic', $lang),
+        'queue' => I18n::t('tab_queue', $lang),
         'settings' => I18n::t('tab_settings', $lang),
         'logs' => I18n::t('tab_logs', $lang),
     ];
@@ -129,6 +130,8 @@ function dcmanage_output(array $vars): void
         echo '<div style="height:340px"><canvas id="dcmanage-traffic-chart" height="120"></canvas></div>';
     } elseif ($activeTab === 'settings') {
         dcmanage_render_settings_form($lang);
+    } elseif ($activeTab === 'queue') {
+        dcmanage_render_queue($lang);
     } elseif ($activeTab === 'datacenters') {
         dcmanage_render_datacenters($lang);
     } elseif ($activeTab === 'switches') {
@@ -195,6 +198,56 @@ function dcmanage_handle_actions(string $lang): string
                 Capsule::table('mod_dcmanage_logs')->delete();
             }
 
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'queue_cancel_job') {
+            $jobId = (int) ($_POST['job_id'] ?? 0);
+            if ($jobId <= 0) {
+                throw new RuntimeException('Invalid job');
+            }
+
+            $updated = Capsule::table('mod_dcmanage_jobs')
+                ->where('id', $jobId)
+                ->whereIn('status', ['pending', 'running'])
+                ->update([
+                    'status' => 'canceled',
+                    'finished_at' => date('Y-m-d H:i:s'),
+                    'last_error' => 'Canceled by admin from queue',
+                ]);
+            if ($updated === 0) {
+                throw new RuntimeException('Job is not cancelable');
+            }
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'queue_retry_job') {
+            $jobId = (int) ($_POST['job_id'] ?? 0);
+            if ($jobId <= 0) {
+                throw new RuntimeException('Invalid job');
+            }
+
+            $updated = Capsule::table('mod_dcmanage_jobs')
+                ->where('id', $jobId)
+                ->whereIn('status', ['failed', 'canceled'])
+                ->update([
+                    'status' => 'pending',
+                    'attempts' => 0,
+                    'run_after' => null,
+                    'started_at' => null,
+                    'finished_at' => null,
+                    'last_error' => null,
+                ]);
+            if ($updated === 0) {
+                throw new RuntimeException('Job is not retryable');
+            }
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'queue_clear_done') {
+            Capsule::table('mod_dcmanage_jobs')->whereIn('status', ['done', 'failed', 'canceled'])->delete();
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
@@ -2841,4 +2894,102 @@ function dcmanage_render_logs(string $lang): void
     }
     echo '</tbody></table></div>';
     echo dcmanage_render_simple_pagination('addonmodules.php?module=dcmanage&tab=logs&log_q=' . urlencode($q) . '&log_level=' . urlencode($level) . '&log_source=' . urlencode($source) . '&log_sort=' . urlencode($sort) . '&log_page=' . $logPage, $purchasePage, $perPagePurchase, $purchaseTotal, $lang, 'purchase_page');
+}
+
+function dcmanage_render_queue(string $lang): void
+{
+    $statusFilter = strtolower(trim((string) ($_GET['queue_status'] ?? '')));
+    $q = trim((string) ($_GET['queue_q'] ?? ''));
+    $page = max(1, (int) ($_GET['queue_page'] ?? 1));
+    $perPage = 50;
+
+    $query = Capsule::table('mod_dcmanage_jobs');
+    if (in_array($statusFilter, ['pending', 'running', 'done', 'failed', 'canceled'], true)) {
+        $query->where('status', $statusFilter);
+    }
+    if ($q !== '') {
+        $query->where(static function ($w) use ($q): void {
+            $w->where('type', 'like', '%' . $q . '%')
+                ->orWhere('payload_json', 'like', '%' . $q . '%')
+                ->orWhere('last_error', 'like', '%' . $q . '%');
+        });
+    }
+
+    $total = (int) $query->count();
+    $rows = $query->orderBy('id', 'desc')
+        ->offset(($page - 1) * $perPage)
+        ->limit($perPage)
+        ->get(['id', 'type', 'status', 'attempts', 'run_after', 'created_at', 'started_at', 'finished_at', 'last_error']);
+
+    $counts = [
+        'pending' => (int) Capsule::table('mod_dcmanage_jobs')->where('status', 'pending')->count(),
+        'running' => (int) Capsule::table('mod_dcmanage_jobs')->where('status', 'running')->count(),
+        'failed' => (int) Capsule::table('mod_dcmanage_jobs')->where('status', 'failed')->count(),
+    ];
+
+    echo '<h5 class="mb-3">Job Queue</h5>';
+    echo '<div class="dcmanage-form-card mb-3">';
+    echo '<div class="row">';
+    echo '<div class="col-md-4 mb-2"><div class="alert alert-info mb-0">Pending: <strong>' . $counts['pending'] . '</strong></div></div>';
+    echo '<div class="col-md-4 mb-2"><div class="alert alert-warning mb-0">Running: <strong>' . $counts['running'] . '</strong></div></div>';
+    echo '<div class="col-md-4 mb-2"><div class="alert alert-danger mb-0">Failed: <strong>' . $counts['failed'] . '</strong></div></div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<form method="get" class="dcmanage-form-card mb-3">';
+    echo '<input type="hidden" name="module" value="dcmanage"><input type="hidden" name="tab" value="queue">';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('logs_search', $lang)) . '</label><input class="form-control dcmanage-input" name="queue_q" value="' . htmlspecialchars($q) . '"></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('cron_status', $lang)) . '</label><select class="form-control dcmanage-input" name="queue_status">';
+    echo '<option value="">All</option>';
+    foreach (['pending', 'running', 'done', 'failed', 'canceled'] as $st) {
+        $selected = $statusFilter === $st ? ' selected' : '';
+        echo '<option value="' . htmlspecialchars($st) . '"' . $selected . '>' . htmlspecialchars($st) . '</option>';
+    }
+    echo '</select></div>';
+    echo '</div>';
+    echo '<div class="dcmanage-form-actions d-flex flex-wrap">';
+    echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('logs_apply_filter', $lang)) . '</button>';
+    echo '<a class="btn btn-outline-secondary btn-sm" href="addonmodules.php?module=dcmanage&tab=queue">' . htmlspecialchars(I18n::t('logs_reset_filter', $lang)) . '</a>';
+    echo '</div>';
+    echo '</form>';
+    echo '<form method="post" class="mb-3" onsubmit="return confirm(\'Clear completed/failed/canceled jobs?\')"><input type="hidden" name="dcmanage_action" value="queue_clear_done"><button class="btn btn-outline-danger btn-sm" type="submit" name="dcmanage_action_btn" value="queue_clear_done">Clear Done/Failed</button></form>';
+
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
+    echo '<thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Attempts</th><th>Created</th><th>Started</th><th>Finished</th><th>Run After</th><th>Error</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+    foreach ($rows as $row) {
+        $status = strtolower((string) $row->status);
+        $badge = $status === 'done' ? 'success' : ($status === 'failed' ? 'danger' : ($status === 'running' ? 'warning' : ($status === 'canceled' ? 'secondary' : 'info')));
+        echo '<tr>';
+        echo '<td>' . (int) $row->id . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->type) . '</td>';
+        echo '<td><span class="badge badge-' . $badge . '">' . htmlspecialchars((string) $row->status) . '</span></td>';
+        echo '<td>' . (int) $row->attempts . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->created_at ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->started_at ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->finished_at ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->run_after ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->last_error ?? '-')) . '</td>';
+        echo '<td class="dcmanage-action-buttons">';
+        if (in_array($status, ['pending', 'running'], true)) {
+            echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="queue_cancel_job"><input type="hidden" name="job_id" value="' . (int) $row->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-warning" name="dcmanage_action_btn" value="queue_cancel_job">Cancel</button></form>';
+        }
+        if (in_array($status, ['failed', 'canceled'], true)) {
+            echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="queue_retry_job"><input type="hidden" name="job_id" value="' . (int) $row->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-success" name="dcmanage_action_btn" value="queue_retry_job">Retry</button></form>';
+        }
+        echo '</td>';
+        echo '</tr>';
+    }
+    if (count($rows) === 0) {
+        echo '<tr><td colspan="10">-</td></tr>';
+    }
+    echo '</tbody></table></div>';
+    echo dcmanage_render_simple_pagination(
+        'addonmodules.php?module=dcmanage&tab=queue&queue_q=' . urlencode($q) . '&queue_status=' . urlencode($statusFilter),
+        $page,
+        $perPage,
+        $total,
+        $lang,
+        'queue_page'
+    );
 }

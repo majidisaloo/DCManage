@@ -3,6 +3,21 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.51] - 2026-02-22
+### Fixed
+- Fixed dashboard update API instability (`dashboard/version`) by adding safe fallback behavior when GitHub release check fails.
+- Fixed stuck cancel/update state by cleaning stale update jobs and clearing orphaned cancel flags when no active update job exists.
+- Fixed queue KPI navigation on dashboard to open a dedicated Queue tab instead of Settings.
+- Fixed update runtime responsiveness by reducing updater retry/timeout overhead and running one immediate queue batch on apply.
+
+### Added
+- Added `Queue` tab with filter/search/pagination for `mod_dcmanage_jobs`.
+- Added queue actions: cancel pending/running job, retry failed/canceled job, and clear completed history.
+- Added latest-release metadata cache for resilient version status display during temporary remote/API failures.
+
+### Changed
+- Increased dashboard KPI icon sizes and label proportions for better visual balance on large screens.
+
 ## [0.1.50] - 2026-02-21
 ### Fixed
 - Fixed cron health false-fail in dispatcher mode by writing per-task completion logs (`task:<name> completed`) when dispatcher executes tasks.
