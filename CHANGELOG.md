@@ -3,6 +3,24 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.19] - 2026-02-21
+### Changed
+- Dashboard KPI cards were redesigned with vector icons, stronger color hierarchy, and cleaner card composition.
+- Version panel was redesigned into a modern status board with aligned Current/Latest/Status metrics.
+- Update controls were aligned into one responsive action row for cleaner UX.
+
+### Added
+- Added visual icon set for dashboard parameters (Datacenters, Racks, Switches, Servers, Ports, Breaches, Queue).
+- Added explicit update state badge classes:
+  - red for not updated
+  - yellow for update available
+  - green for updated
+- Added semantic in-panel feedback styles for update actions (info/success/warning/danger).
+
+### Fixed
+- Fixed update status presentation consistency across Check/Apply/Auto-toggle actions.
+- Improved dashboard typography and spacing to avoid stretched/flat appearance on wide screens.
+
 ## [0.1.18] - 2026-02-21
 ### Changed
 - Switches tab UI was modernized with cleaner action buttons, improved visual hierarchy, and clearer ports panel layout.

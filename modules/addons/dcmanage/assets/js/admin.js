@@ -84,7 +84,18 @@
     checkUpdate: 'بررسی آپدیت',
     applyUpdate: 'اعمال آپدیت',
     autoUpdate: 'آپدیت خودکار',
-    openCron: 'تنظیمات کرون'
+    openCron: 'تنظیمات کرون',
+    updateStateOutdated: 'آپدیت نشده',
+    updateStateAvailable: 'آپدیت داریم',
+    updateStateUpdated: 'آپدیت شد',
+    checking: 'در حال بررسی نسخه...',
+    applying: 'در حال اعمال آپدیت...',
+    updateStatus: 'وضعیت',
+    checkError: 'خطا در بررسی نسخه',
+    applyError: 'خطا در آپدیت',
+    toggleError: 'خطا در تغییر وضعیت آپدیت خودکار',
+    autoEnabled: 'آپدیت خودکار فعال شد.',
+    autoDisabled: 'آپدیت خودکار غیرفعال شد.'
   } : {
     dc: 'Datacenters',
     racks: 'Racks',
@@ -103,8 +114,68 @@
     checkUpdate: 'Check Update',
     applyUpdate: 'Apply Update',
     autoUpdate: 'Auto Update',
-    openCron: 'Open Cron Settings'
+    openCron: 'Open Cron Settings',
+    updateStateOutdated: 'Not Updated',
+    updateStateAvailable: 'Update Available',
+    updateStateUpdated: 'Updated',
+    checking: 'Checking latest release...',
+    applying: 'Applying update...',
+    updateStatus: 'Status',
+    checkError: 'Failed to check update',
+    applyError: 'Failed to apply update',
+    toggleError: 'Failed to change auto update state',
+    autoEnabled: 'Auto update enabled.',
+    autoDisabled: 'Auto update disabled.'
   };
+
+  function iconSvg(name) {
+    var icons = {
+      datacenters: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v4H4V5zm0 5h16v4H4v-4zm0 5h16v4H4v-4z"/></svg>',
+      racks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7V3zm2 2v2h6V5H9zm0 4v2h6V9H9zm0 4v2h6v-2H9z"/></svg>',
+      switches: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v10H3V7zm3 2h2v2H6V9zm3 0h2v2H9V9zm3 0h2v2h-2V9zm3 0h2v2h-2V9z"/></svg>',
+      servers: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v6H4V4zm0 10h16v6H4v-6zm3-8h2v2H7V6zm0 10h2v2H7v-2z"/></svg>',
+      ports: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4h-2v5h4v4h-4v5h-6v-5H5v-4h4V7H7V3z"/></svg>',
+      usage_breaches_today: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 18H2L12 3zm-1 6v5h2V9h-2zm0 7v2h2v-2h-2z"/></svg>',
+      jobs_pending: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v4H4V4zm0 6h16v10H4V10zm3 2h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>',
+      version: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 3v6c0 5-3.4 9.4-7 11-3.6-1.6-7-6-7-11V5l7-3zm-1 6v6l5-3-5-3z"/></svg>',
+      current: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18v8H3v-8zm2 2v4h14v-4H5zm2-10h10l2 5H5l2-5z"/></svg>',
+      latest: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 6h6l-4.5 4.2L18 19l-6-3.2L6 19l1.5-6.8L3 8h6l3-6z"/></svg>',
+      state: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10h-2V3zm0 14h2v4h-2v-4z"/></svg>'
+    };
+    return icons[name] || icons.state;
+  }
+
+  function updateStateMeta(data) {
+    var current = String(data.current_version || '');
+    var latest = String(data.latest_version || '');
+    var hasUpdate = !!data.has_update;
+
+    if (hasUpdate) {
+      return { cls: 'state-warning', text: T.updateStateAvailable };
+    }
+    if (current !== '' && latest !== '' && current === latest) {
+      return { cls: 'state-success', text: T.updateStateUpdated };
+    }
+    return { cls: 'state-danger', text: T.updateStateOutdated };
+  }
+
+  function setUpdateMsg(node, message, kind) {
+    if (!node) {
+      return;
+    }
+
+    var cls = 'is-info';
+    if (kind === 'success') {
+      cls = 'is-success';
+    } else if (kind === 'warning') {
+      cls = 'is-warning';
+    } else if (kind === 'danger') {
+      cls = 'is-danger';
+    }
+
+    node.className = 'mt-3 dcmanage-update-msg ' + cls;
+    node.innerHTML = safeText(message);
+  }
 
   function renderDashboard(base, moduleLink) {
     var dashboard = document.getElementById('dcmanage-dashboard');
@@ -131,10 +202,20 @@
 
       var html = '<div class="row dcmanage-kpi">';
       cards.forEach(function (k) {
+        var cardValue = c[k.key] || 0;
+        var keyClass = 'is-' + String(k.key).replace(/_/g, '-');
         html += '' +
           '<div class="col-md-3 col-6 mb-3">' +
           '<a href="' + moduleLink + '&tab=' + encodeURIComponent(k.tab) + '" class="text-decoration-none">' +
-          '<div class="card dcmanage-click-card"><div class="card-body"><div class="dcmanage-kpi-label">' + safeText(k.label) + '</div><div class="dcmanage-kpi-value">' + (c[k.key] || 0) + '</div></div></div>' +
+          '<div class="card dcmanage-click-card dcmanage-kpi-card ' + keyClass + '">' +
+          '<div class="card-body">' +
+          '<div class="dcmanage-kpi-head">' +
+          '<span class="dcmanage-kpi-icon">' + iconSvg(k.key) + '</span>' +
+          '<span class="dcmanage-kpi-label">' + safeText(k.label) + '</span>' +
+          '</div>' +
+          '<div class="dcmanage-kpi-value">' + safeText(cardValue) + '</div>' +
+          '</div>' +
+          '</div>' +
           '</a>' +
           '</div>';
       });
@@ -158,30 +239,41 @@
       }
 
       var d = res.data || {};
-      var hasUpdate = d.has_update ? '<span class="badge badge-warning">Update Available</span>' : '<span class="badge badge-success">Up To Date</span>';
+      var state = updateStateMeta(d);
       var autoChecked = d.auto_update ? ' checked' : '';
 
       versionBox.innerHTML = '' +
         '<div class="p-3 dcmanage-version-card">' +
-        '<div class="row align-items-center">' +
-        '<div class="col-md-7 mb-2 mb-md-0">' +
-        '<h5 class="mb-2">' + safeText(T.versionCenter) + '</h5>' +
-        '<div>' + safeText(T.currentVersion) + ': <strong>' + safeText(d.current_version || '-') + '</strong></div>' +
-        '<div>' + safeText(T.latestRelease) + ': <strong>' + safeText(d.latest_tag || '-') + '</strong> (' + safeText(d.latest_version || '-') + ')</div>' +
-        '<div class="mt-1">' + hasUpdate + '</div>' +
+        '<div class="dcmanage-version-head">' +
+        '<div class="dcmanage-version-title">' +
+        '<span class="dcmanage-panel-icon">' + iconSvg('version') + '</span>' +
+        '<h5 class="mb-0">' + safeText(T.versionCenter) + '</h5>' +
         '</div>' +
-        '<div class="col-md-5 text-md-right">' +
-        '<div class="dcmanage-update-actions">' +
-        '<div class="custom-control custom-switch mb-2">' +
+        '<div class="dcmanage-update-state ' + state.cls + '">' + safeText(state.text) + '</div>' +
+        '</div>' +
+        '<div class="dcmanage-version-metrics">' +
+        '<div class="dcmanage-version-metric">' +
+        '<div class="metric-label"><span class="metric-icon">' + iconSvg('current') + '</span>' + safeText(T.currentVersion) + '</div>' +
+        '<div class="metric-value">' + safeText(d.current_version || '-') + '</div>' +
+        '</div>' +
+        '<div class="dcmanage-version-metric">' +
+        '<div class="metric-label"><span class="metric-icon">' + iconSvg('latest') + '</span>' + safeText(T.latestRelease) + '</div>' +
+        '<div class="metric-value">' + safeText(d.latest_tag || '-') + ' <small>(' + safeText(d.latest_version || '-') + ')</small></div>' +
+        '</div>' +
+        '<div class="dcmanage-version-metric">' +
+        '<div class="metric-label"><span class="metric-icon">' + iconSvg('state') + '</span>' + safeText(T.updateStatus) + '</div>' +
+        '<div class="metric-value">' + safeText(state.text) + '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="dcmanage-update-actions-row">' +
+        '<div class="custom-control custom-switch">' +
         '<input type="checkbox" class="custom-control-input" id="dcmanage-auto-update"' + autoChecked + '>' +
         '<label class="custom-control-label" for="dcmanage-auto-update">' + safeText(T.autoUpdate) + '</label>' +
         '</div>' +
-        '<button type="button" class="btn btn-outline-primary btn-sm mr-2" id="dcmanage-check-update">' + safeText(T.checkUpdate) + '</button>' +
+        '<button type="button" class="btn btn-outline-primary btn-sm dcmanage-check-btn" id="dcmanage-check-update">' + safeText(T.checkUpdate) + '</button>' +
         '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">' + safeText(T.applyUpdate) + '</button>' +
         '</div>' +
-        '</div>' +
-        '</div>' +
-        '<div id="dcmanage-update-msg" class="mt-2 small dcmanage-update-msg"></div>' +
+        '<div id="dcmanage-update-msg" class="mt-3 dcmanage-update-msg is-info"></div>' +
         '</div>';
 
       bindVersionActions(base);
@@ -234,36 +326,39 @@
 
     if (checkBtn) {
       checkBtn.addEventListener('click', function () {
-        msg.innerHTML = 'Checking latest release...';
+        setUpdateMsg(msg, T.checking, 'info');
         getJson(apiUrl(base, 'update/check')).then(function (res) {
           if (!res.ok) {
-            msg.innerHTML = '<span class="text-danger">' + safeText(res.error || 'check failed') + '</span>';
+            setUpdateMsg(msg, res.error || T.checkError, 'danger');
             return;
           }
 
           var d = res.data || {};
-          msg.innerHTML = '<span class="text-success">Current: ' + safeText(d.current_version || '-') + ' | Latest: ' + safeText(d.latest_tag || '-') + '</span>';
+          var checkMessage = (T.currentVersion + ': ' + (d.current_version || '-') + ' | ' + T.latestRelease + ': ' + (d.latest_tag || '-'));
+          setUpdateMsg(msg, checkMessage, d.has_update ? 'warning' : 'success');
           renderVersion(base);
         }).catch(function (e) {
-          msg.innerHTML = '<span class="text-danger">' + safeText(e && e.message ? e.message : 'check failed') + '</span>';
+          setUpdateMsg(msg, (e && e.message ? e.message : T.checkError), 'danger');
         });
       });
     }
 
     if (applyBtn) {
       applyBtn.addEventListener('click', function () {
-        msg.innerHTML = 'Applying update...';
+        setUpdateMsg(msg, T.applying, 'warning');
         getJson(apiUrl(base, 'update/apply', { force: 0 })).then(function (res) {
           if (!res.ok) {
-            msg.innerHTML = '<span class="text-danger">' + safeText(res.error || 'update failed') + '</span>';
+            setUpdateMsg(msg, res.error || T.applyError, 'danger');
             return;
           }
 
           var d = res.data || {};
-          msg.innerHTML = '<span class="text-success">Update status: ' + safeText(d.status || 'done') + '</span>';
+          var state = String(d.status || '');
+          var kind = state === 'updated' || state === 'up-to-date' ? 'success' : 'warning';
+          setUpdateMsg(msg, (T.updateStatus + ': ' + (state || 'done')), kind);
           renderVersion(base);
         }).catch(function (e) {
-          msg.innerHTML = '<span class="text-danger">' + safeText(e && e.message ? e.message : 'update failed') + '</span>';
+          setUpdateMsg(msg, (e && e.message ? e.message : T.applyError), 'danger');
         });
       });
     }
@@ -273,13 +368,13 @@
         var enabled = autoToggle.checked ? 1 : 0;
         getJson(apiUrl(base, 'update/set-auto', { enabled: enabled })).then(function (res) {
           if (!res.ok) {
-            msg.innerHTML = '<span class="text-danger">' + safeText(res.error || 'toggle failed') + '</span>';
+            setUpdateMsg(msg, res.error || T.toggleError, 'danger');
             return;
           }
 
-          msg.innerHTML = '<span class="text-success">Auto update ' + (autoToggle.checked ? 'enabled' : 'disabled') + '.</span>';
+          setUpdateMsg(msg, autoToggle.checked ? T.autoEnabled : T.autoDisabled, 'success');
         }).catch(function (e) {
-          msg.innerHTML = '<span class="text-danger">' + safeText(e && e.message ? e.message : 'toggle failed') + '</span>';
+          setUpdateMsg(msg, (e && e.message ? e.message : T.toggleError), 'danger');
         });
       });
     }

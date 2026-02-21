@@ -105,25 +105,79 @@
 
 .dcmanage-kpi .dcmanage-click-card .card-body {
   text-align: center;
-  padding: 18px 12px 16px;
-  background: linear-gradient(180deg, #fafdff, #edf3ff);
+  padding: 16px 12px 14px;
+  background: linear-gradient(180deg, #fbfdff, #eef4ff);
+}
+
+.dcmanage-kpi-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.dcmanage-kpi-card::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: -26px;
+  bottom: -24px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: rgba(74, 123, 224, .12);
+  z-index: 0;
+}
+
+.dcmanage-kpi-card .card-body {
+  position: relative;
+  z-index: 1;
+}
+
+.dcmanage-kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dcmanage-kpi-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2456b0;
+  background: #dce9ff;
+}
+
+.dcmanage-kpi-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .dcmanage-kpi-label {
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: .4px;
+  letter-spacing: .15px;
   color: #4f618b;
-  text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .dcmanage-kpi-value {
-  font-size: 30px;
+  font-size: 31px;
   line-height: 1;
   font-weight: 800;
   color: var(--dc-text);
 }
+
+.dcmanage-kpi-card.is-datacenters .dcmanage-kpi-icon { color: #2156c9; background: #dbe8ff; }
+.dcmanage-kpi-card.is-racks .dcmanage-kpi-icon { color: #5646d3; background: #e6e0ff; }
+.dcmanage-kpi-card.is-switches .dcmanage-kpi-icon { color: #0c8f6a; background: #daf8ee; }
+.dcmanage-kpi-card.is-servers .dcmanage-kpi-icon { color: #1a6fb8; background: #dff0ff; }
+.dcmanage-kpi-card.is-ports .dcmanage-kpi-icon { color: #0d7f8f; background: #d9f8ff; }
+.dcmanage-kpi-card.is-usage-breaches-today .dcmanage-kpi-icon { color: #b14e14; background: #ffe8d8; }
+.dcmanage-kpi-card.is-jobs-pending .dcmanage-kpi-icon { color: #99452f; background: #ffe1d8; }
 
 .dcmanage-version-card {
   border-radius: 16px;
@@ -143,18 +197,157 @@
   padding: 7px 12px;
 }
 
-.dcmanage-update-actions {
+.dcmanage-version-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dcmanage-version-title {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.dcmanage-panel-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1c57ca;
+  background: #dbe7ff;
+}
+
+.dcmanage-panel-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.dcmanage-update-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.dcmanage-update-state.state-danger {
+  background: #ffe5e8;
+  color: #b92944;
+  border-color: #ffc2cb;
+}
+
+.dcmanage-update-state.state-warning {
+  background: #fff1d8;
+  color: #9b6300;
+  border-color: #ffd99a;
+}
+
+.dcmanage-update-state.state-success {
+  background: #ddf8ea;
+  color: #0b8a49;
+  border-color: #b8ebd0;
+}
+
+.dcmanage-version-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.dcmanage-version-metric {
+  border: 1px solid #d7e4ff;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .8);
+  padding: 10px 12px;
+}
+
+.dcmanage-version-metric .metric-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #496089;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dcmanage-version-metric .metric-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2e5cae;
+}
+
+.dcmanage-version-metric .metric-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.dcmanage-version-metric .metric-value {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e345f;
+}
+
+.dcmanage-update-actions-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dcmanage-update-actions-row .custom-control {
+  margin-bottom: 0;
+}
+
+.dcmanage-check-btn {
+  margin-inline-start: auto;
 }
 
 .dcmanage-update-msg {
   text-align: center;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .6);
-  color: #24406f;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  font-weight: 700;
+}
+
+.dcmanage-update-msg.is-info {
+  background: #e8f3ff;
+  color: #1e5a92;
+  border-color: #c6e1ff;
+}
+
+.dcmanage-update-msg.is-success {
+  background: #e2f9ed;
+  color: #126b42;
+  border-color: #bfeace;
+}
+
+.dcmanage-update-msg.is-warning {
+  background: #fff3dd;
+  color: #8a5a00;
+  border-color: #ffdfaa;
+}
+
+.dcmanage-update-msg.is-danger {
+  background: #ffe7ea;
+  color: #98273a;
+  border-color: #ffc3cb;
 }
 
 .dcmanage-shell .dcmanage-form-card {
@@ -532,8 +725,16 @@
     max-height: 360px;
   }
 
-  .dcmanage-update-actions {
+  .dcmanage-version-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .dcmanage-update-actions-row {
     align-items: stretch;
+  }
+
+  .dcmanage-check-btn {
+    margin-inline-start: 0;
   }
 
   .dcmanage-action-buttons {
