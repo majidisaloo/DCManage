@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.23)
+## Features in this release (v0.1.24)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -38,6 +38,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Shows counts for Datacenters, total Racks, Switches, Servers, Ports, queue, and breaches.
   - KPI cards navigate directly to related module tabs (queue card routes to Settings).
   - KPI cards now include dedicated vector-style icons per parameter.
+  - Standalone `Ports` KPI card was removed to keep port management consolidated under `Switches`.
   - Shows cron overall status (`green/yellow/red`) and per-task status.
 - System Settings tab inside module:
   - timezone, locale, traffic poll interval, switch discovery interval, graph cache TTL, log retention, dashboard refresh interval.
@@ -62,6 +63,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Switch discovery now imports port speed profile and mode and shows it as:
     - `1G`, `10G`
     - `Auto 1G`, `Auto 10G`
+  - Top navigation no longer includes `Ports`; all port operations are under `Switches`.
   - Switch SNMP test now auto-discovers and stores ports when connection succeeds.
   - SNMP compatibility added for environments that do not provide `snmp2_real_walk` but expose `snmprealwalk` or `snmp2_walk/snmpwalk`.
   - VLAN resolution is improved using `dot1dBasePortIfIndex` -> `dot1qPvid` mapping for broader switch compatibility.

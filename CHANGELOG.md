@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.24] - 2026-02-21
+### Changed
+- Removed `Ports` tab from top navigation to avoid duplicate workflow with Switches.
+- Dashboard KPI cards no longer render a standalone `Ports` card.
+
+### Fixed
+- Legacy links using `&tab=ports` now redirect to `Switches` tab to preserve backward compatibility.
+
 ## [0.1.23] - 2026-02-21
 ### Added
 - Added switch port speed visibility in Switches -> Ports table.

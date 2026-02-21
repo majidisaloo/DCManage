@@ -78,6 +78,9 @@ function dcmanage_output(array $vars): void
     if ($activeTab === 'automation') {
         $activeTab = 'settings';
     }
+    if ($activeTab === 'ports') {
+        $activeTab = 'switches';
+    }
 
     $flash = dcmanage_handle_actions($lang);
 
@@ -92,7 +95,6 @@ function dcmanage_output(array $vars): void
         'datacenters' => I18n::t('tab_datacenters', $lang),
         'switches' => I18n::t('tab_switches', $lang),
         'servers' => I18n::t('tab_servers', $lang),
-        'ports' => I18n::t('tab_ports', $lang),
         'ilos' => 'iLOs',
         'monitoring' => I18n::t('tab_monitoring', $lang),
         'packages' => I18n::t('tab_packages', $lang),
