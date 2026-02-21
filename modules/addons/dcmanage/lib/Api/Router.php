@@ -316,9 +316,18 @@ final class Router
         foreach ($tasks as $item) {
             $task = $item['task'];
             $interval = $item['interval'];
+            $patterns = self::cronSuccessPatterns($task);
             $last = Capsule::table('mod_dcmanage_logs')
                 ->where('source', 'cron')
-                ->where('message', 'like', 'task:' . $task . ' %')
+                ->where(static function ($q) use ($patterns): void {
+                    foreach ($patterns as $idx => $pattern) {
+                        if ($idx === 0) {
+                            $q->where('message', 'like', $pattern);
+                        } else {
+                            $q->orWhere('message', 'like', $pattern);
+                        }
+                    }
+                })
                 ->orderBy('id', 'desc')
                 ->first(['message', 'created_at']);
 
@@ -401,5 +410,27 @@ final class Router
         }
 
         return $total;
+    }
+
+    private static function cronSuccessPatterns(string $task): array
+    {
+        $patterns = ['task:' . $task . ' completed%'];
+
+        $legacy = [
+            'poll_usage' => ['poll_usage processed%'],
+            'enforce_queue' => ['enforce_queue executed%'],
+            'graph_warm' => ['graph_warm executed%'],
+            'cleanup' => ['cleanup executed%'],
+            'switch_discovery' => ['switch_discovery executed%'],
+            'self_update' => ['self_update executed%'],
+        ];
+
+        if (isset($legacy[$task])) {
+            foreach ($legacy[$task] as $pattern) {
+                $patterns[] = $pattern;
+            }
+        }
+
+        return $patterns;
     }
 }

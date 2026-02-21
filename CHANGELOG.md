@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.52] - 2026-02-22
+### Fixed
+- Fixed Cron Health false-fail state in both Dashboard and Settings monitor by accepting both dispatcher-style and legacy task success log messages.
+- Cron status now correctly marks tasks as healthy when logs contain `poll_usage processed`, `... executed`, or `task:<name> completed`.
+
 ## [0.1.51] - 2026-02-22
 ### Fixed
 - Fixed dashboard update API instability (`dashboard/version`) by adding safe fallback behavior when GitHub release check fails.

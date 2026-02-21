@@ -1077,9 +1077,18 @@ function dcmanage_cron_status(): array
     $fail = 0;
 
     foreach ($defs as $def) {
+        $patterns = dcmanage_cron_success_patterns((string) $def['task']);
         $last = Capsule::table('mod_dcmanage_logs')
             ->where('source', 'cron')
-            ->where('message', 'like', 'task:' . $def['task'] . ' %')
+            ->where(static function ($q) use ($patterns): void {
+                foreach ($patterns as $idx => $pattern) {
+                    if ($idx === 0) {
+                        $q->where('message', 'like', $pattern);
+                    } else {
+                        $q->orWhere('message', 'like', $pattern);
+                    }
+                }
+            })
             ->orderBy('id', 'desc')
             ->first(['message', 'created_at']);
 
@@ -1125,6 +1134,27 @@ function dcmanage_cron_status(): array
     }
 
     return ['overall' => $overall, 'items' => $items];
+}
+
+function dcmanage_cron_success_patterns(string $task): array
+{
+    $patterns = ['task:' . $task . ' completed%'];
+    $legacy = [
+        'poll_usage' => ['poll_usage processed%'],
+        'enforce_queue' => ['enforce_queue executed%'],
+        'graph_warm' => ['graph_warm executed%'],
+        'cleanup' => ['cleanup executed%'],
+        'switch_discovery' => ['switch_discovery executed%'],
+        'self_update' => ['self_update executed%'],
+    ];
+
+    if (isset($legacy[$task])) {
+        foreach ($legacy[$task] as $pattern) {
+            $patterns[] = $pattern;
+        }
+    }
+
+    return $patterns;
 }
 
 function dcmanage_render_settings_form(string $lang): void
