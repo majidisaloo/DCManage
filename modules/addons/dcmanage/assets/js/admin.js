@@ -21,7 +21,9 @@
       .replace(/'/g, '&#39;');
   }
 
-  var isFa = (document.documentElement.getAttribute('dir') || '').toLowerCase() === 'rtl';
+  var shell = document.querySelector('.dcmanage-shell');
+  var shellLang = shell ? (shell.getAttribute('data-lang') || '') : '';
+  var isFa = shellLang.toLowerCase() === 'fa';
   var T = isFa ? {
     dc: 'دیتاسنتر',
     racks: 'رک',

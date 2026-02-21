@@ -98,3 +98,41 @@
 .dcmanage-shell code {
   color: #1a4bb5;
 }
+
+.dcmanage-rack-block .card {
+  border: 1px solid #d9e4ff;
+}
+
+.dcmanage-rack-grid {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #e5ebfb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.dcmanage-rack-u {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-bottom: 1px solid #eef2ff;
+}
+
+.dcmanage-rack-u .u-num {
+  font-weight: 700;
+  color: #445071;
+}
+
+.dcmanage-rack-u.blank .u-item {
+  color: #9aa7c2;
+}
+
+.dcmanage-rack-u.server {
+  background: #e8f3ff;
+}
+
+.dcmanage-rack-u.switch {
+  background: #e7fff8;
+}

@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 2;
+    private const SCHEMA_VERSION = 3;
 
     public static function migrate(): void
     {
@@ -24,6 +24,11 @@ final class Schema
         if ($current < 2) {
             self::migrationV2();
             self::setCurrentVersion(2);
+        }
+
+        if ($current < 3) {
+            self::migrationV3();
+            self::setCurrentVersion(3);
         }
     }
 
@@ -346,6 +351,16 @@ final class Schema
         if (Capsule::schema()->hasTable('mod_dcmanage_switches') && !Capsule::schema()->hasColumn('mod_dcmanage_switches', 'rack_id')) {
             Capsule::schema()->table('mod_dcmanage_switches', static function (Blueprint $table): void {
                 $table->unsignedInteger('rack_id')->nullable()->after('dc_id')->index();
+            });
+        }
+    }
+
+    private static function migrationV3(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_switches') && !Capsule::schema()->hasColumn('mod_dcmanage_switches', 'u_start')) {
+            Capsule::schema()->table('mod_dcmanage_switches', static function (Blueprint $table): void {
+                $table->unsignedSmallInteger('u_start')->nullable()->after('rack_id');
+                $table->unsignedSmallInteger('u_height')->default(1)->after('u_start');
             });
         }
     }

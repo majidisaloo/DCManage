@@ -3,6 +3,22 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.6] - 2026-02-21
+### Changed
+- Removed duplicate module heading/version line from non-dashboard pages.
+- Datacenters page now uses an Add button + collapsed form instead of always-open create form.
+- Datacenter list now includes rack visualization cards with U-level occupancy mapping.
+
+### Added
+- Added rack occupancy rendering that shows server and switch placement in each unit.
+- Added optional U position fields for switch creation and rack placement tracking.
+- Added migration step for switch U-position fields.
+
+### Fixed
+- Fixed language detection to honor saved locale and session/system language fallback.
+- Fixed JS language mode detection by reading module shell language state directly.
+- Removed `Code` dependency from datacenter creation form.
+
 ## [0.1.5] - 2026-02-21
 ### Changed
 - UI direction is now language-aware: Persian renders RTL/right-aligned and English renders LTR/left-aligned.

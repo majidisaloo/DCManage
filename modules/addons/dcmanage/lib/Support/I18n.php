@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DCManage\Support;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
+
 final class I18n
 {
     private const DEFAULT_LANG = 'en';
@@ -141,10 +143,17 @@ final class I18n
 
         if (!empty($_GET['lang'])) {
             $candidate = (string) $_GET['lang'];
+        } elseif (class_exists(Capsule::class) && Capsule::schema()->hasTable('mod_dcmanage_meta')) {
+            $stored = Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.locale')->value('meta_value');
+            if (!empty($stored)) {
+                $candidate = (string) $stored;
+            }
         } elseif (!empty($_SESSION['Language'])) {
             $candidate = (string) $_SESSION['Language'];
         } elseif (!empty($_SESSION['adminlang'])) {
             $candidate = (string) $_SESSION['adminlang'];
+        } elseif (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+            $candidate = substr((string) $_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
         }
 
         $candidate = strtolower(trim($candidate));

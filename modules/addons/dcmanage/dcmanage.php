@@ -76,16 +76,11 @@ function dcmanage_output(array $vars): void
 
     $flash = dcmanage_handle_actions($lang);
 
-    echo '<div class="container-fluid dcmanage-shell ' . ($isRtl ? 'dcmanage-rtl' : 'dcmanage-ltr') . '" dir="' . ($isRtl ? 'rtl' : 'ltr') . '">';
+    echo '<div class="container-fluid dcmanage-shell ' . ($isRtl ? 'dcmanage-rtl' : 'dcmanage-ltr') . '" dir="' . ($isRtl ? 'rtl' : 'ltr') . '" data-lang="' . htmlspecialchars($lang) . '">';
 
     if ($flash !== '') {
         echo $flash;
     }
-
-    echo '<div class="row mb-3"><div class="col-12 ' . ($isRtl ? 'text-right' : 'text-left') . '">';
-    echo '<h2 class="mb-1">' . htmlspecialchars(I18n::t('title', $lang)) . '</h2>';
-    echo '<p class="text-muted mb-0">' . htmlspecialchars(I18n::t('subtitle', $lang)) . ' - Version ' . htmlspecialchars(DCManage\Version::CURRENT) . '</p>';
-    echo '</div></div>';
 
     $tabs = [
         'dashboard' => I18n::t('tab_dashboard', $lang),
@@ -172,7 +167,7 @@ function dcmanage_handle_actions(string $lang): string
 
             $dcId = (int) Capsule::table('mod_dcmanage_datacenters')->insertGetId([
                 'name' => $name,
-                'code' => trim((string) ($_POST['code'] ?? '')),
+                'code' => null,
                 'location' => trim((string) ($_POST['location'] ?? '')),
                 'notes' => trim((string) ($_POST['notes'] ?? '')),
                 'created_at' => date('Y-m-d H:i:s'),
@@ -201,6 +196,8 @@ function dcmanage_handle_actions(string $lang): string
             Capsule::table('mod_dcmanage_switches')->insert([
                 'dc_id' => $dcId,
                 'rack_id' => $rackId > 0 ? $rackId : null,
+                'u_start' => (int) ($_POST['u_start'] ?? 0) ?: null,
+                'u_height' => max(1, (int) ($_POST['u_height'] ?? 1)),
                 'name' => $name,
                 'vendor' => trim((string) ($_POST['vendor'] ?? '')),
                 'model' => trim((string) ($_POST['model'] ?? '')),
@@ -413,35 +410,92 @@ function dcmanage_render_datacenters(string $lang): void
             Capsule::raw('COUNT(r.id) as rack_count'),
         ]);
 
-    echo '<div class="row">';
-    echo '<div class="col-lg-5 mb-4">';
-    echo '<h5>' . htmlspecialchars(I18n::t('datacenter_add', $lang)) . '</h5>';
+    echo '<div class="d-flex justify-content-between align-items-center mb-3">';
+    echo '<h5 class="mb-0">' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</h5>';
+    echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-dc-add">' . htmlspecialchars(I18n::t('datacenter_add', $lang)) . '</button>';
+    echo '</div>';
+
+    echo '<div class="collapse mb-4" id="dcmanage-dc-add">';
     echo '<form method="post" action="" class="dcmanage-form-card">';
     echo '<input type="hidden" name="dcmanage_action" value="datacenter_create">';
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</label><input required name="name" class="form-control dcmanage-input"></div>';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('datacenter_code', $lang)) . '</label><input name="code" class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</label><input name="location" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</label><input required name="name" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</label><input name="location" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</label><input type="number" min="0" name="rack_count" value="0" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('datacenter_rack_units', $lang)) . '</label><input type="number" min="1" name="rack_units" value="42" class="form-control dcmanage-input"></div>';
     echo '</div>';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</label><input type="number" min="0" name="rack_count" value="0" class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('datacenter_rack_units', $lang)) . '</label><input type="number" min="1" name="rack_units" value="42" class="form-control dcmanage-input"></div>';
-    echo '</div>';
-    echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="3"></textarea></div>';
+    echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="2"></textarea></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_datacenter', $lang)) . '</button>';
     echo '</form>';
     echo '</div>';
 
-    echo '<div class="col-lg-7">';
-    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</h5>';
-    echo '<div class="table-responsive"><table class="table table-sm table-striped">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_code', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</th></tr></thead><tbody>';
+    echo '<div class="table-responsive mb-4"><table class="table table-sm table-striped">';
+    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
-        echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->name) . '</td><td>' . htmlspecialchars((string) $row->code) . '</td><td>' . htmlspecialchars((string) $row->location) . '</td><td>' . (int) $row->rack_count . '</td></tr>';
+        echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->name) . '</td><td>' . htmlspecialchars((string) $row->location) . '</td><td>' . (int) $row->rack_count . '</td></tr>';
     }
     echo '</tbody></table></div>';
-    echo '</div>';
-    echo '</div>';
+
+    foreach ($rows as $row) {
+        $racks = Capsule::table('mod_dcmanage_racks')->where('dc_id', (int) $row->id)->orderBy('name')->get();
+        echo '<div class="dcmanage-rack-block mb-4">';
+        echo '<h6>' . htmlspecialchars((string) $row->name) . ' - ' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . ': ' . (int) $row->rack_count . '</h6>';
+        echo '<div class="row">';
+        foreach ($racks as $rack) {
+            $units = max(1, (int) $rack->total_u);
+            $usage = dcmanage_rack_usage((int) $rack->id, $units);
+            echo '<div class="col-lg-4 col-md-6 mb-3">';
+            echo '<div class="card"><div class="card-body">';
+            echo '<h6 class="mb-2">' . htmlspecialchars((string) $rack->name) . ' (' . $units . 'U)</h6>';
+            echo '<div class="dcmanage-rack-grid">';
+            for ($u = $units; $u >= 1; $u--) {
+                $cell = $usage[$u] ?? '';
+                $cls = $cell === '' ? 'blank' : (strpos($cell, 'SW:') === 0 ? 'switch' : 'server');
+                echo '<div class="dcmanage-rack-u ' . $cls . '"><span class="u-num">U' . $u . '</span><span class="u-item">' . htmlspecialchars($cell === '' ? '-' : $cell) . '</span></div>';
+            }
+            echo '</div>';
+            echo '</div></div>';
+            echo '</div>';
+        }
+        echo '</div>';
+        echo '</div>';
+    }
+}
+
+function dcmanage_rack_usage(int $rackId, int $totalU): array
+{
+    $usage = [];
+    $servers = Capsule::table('mod_dcmanage_servers')->where('rack_id', $rackId)->get(['hostname', 'u_start', 'u_height']);
+    foreach ($servers as $s) {
+        $start = (int) ($s->u_start ?? 0);
+        $height = max(1, (int) ($s->u_height ?? 1));
+        if ($start <= 0) {
+            continue;
+        }
+        for ($i = 0; $i < $height; $i++) {
+            $u = $start + $i;
+            if ($u >= 1 && $u <= $totalU) {
+                $usage[$u] = 'SRV:' . (string) $s->hostname;
+            }
+        }
+    }
+
+    $switches = Capsule::table('mod_dcmanage_switches')->where('rack_id', $rackId)->get(['name', 'u_start', 'u_height']);
+    foreach ($switches as $s) {
+        $start = (int) ($s->u_start ?? 0);
+        $height = max(1, (int) ($s->u_height ?? 1));
+        if ($start <= 0) {
+            continue;
+        }
+        for ($i = 0; $i < $height; $i++) {
+            $u = $start + $i;
+            if ($u >= 1 && $u <= $totalU) {
+                $usage[$u] = 'SW:' . (string) $s->name;
+            }
+        }
+    }
+
+    return $usage;
 }
 
 function dcmanage_render_switches(string $lang): void
@@ -454,7 +508,7 @@ function dcmanage_render_switches(string $lang): void
         ->leftJoin('mod_dcmanage_racks as r', 'r.id', '=', 's.rack_id')
         ->orderBy('s.id', 'desc')
         ->limit(200)
-        ->get(['s.id', 's.name', 's.vendor', 's.model', 's.mgmt_ip', 'd.name as dc_name', 'r.name as rack_name']);
+        ->get(['s.id', 's.name', 's.vendor', 's.model', 's.mgmt_ip', 's.u_start', 's.u_height', 'd.name as dc_name', 'r.name as rack_name']);
 
     echo '<div class="row">';
     echo '<div class="col-lg-5 mb-4">';
@@ -481,6 +535,10 @@ function dcmanage_render_switches(string $lang): void
     echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</label><input name="vendor" class="form-control dcmanage-input"></div>';
     echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('switch_model', $lang)) . '</label><input name="model" class="form-control dcmanage-input"></div>';
     echo '</div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-6"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-6"><label>U Height</label><input type="number" min="1" name="u_height" value="1" class="form-control dcmanage-input"></div>';
+    echo '</div>';
     echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</label><input name="mgmt_ip" class="form-control dcmanage-input"></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_switch', $lang)) . '</button>';
     echo '</form>';
@@ -489,9 +547,10 @@ function dcmanage_render_switches(string $lang): void
     echo '<div class="col-lg-7">';
     echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('tab_switches', $lang)) . '</h5>';
     echo '<div class="table-responsive"><table class="table table-sm table-striped">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</th></tr></thead><tbody>';
+    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>U</th><th>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
-        echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->name) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . htmlspecialchars((string) $row->mgmt_ip) . '</td></tr>';
+        $u = ($row->u_start !== null ? (string) $row->u_start : '-') . '/' . (string) ($row->u_height ?? 1);
+        echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->name) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . htmlspecialchars($u) . '</td><td>' . htmlspecialchars((string) $row->mgmt_ip) . '</td></tr>';
     }
     echo '</tbody></table></div>';
     echo '</div>';
