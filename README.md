@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.27)
+## Features in this release (v0.1.28)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -54,7 +54,9 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Datacenter page shows rack U-level maps and occupancy.
   - Switch create supports Datacenter -> Rack dependent selection.
   - Switch create supports optional U position for rack placement.
-  - Server create supports Datacenter -> Rack dependent selection and U position fields.
+  - Server create supports Datacenter -> Rack dependent selection, Switch selection, Switch Port selection, and U position fields.
+  - Server create supports PRTG instance selection and multi-sensor traffic mapping.
+  - Monitoring tab now includes PRTG instance management (add/list/test/delete).
   - Datacenter rows now expose direct actions: Racks, Servers, Edit, Delete.
   - Rack map is front-focused with click-to-select U workflow and per-U marking for reserved/cable/airflow/blank planning.
   - Rack UI is now compact and card-based with a tower-style layout (no oversized stretched rows).
@@ -67,6 +69,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
     - `1G`, `10G`
     - `Auto 1G`, `Auto 10G`
   - Top navigation no longer includes `Ports`; all port operations are under `Switches`.
+  - Servers list now shows linked switch/port and mapped sensor count preview.
   - Switch SNMP test now auto-discovers and stores ports when connection succeeds.
   - SNMP compatibility added for environments that do not provide `snmp2_real_walk` but expose `snmprealwalk` or `snmp2_walk/snmpwalk`.
   - VLAN resolution is improved using `dot1dBasePortIfIndex` -> `dot1qPvid` mapping for broader switch compatibility.

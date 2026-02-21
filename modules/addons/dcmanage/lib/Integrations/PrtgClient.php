@@ -68,6 +68,59 @@ final class PrtgClient
         ]);
     }
 
+    public function listSensors(int $limit = 200, string $query = ''): array
+    {
+        $limit = max(20, min(1000, $limit));
+        $json = $this->get('/api/table.json', [
+            'content' => 'sensors',
+            'output' => 'json',
+            'columns' => 'objid,sensor,device,group,status,lastvalue',
+            'count' => $limit,
+        ]);
+
+        $rows = $json['sensors'] ?? [];
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $q = strtolower(trim($query));
+        $items = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $id = trim((string) ($row['objid'] ?? $row['id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+
+            $name = trim((string) ($row['sensor'] ?? $row['name'] ?? $id));
+            $device = trim((string) ($row['device'] ?? ''));
+            $group = trim((string) ($row['group'] ?? ''));
+            $status = trim((string) ($row['status'] ?? ''));
+            $lastValue = trim((string) ($row['lastvalue'] ?? ''));
+
+            if ($q !== '') {
+                $haystack = strtolower($id . ' ' . $name . ' ' . $device . ' ' . $group . ' ' . $status);
+                if (strpos($haystack, $q) === false) {
+                    continue;
+                }
+            }
+
+            $items[] = [
+                'id' => $id,
+                'name' => $name,
+                'device' => $device,
+                'group' => $group,
+                'status' => $status,
+                'lastvalue' => $lastValue,
+            ];
+        }
+
+        return $items;
+    }
+
     private function get(string $path, array $query): array
     {
         $query = array_merge($query, [

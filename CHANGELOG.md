@@ -3,6 +3,19 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.28] - 2026-02-21
+### Added
+- Server create flow now supports selecting switch and switch port directly.
+- Added PRTG sensor multi-select on server form (multiple sensors per server for traffic).
+- Added API endpoint `prtg/sensors` for loading sensor lists from selected PRTG instance.
+- Added PRTG instance CRUD in Monitoring tab (add/list/test/delete).
+
+### Changed
+- Servers table now shows linked `Switch/Port` and traffic sensor count/preview.
+
+### Fixed
+- Server provisioning workflow now saves switch/port and sensor mappings in database instead of hostname-only create.
+
 ## [0.1.27] - 2026-02-21
 ### Changed
 - Datacenters section spacing was normalized on all sides.

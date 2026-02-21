@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 7;
+    private const SCHEMA_VERSION = 8;
 
     public static function migrate(): void
     {
@@ -49,6 +49,11 @@ final class Schema
         if ($current < 7) {
             self::migrationV7();
             self::setCurrentVersion(7);
+        }
+
+        if ($current < 8) {
+            self::migrationV8();
+            self::setCurrentVersion(8);
         }
     }
 
@@ -441,6 +446,21 @@ final class Schema
         if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports') && !Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'speed_mode')) {
             Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
                 $table->string('speed_mode', 16)->nullable()->after('speed_mbps');
+            });
+        }
+    }
+
+    private static function migrationV8(): void
+    {
+        if (!Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
+            Capsule::schema()->create('mod_dcmanage_server_traffic_sensors', static function (Blueprint $table): void {
+                $table->bigIncrements('id');
+                $table->unsignedInteger('server_id')->index();
+                $table->unsignedInteger('prtg_id')->nullable()->index();
+                $table->string('sensor_id', 64)->index();
+                $table->string('sensor_name', 191)->nullable();
+                $table->timestamp('created_at')->nullable();
+                $table->unique(['server_id', 'sensor_id'], 'mod_dcmanage_server_sensor_unique');
             });
         }
     }

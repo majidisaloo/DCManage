@@ -48,6 +48,9 @@ final class Router
                 case 'graphs/get':
                     $data = self::graphGet();
                     break;
+                case 'prtg/sensors':
+                    $data = self::prtgSensors();
+                    break;
                 default:
                     throw new \RuntimeException('Endpoint not found: ' . $endpoint);
             }
@@ -215,6 +218,25 @@ final class Router
         return [
             'cached' => false,
             'payload' => $payload,
+        ];
+    }
+
+    private static function prtgSensors(): array
+    {
+        $prtgId = (int) ($_GET['prtg_id'] ?? 0);
+        if ($prtgId <= 0) {
+            throw new \InvalidArgumentException('prtg_id is required');
+        }
+
+        $limit = max(20, min(500, (int) ($_GET['limit'] ?? 200)));
+        $query = trim((string) ($_GET['q'] ?? ''));
+
+        $client = PrtgClient::fromDb($prtgId);
+        $items = $client->listSensors($limit, $query);
+
+        return [
+            'items' => $items,
+            'count' => count($items),
         ];
     }
 
