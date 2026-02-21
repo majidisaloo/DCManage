@@ -3,6 +3,18 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.21] - 2026-02-21
+### Added
+- Added SNMP compatibility layer for discovery:
+  - `snmp2_real_walk`
+  - `snmprealwalk`
+  - fallback `snmp2_walk/snmpwalk`
+- Added SNMP get compatibility fallback (`snmp2_get` -> `snmpget`) for connectivity checks.
+
+### Fixed
+- Fixed switch auto-discovery on hosts where `snmp2_real_walk` is missing but other SNMP functions are available.
+- Improved discovery resilience by supporting both real-walk and list-walk PHP SNMP APIs.
+
 ## [0.1.20] - 2026-02-21
 ### Added
 - Added robust switch port auto-discovery flow reuse helper to store discovered ports consistently.

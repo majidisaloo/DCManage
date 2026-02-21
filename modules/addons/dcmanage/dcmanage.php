@@ -939,14 +939,12 @@ function dcmanage_test_snmp(string $host, string $community, int $port = 161): a
         return ['ok' => false, 'message' => 'Management IP is empty'];
     }
 
-    if (function_exists('snmp2_get')) {
-        $timeoutMicros = 1000000;
-        $retries = 0;
-        $target = $host . ':' . max(1, $port);
-        $value = @snmp2_get($target, $community === '' ? 'public' : $community, '.1.3.6.1.2.1.1.1.0', $timeoutMicros, $retries);
-        if ($value !== false) {
-            return ['ok' => true, 'message' => 'SNMP connected'];
-        }
+    $timeoutMicros = 1000000;
+    $retries = 0;
+    $target = $host . ':' . max(1, $port);
+    $value = dcmanage_snmp_get($target, $community === '' ? 'public' : $community, '.1.3.6.1.2.1.1.1.0', $timeoutMicros, $retries);
+    if ($value !== false) {
+        return ['ok' => true, 'message' => 'SNMP connected'];
     }
 
     $errno = 0;
@@ -958,6 +956,51 @@ function dcmanage_test_snmp(string $host, string $community, int $port = 161): a
     }
 
     return ['ok' => false, 'message' => 'SNMP connection failed'];
+}
+
+function dcmanage_snmp_get(string $target, string $community, string $oid, int $timeoutMicros, int $retries)
+{
+    if (function_exists('snmp2_get')) {
+        return @snmp2_get($target, $community, $oid, $timeoutMicros, $retries);
+    }
+    if (function_exists('snmpget')) {
+        return @snmpget($target, $community, $oid, $timeoutMicros, $retries);
+    }
+    return false;
+}
+
+function dcmanage_snmp_real_walk_any(string $target, string $community, string $oid, int $timeoutMicros, int $retries): array
+{
+    if (function_exists('snmp2_real_walk')) {
+        $out = @snmp2_real_walk($target, $community, $oid, $timeoutMicros, $retries);
+        if (is_array($out) && count($out) > 0) {
+            return $out;
+        }
+    }
+    if (function_exists('snmprealwalk')) {
+        $out = @snmprealwalk($target, $community, $oid, $timeoutMicros, $retries);
+        if (is_array($out) && count($out) > 0) {
+            return $out;
+        }
+    }
+    return [];
+}
+
+function dcmanage_snmp_walk_list_any(string $target, string $community, string $oid, int $timeoutMicros, int $retries): array
+{
+    if (function_exists('snmp2_walk')) {
+        $out = @snmp2_walk($target, $community, $oid, $timeoutMicros, $retries);
+        if (is_array($out) && count($out) > 0) {
+            return array_values($out);
+        }
+    }
+    if (function_exists('snmpwalk')) {
+        $out = @snmpwalk($target, $community, $oid, $timeoutMicros, $retries);
+        if (is_array($out) && count($out) > 0) {
+            return array_values($out);
+        }
+    }
+    return [];
 }
 
 function dcmanage_normalize_if_name(string $ifName): string
@@ -1013,8 +1056,10 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
         return ['ok' => false, 'message' => 'Management IP is empty', 'ports' => []];
     }
 
-    if (!function_exists('snmp2_real_walk')) {
-        return ['ok' => false, 'message' => 'PHP SNMP extension (snmp2_real_walk) is not available', 'ports' => []];
+    $hasRealWalk = function_exists('snmp2_real_walk') || function_exists('snmprealwalk');
+    $hasWalkList = function_exists('snmp2_walk') || function_exists('snmpwalk');
+    if (!$hasRealWalk && !$hasWalkList) {
+        return ['ok' => false, 'message' => 'PHP SNMP functions are not available on this server', 'ports' => []];
     }
 
     $target = $host . ':' . max(1, $port);
@@ -1029,45 +1074,75 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
         @snmp_set_quick_print(false);
     }
 
-    $ifNameWalk = @snmp2_real_walk($target, $community, '.1.3.6.1.2.1.31.1.1.1.1', $timeoutMicros, $retries);
-    if (!is_array($ifNameWalk) || count($ifNameWalk) === 0) {
-        $ifNameWalk = @snmp2_real_walk($target, $community, '.1.3.6.1.2.1.2.2.1.2', $timeoutMicros, $retries);
-    }
-    if (!is_array($ifNameWalk) || count($ifNameWalk) === 0) {
-        return ['ok' => false, 'message' => 'No interfaces received from SNMP walk', 'ports' => []];
-    }
-
-    $adminWalk = @snmp2_real_walk($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries);
-    $operWalk = @snmp2_real_walk($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries);
-    $pvidWalk = @snmp2_real_walk($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1', $timeoutMicros, $retries);
-
     $ports = [];
-    foreach ($ifNameWalk as $oid => $rawName) {
-        $oid = (string) $oid;
-        if (!preg_match('/\.(\d+)$/', $oid, $m)) {
-            continue;
+    $ifNameWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.1', $timeoutMicros, $retries);
+    if (count($ifNameWalk) === 0) {
+        $ifNameWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.2', $timeoutMicros, $retries);
+    }
+
+    if (count($ifNameWalk) > 0) {
+        $adminWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries);
+        $operWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries);
+        $pvidWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1', $timeoutMicros, $retries);
+
+        foreach ($ifNameWalk as $oid => $rawName) {
+            $oid = (string) $oid;
+            if (!preg_match('/\.(\d+)$/', $oid, $m)) {
+                continue;
+            }
+            $index = (int) $m[1];
+            if ($index <= 0) {
+                continue;
+            }
+
+            $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value((string) $rawName));
+            if ($ifName === '') {
+                continue;
+            }
+
+            $adminRaw = is_array($adminWalk) && isset($adminWalk['.1.3.6.1.2.1.2.2.1.7.' . $index]) ? (string) $adminWalk['.1.3.6.1.2.1.2.2.1.7.' . $index] : '';
+            $operRaw = is_array($operWalk) && isset($operWalk['.1.3.6.1.2.1.2.2.1.8.' . $index]) ? (string) $operWalk['.1.3.6.1.2.1.2.2.1.8.' . $index] : '';
+            $pvidRaw = is_array($pvidWalk) && isset($pvidWalk['.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $index]) ? (string) $pvidWalk['.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $index] : '';
+
+            $vlan = dcmanage_snmp_parse_typed_value($pvidRaw);
+            $ports[] = [
+                'if_name' => $ifName,
+                'vlan' => preg_replace('/[^0-9,\\-]/', '', $vlan) ?: '',
+                'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
+                'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
+            ];
         }
-        $index = (int) $m[1];
-        if ($index <= 0) {
-            continue;
+    } else {
+        $ifNameList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.1', $timeoutMicros, $retries);
+        if (count($ifNameList) === 0) {
+            $ifNameList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.2', $timeoutMicros, $retries);
+        }
+        if (count($ifNameList) === 0) {
+            return ['ok' => false, 'message' => 'No interfaces received from SNMP walk', 'ports' => []];
         }
 
-        $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value((string) $rawName));
-        if ($ifName === '') {
-            continue;
+        $adminList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries);
+        $operList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries);
+        $pvidList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1', $timeoutMicros, $retries);
+
+        foreach ($ifNameList as $i => $rawName) {
+            $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value((string) $rawName));
+            if ($ifName === '') {
+                continue;
+            }
+
+            $adminRaw = isset($adminList[$i]) ? (string) $adminList[$i] : '';
+            $operRaw = isset($operList[$i]) ? (string) $operList[$i] : '';
+            $pvidRaw = isset($pvidList[$i]) ? (string) $pvidList[$i] : '';
+
+            $vlan = dcmanage_snmp_parse_typed_value($pvidRaw);
+            $ports[] = [
+                'if_name' => $ifName,
+                'vlan' => preg_replace('/[^0-9,\\-]/', '', $vlan) ?: '',
+                'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
+                'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
+            ];
         }
-
-        $adminRaw = is_array($adminWalk) && isset($adminWalk['.1.3.6.1.2.1.2.2.1.7.' . $index]) ? (string) $adminWalk['.1.3.6.1.2.1.2.2.1.7.' . $index] : '';
-        $operRaw = is_array($operWalk) && isset($operWalk['.1.3.6.1.2.1.2.2.1.8.' . $index]) ? (string) $operWalk['.1.3.6.1.2.1.2.2.1.8.' . $index] : '';
-        $pvidRaw = is_array($pvidWalk) && isset($pvidWalk['.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $index]) ? (string) $pvidWalk['.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $index] : '';
-
-        $vlan = dcmanage_snmp_parse_typed_value($pvidRaw);
-        $ports[] = [
-            'if_name' => $ifName,
-            'vlan' => preg_replace('/[^0-9,\\-]/', '', $vlan) ?: '',
-            'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
-            'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
-        ];
     }
 
     usort($ports, static function (array $a, array $b): int {
