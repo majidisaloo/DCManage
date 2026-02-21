@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.13] - 2026-02-21
+### Changed
+- Dashboard KPI cards were redesigned with cleaner card hierarchy, centered values, and stronger visual emphasis.
+- Version/Update card and actions were restyled to a more modern, card-based UI.
+- Dashboard table headers and card surfaces were refined for improved readability.
+
+### Fixed
+- All module alerts/notifications now render centered text with consistent spacing and modern visual style.
+
 ## [0.1.12] - 2026-02-21
 ### Fixed
 - Fixed dashboard/API parsing when WHMCS wraps addon output with admin HTML.

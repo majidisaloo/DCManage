@@ -134,7 +134,7 @@
         html += '' +
           '<div class="col-md-3 col-6 mb-3">' +
           '<a href="' + moduleLink + '&tab=' + encodeURIComponent(k.tab) + '" class="text-decoration-none">' +
-          '<div class="card dcmanage-click-card"><div class="card-body"><small>' + safeText(k.label) + '</small><h4>' + (c[k.key] || 0) + '</h4></div></div>' +
+          '<div class="card dcmanage-click-card"><div class="card-body"><div class="dcmanage-kpi-label">' + safeText(k.label) + '</div><div class="dcmanage-kpi-value">' + (c[k.key] || 0) + '</div></div></div>' +
           '</a>' +
           '</div>';
       });
@@ -171,6 +171,7 @@
         '<div class="mt-1">' + hasUpdate + '</div>' +
         '</div>' +
         '<div class="col-md-5 text-md-right">' +
+        '<div class="dcmanage-update-actions">' +
         '<div class="custom-control custom-switch mb-2">' +
         '<input type="checkbox" class="custom-control-input" id="dcmanage-auto-update"' + autoChecked + '>' +
         '<label class="custom-control-label" for="dcmanage-auto-update">' + safeText(T.autoUpdate) + '</label>' +
@@ -179,7 +180,8 @@
         '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">' + safeText(T.applyUpdate) + '</button>' +
         '</div>' +
         '</div>' +
-        '<div id="dcmanage-update-msg" class="mt-2 small"></div>' +
+        '</div>' +
+        '<div id="dcmanage-update-msg" class="mt-2 small dcmanage-update-msg"></div>' +
         '</div>';
 
       bindVersionActions(base);

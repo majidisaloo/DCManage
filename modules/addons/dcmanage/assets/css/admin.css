@@ -2,6 +2,7 @@
   --dc-primary: #1e5eff;
   --dc-accent: #12b3c7;
   --dc-soft: #eef4ff;
+  --dc-text: #173063;
 }
 
 .dcmanage-shell.dcmanage-rtl {
@@ -57,23 +58,103 @@
 }
 
 .dcmanage-shell .card {
+  border-radius: 16px;
+  border: 1px solid #dbe6ff;
+  box-shadow: 0 8px 24px rgba(19, 54, 124, .08);
+}
+
+.dcmanage-shell .alert {
+  border: 0;
   border-radius: 14px;
+  min-height: 58px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: .15px;
+  box-shadow: 0 8px 18px rgba(16, 43, 99, .08);
+}
+
+.dcmanage-shell .alert-danger {
+  background: linear-gradient(180deg, #ffecec, #ffe2e2);
+  color: #9d2121;
+}
+
+.dcmanage-shell .alert-success {
+  background: linear-gradient(180deg, #e9fff3, #dcfaeb);
+  color: #15613d;
+}
+
+.dcmanage-shell .alert-info {
+  background: linear-gradient(180deg, #ecf7ff, #deefff);
+  color: #11547e;
 }
 
 .dcmanage-kpi .card {
-  border: 1px solid #e5ecff;
-  box-shadow: 0 4px 14px rgba(7, 37, 102, .06);
+  border: 1px solid #dce7ff;
+  box-shadow: 0 10px 24px rgba(9, 42, 106, .10);
+  overflow: hidden;
 }
 
 .dcmanage-kpi .dcmanage-click-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 18px rgba(7, 37, 102, .12);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 28px rgba(7, 37, 102, .14);
+}
+
+.dcmanage-kpi .dcmanage-click-card .card-body {
+  text-align: center;
+  padding: 18px 12px 16px;
+  background: linear-gradient(180deg, #fafdff, #edf3ff);
+}
+
+.dcmanage-kpi-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  color: #4f618b;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.dcmanage-kpi-value {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--dc-text);
 }
 
 .dcmanage-version-card {
-  border-radius: 14px;
-  border: 1px solid #d9e4ff;
-  background: linear-gradient(180deg, #f8fbff, #eef4ff);
+  border-radius: 16px;
+  border: 1px solid #ccdcff;
+  background: linear-gradient(140deg, #f7fbff, #e8f0ff 55%, #e7f6ff);
+  box-shadow: 0 12px 28px rgba(18, 61, 140, .10);
+}
+
+.dcmanage-version-card h5 {
+  font-weight: 800;
+  color: #1f3363;
+}
+
+.dcmanage-version-card .btn {
+  border-radius: 11px;
+  font-weight: 700;
+  padding: 7px 12px;
+}
+
+.dcmanage-update-actions {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.dcmanage-update-msg {
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .6);
+  color: #24406f;
 }
 
 .dcmanage-shell .dcmanage-form-card {
@@ -99,6 +180,8 @@
 .dcmanage-shell .table thead th {
   background: #f1f5ff;
   border-bottom: 0;
+  color: #21386b;
+  font-weight: 800;
 }
 
 .dcmanage-shell .dcmanage-dc-table th,
@@ -296,5 +379,9 @@
 @media (max-width: 991px) {
   .dcmanage-rack-grid {
     max-height: 320px;
+  }
+
+  .dcmanage-update-actions {
+    align-items: stretch;
   }
 }
