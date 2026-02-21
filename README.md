@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.3)
+## Features in this release (v0.1.4)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -23,6 +23,12 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - `graph_warm` (every 30 min)
   - `cleanup` (daily)
   - `self_update` (daily/weekly)
+- Dashboard update center:
+  - Shows current installed version and latest GitHub release.
+  - Supports one-click `Check Update` and one-click `Apply Update`.
+  - Supports toggling Auto Update directly from dashboard.
+- System Settings tab inside module:
+  - timezone, locale, traffic poll interval, graph cache TTL, log retention, dashboard refresh interval.
 
 ## Installation From GitHub Releases
 1. Download asset: `DCManage-vX.Y.Z.zip` from repository Releases.
@@ -46,9 +52,8 @@ Add these server cron entries:
 The addon can pull new releases from GitHub automatically without `shell_exec`.
 - Module settings:
   - `Enable Auto Update`: on/off
-  - `GitHub Repository`: default `majidisaloo/DCManage`
-  - `Update Branch`: fallback reference
 - Runtime behavior:
+  - GitHub source is hardcoded to `majidisaloo/DCManage` (`main` policy).
   - `self_update` cron checks `releases/latest`.
   - If release tag version is newer than installed version, zip is downloaded and files are replaced in `modules/addons/dcmanage`.
   - Lock `cron:self_update` prevents parallel update runs.

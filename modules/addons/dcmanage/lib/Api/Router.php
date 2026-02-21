@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DCManage\Api;
 
 use DCManage\Integrations\PrtgClient;
+use DCManage\Support\UpdateManager;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 final class Router
@@ -18,6 +19,10 @@ final class Router
 
             $data = match ($endpoint) {
                 'dashboard/health' => self::dashboardHealth(),
+                'dashboard/version' => self::dashboardVersion(),
+                'update/check' => self::updateCheck(),
+                'update/apply' => self::updateApply(),
+                'update/set-auto' => self::updateSetAuto(),
                 'datacenters/list' => self::datacenterList(),
                 'traffic/list' => self::trafficList(),
                 'graphs/get' => self::graphGet(),
@@ -50,6 +55,30 @@ final class Router
         ];
     }
 
+    private static function dashboardVersion(): array
+    {
+        return UpdateManager::checkLatestStatus();
+    }
+
+    private static function updateCheck(): array
+    {
+        return UpdateManager::checkLatestStatus();
+    }
+
+    private static function updateApply(): array
+    {
+        $force = (int) ($_GET['force'] ?? 0) === 1;
+        return UpdateManager::applyLatestIfNewer($force);
+    }
+
+    private static function updateSetAuto(): array
+    {
+        $enabled = (int) ($_GET['enabled'] ?? 0) === 1;
+        UpdateManager::setAutoEnabled($enabled);
+
+        return ['auto_update' => UpdateManager::isAutoEnabled()];
+    }
+
     private static function datacenterList(): array
     {
         return Capsule::table('mod_dcmanage_datacenters')
@@ -61,7 +90,7 @@ final class Router
 
     private static function trafficList(): array
     {
-        $rows = Capsule::table('mod_dcmanage_usage_state as us')
+        return Capsule::table('mod_dcmanage_usage_state as us')
             ->leftJoin('tblhosting as h', 'h.id', '=', 'us.whmcs_serviceid')
             ->select([
                 'us.whmcs_serviceid',
@@ -94,8 +123,6 @@ final class Router
                 ];
             })
             ->toArray();
-
-        return $rows;
     }
 
     private static function graphGet(): array

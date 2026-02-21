@@ -1,9 +1,23 @@
 # Changelog
 
 ## [Unreleased]
-- Maintenance:
-  - ignored local verification artifacts (`dist/`, `_verify.zip`) to keep repository clean.
-  - fixed release workflow note-body generation bug for tag-based releases.
+- No pending entries.
+
+## [0.1.4] - 2026-02-21
+### Changed
+- GitHub update source is now hardcoded and no longer configurable by repo/branch fields.
+- Dashboard now includes a dedicated version/update panel with current and latest release visibility.
+- Admin module tabs now use a colored visual style for better navigation and readability.
+
+### Added
+- Added one-click update actions in dashboard: `Check Update` and `Apply Update`.
+- Added auto-update toggle action directly in dashboard.
+- Added `Settings` tab for global system options (timezone, locale, polling interval, cache TTL, retention, refresh period).
+- Added update API endpoints for status check, apply, and auto-update toggle operations.
+
+### Fixed
+- Removed dependence on editable GitHub repository/branch values for update flow consistency.
+- Improved update file copy routine to ignore non-essential artifacts like `.DS_Store`.
 
 ## [0.1.3] - 2026-02-21
 ### Changed

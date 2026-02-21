@@ -10,16 +10,48 @@ use ZipArchive;
 
 final class UpdateManager
 {
+    private const GITHUB_REPO = 'majidisaloo/DCManage';
+    private const GITHUB_BRANCH = 'main';
+
     public static function autoUpdateIfNeeded(): array
     {
-        if (!self::isEnabled()) {
+        if (!self::isAutoEnabled()) {
             return ['status' => 'skipped', 'reason' => 'auto-update disabled'];
         }
 
+        return self::applyLatestIfNewer(false);
+    }
+
+    public static function checkLatestStatus(): array
+    {
         $latest = self::fetchLatestRelease();
         $latestVersion = self::normalizeVersion((string) ($latest['tag_name'] ?? ''));
-        if ($latestVersion === '' || version_compare($latestVersion, Version::CURRENT, '<=')) {
-            return ['status' => 'up-to-date', 'current' => Version::CURRENT, 'latest' => $latestVersion];
+
+        return [
+            'current_version' => Version::CURRENT,
+            'latest_version' => $latestVersion,
+            'latest_tag' => (string) ($latest['tag_name'] ?? ''),
+            'has_update' => $latestVersion !== '' && version_compare($latestVersion, Version::CURRENT, '>'),
+            'auto_update' => self::isAutoEnabled(),
+            'repo' => self::GITHUB_REPO,
+            'branch' => self::GITHUB_BRANCH,
+            'release_url' => (string) ($latest['html_url'] ?? ''),
+            'published_at' => (string) ($latest['published_at'] ?? ''),
+        ];
+    }
+
+    public static function applyLatestIfNewer(bool $force): array
+    {
+        $latest = self::fetchLatestRelease();
+        $latestVersion = self::normalizeVersion((string) ($latest['tag_name'] ?? ''));
+
+        if (!$force && ($latestVersion === '' || version_compare($latestVersion, Version::CURRENT, '<='))) {
+            return [
+                'status' => 'up-to-date',
+                'current' => Version::CURRENT,
+                'latest' => $latestVersion,
+                'tag' => (string) ($latest['tag_name'] ?? ''),
+            ];
         }
 
         $zipUrl = (string) ($latest['zipball_url'] ?? '');
@@ -37,7 +69,7 @@ final class UpdateManager
         ];
     }
 
-    private static function isEnabled(): bool
+    public static function isAutoEnabled(): bool
     {
         $value = Capsule::table('tbladdonmodules')
             ->where('module', 'dcmanage')
@@ -52,33 +84,25 @@ final class UpdateManager
         return $value === 'on' || $value === '1' || $value === 'true' || $value === 'yes';
     }
 
+    public static function setAutoEnabled(bool $enabled): void
+    {
+        Capsule::table('tbladdonmodules')->updateOrInsert(
+            ['module' => 'dcmanage', 'setting' => 'update_auto'],
+            ['value' => $enabled ? 'on' : 'off']
+        );
+    }
+
     private static function fetchLatestRelease(): array
     {
-        $repo = self::repo();
-        [$owner, $name] = explode('/', $repo, 2);
+        [$owner, $name] = explode('/', self::GITHUB_REPO, 2);
         $url = 'https://api.github.com/repos/' . rawurlencode($owner) . '/' . rawurlencode($name) . '/releases/latest';
 
         $json = self::httpGetJson($url);
         if (!isset($json['tag_name'])) {
-            throw new \RuntimeException('Latest release tag not found for ' . $repo);
+            throw new \RuntimeException('Latest release tag not found for ' . self::GITHUB_REPO);
         }
 
         return $json;
-    }
-
-    private static function repo(): string
-    {
-        $value = Capsule::table('tbladdonmodules')
-            ->where('module', 'dcmanage')
-            ->where('setting', 'update_repo')
-            ->value('value');
-
-        $repo = trim((string) ($value ?: 'majidisaloo/DCManage'));
-        if ($repo === '' || strpos($repo, '/') === false) {
-            return 'majidisaloo/DCManage';
-        }
-
-        return $repo;
     }
 
     private static function normalizeVersion(string $tag): string
@@ -165,7 +189,7 @@ final class UpdateManager
         }
 
         foreach ($items as $item) {
-            if ($item === '.' || $item === '..' || $item === '.git') {
+            if ($item === '.' || $item === '..' || $item === '.git' || $item === '.DS_Store') {
                 continue;
             }
 
