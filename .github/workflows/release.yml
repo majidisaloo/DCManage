@@ -16,21 +16,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build public_html package
+      - name: Build module package
         run: |
           set -euo pipefail
-          mkdir -p dist/public_html/modules/addons
-          cp -R modules/addons/dcmanage dist/public_html/modules/addons/dcmanage
-          cp README.md dist/public_html/README-DCManage.md
-          cp CHANGELOG.md dist/public_html/CHANGELOG-DCManage.md
-          cd dist/public_html
-          zip -r ../DCManage-${GITHUB_REF_NAME}-public_html.zip .
+          mkdir -p dist
+          cp -R modules/addons/dcmanage dist/dcmanage
+          cd dist
+          zip -r ../DCManage-${GITHUB_REF_NAME}.zip dcmanage
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/DCManage-${{ github.ref_name }}-public_html.zip
+            DCManage-${{ github.ref_name }}.zip
           generate_release_notes: true
           draft: false
           prerelease: false

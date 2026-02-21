@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.0)
+## Features in this release (v0.1.1)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -17,8 +17,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
 - Bilingual admin UI:
   - Persian (`fa`) and English (`en`) labels/messages.
   - Automatic language detection from WHMCS session (`Language`/`adminlang`).
-- Cron entrypoint with 4 tasks:
- - Cron entrypoint with 5 tasks:
+- Cron entrypoint with 5 tasks:
   - `poll_usage` (every 5 min)
   - `enforce_queue` (every 1 min)
   - `graph_warm` (every 30 min)
@@ -26,12 +25,11 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - `self_update` (daily/weekly)
 
 ## Installation From GitHub Releases
-1. Download asset: `DCManage-vX.Y.Z-public_html.zip` from repository Releases.
-2. Upload the zip into WHMCS `public_html`.
-3. Extract zip in `public_html`.
-4. Verify path exists: `public_html/modules/addons/dcmanage`.
-5. Activate addon in WHMCS Admin > System Settings > Addon Modules.
-6. Grant admin role access to `DCManage`.
+1. Download asset: `DCManage-vX.Y.Z.zip` from repository Releases.
+2. Extract the zip and confirm it contains only one folder: `dcmanage`.
+3. Copy folder to WHMCS: `public_html/modules/addons/dcmanage`.
+4. Activate addon in WHMCS Admin > System Settings > Addon Modules.
+5. Grant admin role access to `DCManage`.
 
 ## Cron Setup
 Add these server cron entries:

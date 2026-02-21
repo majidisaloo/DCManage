@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-02-21
+- Fixed GitHub release package format:
+  - zip name no longer contains `public_html`.
+  - zip root contains only `dcmanage/` module folder.
+  - no README/CHANGELOG files are included in release zip payload.
+
 ## [0.1.0] - 2026-02-21
 - Added initial WHMCS addon skeleton for `DCManage`.
 - Added versioned database migrations for datacenters, racks, networks, switches, servers, ports, iLO, PRTG, scope, service linking, usage, packages, purchases, graph cache, logs, locks, jobs.
