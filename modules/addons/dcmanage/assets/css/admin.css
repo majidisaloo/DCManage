@@ -120,36 +120,161 @@
   border: 1px solid #d9e4ff;
 }
 
-.dcmanage-rack-grid {
-  max-height: 320px;
-  overflow: auto;
-  border: 1px solid #e5ebfb;
+.dcmanage-rack-card {
+  border: 1px solid #d9e4ff;
+  background: linear-gradient(180deg, #fcfdff, #f4f7ff);
+}
+
+.dcmanage-rack-legend {
+  font-size: 12px;
+  color: #344567;
+}
+
+.dcmanage-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+}
+
+.dcmanage-dot.server { background: #2a78ff; }
+.dcmanage-dot.switch { background: #1fb77f; }
+.dcmanage-dot.reserved { background: #9c6bff; }
+.dcmanage-dot.cable { background: #f39a2b; }
+.dcmanage-dot.air { background: #25bcd1; }
+
+.dcmanage-rack-frame {
+  border: 2px solid #8895b7;
   border-radius: 10px;
-  background: #fff;
+  background: #d9deec;
+  padding: 10px 8px 8px;
+  position: relative;
+}
+
+.dcmanage-rack-frame::before,
+.dcmanage-rack-frame::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  background: linear-gradient(180deg, #747f9e, #5f6b88);
+  border-radius: 6px;
+}
+
+.dcmanage-rack-frame::before { left: 6px; }
+.dcmanage-rack-frame::after { right: 6px; }
+
+.dcmanage-rack-title {
+  text-align: center;
+  font-weight: 700;
+  color: #20335f;
+  margin-bottom: 8px;
+}
+
+.dcmanage-rack-grid {
+  max-height: 460px;
+  overflow: auto;
+  border: 1px solid #aeb8d1;
+  border-radius: 10px;
+  background: #eef1f8;
+  padding: 8px;
 }
 
 .dcmanage-rack-u {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 44px 1fr 48px;
   align-items: center;
   font-size: 12px;
-  padding: 5px 8px;
-  border-bottom: 1px solid #eef2ff;
+  gap: 8px;
+  padding: 3px 4px;
+  border-bottom: 1px dashed #cad2e6;
 }
 
 .dcmanage-rack-u .u-num {
   font-weight: 700;
-  color: #445071;
+  color: #2d3a59;
+}
+
+.dcmanage-rack-u .u-slot {
+  height: 20px;
+  border-radius: 4px;
+  position: relative;
+  background: #d6dbe8;
+  border: 1px solid #b2bbcf;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.dcmanage-rack-u .u-face {
+  width: 28px;
+  height: 100%;
+  border-inline-end: 1px solid #8e9bb9;
+  background: repeating-linear-gradient(90deg, #5f6982 0, #5f6982 2px, #6d7792 2px, #6d7792 4px);
+}
+
+.dcmanage-rack-u .u-item {
+  padding: 0 6px;
+  font-size: 11px;
+  color: #243455;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dcmanage-rack-u.blank .u-item {
-  color: #9aa7c2;
+  color: #7e8aa7;
+}
+
+.dcmanage-rack-u.blank .u-slot {
+  background: #eceff7;
 }
 
 .dcmanage-rack-u.server {
-  background: #e8f3ff;
+  background: #f3f8ff;
+}
+
+.dcmanage-rack-u.server .u-slot {
+  background: linear-gradient(90deg, #cfe3ff, #e3efff);
 }
 
 .dcmanage-rack-u.switch {
-  background: #e7fff8;
+  background: #f0fff8;
+}
+
+.dcmanage-rack-u.switch .u-slot {
+  background: linear-gradient(90deg, #c8f5e5, #e1fff4);
+}
+
+.dcmanage-rack-u.reserved .u-slot {
+  background: linear-gradient(90deg, #e5d7ff, #f0e9ff);
+}
+
+.dcmanage-rack-u.cable .u-slot {
+  background: linear-gradient(90deg, #ffe6c9, #fff2e1);
+}
+
+.dcmanage-rack-u.air .u-slot {
+  background: linear-gradient(90deg, #d0f6fa, #e8fcff);
+}
+
+.dcmanage-rack-frame.rear .u-wire {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff2a2a, #ffd43b);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .08);
+}
+
+.dcmanage-rack-frame.rear .dcmanage-rack-u.blank .u-wire {
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (max-width: 991px) {
+  .dcmanage-rack-grid {
+    max-height: 320px;
+  }
 }

@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.9] - 2026-02-21
+### Changed
+- Rack presentation was redesigned to a more realistic visual style with dedicated front/rear views.
+- Rack cards now display a visual legend for server/switch/reserved/cable/airflow unit states.
+
+### Added
+- Rear-view rack units now include cable-lane indicators for occupied units to improve physical mapping clarity.
+- Rack frame styling now includes rails, slot faces, and state-aware unit coloring for easier operational scanning.
+
 ## [0.1.8] - 2026-02-21
 ### Changed
 - Settings field label was renamed from `Locale` to `Language` for clearer UX.

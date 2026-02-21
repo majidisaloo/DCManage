@@ -603,13 +603,46 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
     foreach ($racks as $rack) {
         $units = max(1, (int) $rack->total_u);
         $usage = dcmanage_rack_usage((int) $rack->id, $units);
-        echo '<div class="col-lg-4 col-md-6 mb-3">';
-        echo '<div class="card"><div class="card-body">';
-        echo '<h6 class="mb-2">' . htmlspecialchars((string) $rack->name) . ' (' . $units . 'U)</h6>';
-        echo '<div class="dcmanage-rack-grid">';
-        for ($u = $units; $u >= 1; $u--) {
-            $cell = $usage[$u] ?? ['kind' => 'blank', 'label' => '-'];
-            echo '<div class="dcmanage-rack-u ' . htmlspecialchars((string) $cell['kind']) . '"><span class="u-num">U' . $u . '</span><span class="u-item">' . htmlspecialchars((string) $cell['label']) . '</span></div>';
+        echo '<div class="col-12 mb-4">';
+        echo '<div class="card dcmanage-rack-card"><div class="card-body">';
+        echo '<div class="d-flex justify-content-between align-items-center mb-2">';
+        echo '<h6 class="mb-0">' . htmlspecialchars((string) $rack->name) . '</h6>';
+        echo '<span class="badge badge-light">' . $units . 'U</span>';
+        echo '</div>';
+
+        echo '<div class="dcmanage-rack-legend mb-2">';
+        echo '<strong class="mr-2">' . htmlspecialchars(I18n::t('rack_legend', $lang)) . ':</strong>';
+        echo '<span class="dcmanage-dot server"></span>SRV';
+        echo '<span class="dcmanage-dot switch ml-2"></span>SW';
+        echo '<span class="dcmanage-dot reserved ml-2"></span>' . htmlspecialchars(I18n::t('unit_reserved', $lang));
+        echo '<span class="dcmanage-dot cable ml-2"></span>' . htmlspecialchars(I18n::t('unit_cable', $lang));
+        echo '<span class="dcmanage-dot air ml-2"></span>' . htmlspecialchars(I18n::t('unit_air', $lang));
+        echo '</div>';
+
+        echo '<div class="row">';
+        foreach (['front' => I18n::t('rack_front_view', $lang), 'rear' => I18n::t('rack_rear_view', $lang)] as $view => $viewLabel) {
+            echo '<div class="col-lg-6 mb-3">';
+            echo '<div class="dcmanage-rack-frame ' . $view . '">';
+            echo '<div class="dcmanage-rack-title">' . htmlspecialchars($viewLabel) . '</div>';
+            echo '<div class="dcmanage-rack-grid">';
+            for ($u = $units; $u >= 1; $u--) {
+                $cell = $usage[$u] ?? ['kind' => 'blank', 'label' => '-'];
+                $kind = (string) $cell['kind'];
+                $label = (string) $cell['label'];
+                if ($label === '') {
+                    $label = '-';
+                }
+                echo '<div class="dcmanage-rack-u ' . htmlspecialchars($kind) . '">';
+                echo '<span class="u-num">U' . $u . '</span>';
+                echo '<span class="u-slot"><span class="u-face"></span><span class="u-item">' . htmlspecialchars($label) . '</span></span>';
+                if ($view === 'rear' && $kind !== 'blank') {
+                    echo '<span class="u-wire"></span>';
+                }
+                echo '</div>';
+            }
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
         }
         echo '</div>';
 
