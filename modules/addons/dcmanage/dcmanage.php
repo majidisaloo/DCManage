@@ -505,6 +505,68 @@ function dcmanage_handle_actions(string $lang): string
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('switch_port_updated', $lang)) . '</div>';
         }
 
+        if ($action === 'server_create_bulk') {
+            $dcId = (int) ($_POST['bulk_dc_id'] ?? 0);
+            $rackId = (int) ($_POST['bulk_rack_id'] ?? 0);
+            $rangeStart = trim((string) ($_POST['bulk_hostname_start'] ?? ''));
+            $rangeEnd = trim((string) ($_POST['bulk_hostname_end'] ?? ''));
+            $uHeight = max(1, (int) ($_POST['bulk_u_height'] ?? 1));
+            $notes = trim((string) ($_POST['bulk_notes'] ?? ''));
+
+            if ($dcId <= 0) {
+                throw new RuntimeException('Datacenter is required');
+            }
+
+            $range = dcmanage_parse_hostname_range($rangeStart, $rangeEnd);
+            $rangeSize = $range['end'] - $range['start'] + 1;
+            if ($rangeSize > 1000) {
+                throw new RuntimeException('Bulk range is too large (max 1000)');
+            }
+
+            $hostnames = [];
+            for ($i = $range['start']; $i <= $range['end']; $i++) {
+                $hostnames[] = $range['prefix'] . str_pad((string) $i, $range['pad'], '0', STR_PAD_LEFT);
+            }
+
+            $existingSet = [];
+            $existingRows = Capsule::table('mod_dcmanage_servers')
+                ->whereIn('hostname', $hostnames)
+                ->pluck('hostname');
+            foreach ($existingRows as $existingHostname) {
+                $existingSet[(string) $existingHostname] = true;
+            }
+
+            $now = date('Y-m-d H:i:s');
+            $insertRows = [];
+            foreach ($hostnames as $hostname) {
+                if (isset($existingSet[$hostname])) {
+                    continue;
+                }
+                $insertRows[] = [
+                    'dc_id' => $dcId,
+                    'rack_id' => $rackId > 0 ? $rackId : null,
+                    'hostname' => $hostname,
+                    'asset_tag' => '',
+                    'serial' => '',
+                    'u_start' => null,
+                    'u_height' => $uHeight,
+                    'notes' => $notes,
+                    'created_at' => $now,
+                ];
+            }
+
+            if ($insertRows !== []) {
+                Capsule::table('mod_dcmanage_servers')->insert($insertRows);
+            }
+
+            $createdCount = count($insertRows);
+            $skippedCount = count($hostnames) - $createdCount;
+            $message = sprintf(I18n::t('server_bulk_result', $lang), $createdCount, $skippedCount);
+            $class = $createdCount > 0 ? 'success' : 'warning';
+
+            return '<div class="alert alert-' . $class . '">' . htmlspecialchars($message) . '</div>';
+        }
+
         if ($action === 'server_create') {
             $dcId = (int) ($_POST['dc_id'] ?? 0);
             $rackId = (int) ($_POST['rack_id'] ?? 0);
@@ -933,6 +995,38 @@ function dcmanage_parse_prtg_sensor_ids($selected, string $manual): array
     }
 
     return array_values($items);
+}
+
+function dcmanage_parse_hostname_range(string $startHostname, string $endHostname): array
+{
+    $startHostname = trim($startHostname);
+    $endHostname = trim($endHostname);
+    if ($startHostname === '' || $endHostname === '') {
+        throw new RuntimeException('Start and end hostname are required');
+    }
+
+    if (preg_match('/^(.*?)(\d+)$/', $startHostname, $startMatch) !== 1
+        || preg_match('/^(.*?)(\d+)$/', $endHostname, $endMatch) !== 1) {
+        throw new RuntimeException('Hostname range must end with numeric value');
+    }
+
+    $prefix = (string) $startMatch[1];
+    if ($prefix !== (string) $endMatch[1]) {
+        throw new RuntimeException('Hostname prefix mismatch in bulk range');
+    }
+
+    $start = (int) $startMatch[2];
+    $end = (int) $endMatch[2];
+    if ($end < $start) {
+        throw new RuntimeException('Range end must be greater than or equal to range start');
+    }
+
+    return [
+        'prefix' => $prefix,
+        'start' => $start,
+        'end' => $end,
+        'pad' => max(strlen((string) $startMatch[2]), strlen((string) $endMatch[2])),
+    ];
 }
 
 function dcmanage_render_datacenters(string $lang): void
@@ -1877,6 +1971,33 @@ function dcmanage_render_servers(string $lang): void
     echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="3"></textarea></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_server', $lang)) . '</button>';
     echo '</form>';
+
+    echo '<h5 class="mt-4">' . htmlspecialchars(I18n::t('server_bulk_add', $lang)) . '</h5>';
+    echo '<form method="post" action="" class="dcmanage-form-card">';
+    echo '<input type="hidden" name="dcmanage_action" value="server_create_bulk">';
+    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="bulk_dc_id" id="dcmanage-server-bulk-dc" required class="form-control dcmanage-input">';
+    echo '<option value="">--</option>';
+    foreach ($dcs as $dc) {
+        echo '<option value="' . (int) $dc->id . '">' . htmlspecialchars((string) $dc->name) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="bulk_rack_id" id="dcmanage-server-bulk-rack" class="form-control dcmanage-input">';
+    echo '<option value="">--</option>';
+    foreach ($racks as $rack) {
+        echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '">' . htmlspecialchars((string) $rack->name) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_range_start', $lang)) . '</label><input required name="bulk_hostname_start" class="form-control dcmanage-input" placeholder="MDP-301"></div>';
+    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_range_end', $lang)) . '</label><input required name="bulk_hostname_end" class="form-control dcmanage-input" placeholder="MDP-399"></div>';
+    echo '</div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('server_bulk_u_height', $lang)) . '</label><input type="number" min="1" name="bulk_u_height" value="1" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-8"><label>' . htmlspecialchars(I18n::t('server_bulk_notes', $lang)) . '</label><input name="bulk_notes" class="form-control dcmanage-input"></div>';
+    echo '</div>';
+    echo '<small class="form-text text-muted mb-3">' . htmlspecialchars(I18n::t('server_bulk_hint', $lang)) . '</small>';
+    echo '<button class="btn btn-outline-primary" type="submit">' . htmlspecialchars(I18n::t('create_servers_bulk', $lang)) . '</button>';
+    echo '</form>';
     echo '</div>';
 
     echo '<div class="col-lg-7">';
@@ -1905,19 +2026,21 @@ function dcmanage_render_servers(string $lang): void
 
     echo '<script>';
     echo '(function(){';
-    echo 'var dc=document.getElementById("dcmanage-server-dc");var rack=document.getElementById("dcmanage-server-rack");var sw=document.getElementById("dcmanage-server-switch");var swp=document.getElementById("dcmanage-server-switch-port");var prtg=document.getElementById("dcmanage-server-prtg");var sensorSearch=document.getElementById("dcmanage-server-sensor-search");var sensorSel=document.getElementById("dcmanage-server-prtg-sensors");var sensorStatus=document.getElementById("dcmanage-server-sensor-status");var loadBtn=document.getElementById("dcmanage-server-load-sensors");';
+    echo 'var dc=document.getElementById("dcmanage-server-dc");var rack=document.getElementById("dcmanage-server-rack");var sw=document.getElementById("dcmanage-server-switch");var swp=document.getElementById("dcmanage-server-switch-port");var prtg=document.getElementById("dcmanage-server-prtg");var sensorSearch=document.getElementById("dcmanage-server-sensor-search");var sensorSel=document.getElementById("dcmanage-server-prtg-sensors");var sensorStatus=document.getElementById("dcmanage-server-sensor-status");var loadBtn=document.getElementById("dcmanage-server-load-sensors");var bulkDc=document.getElementById("dcmanage-server-bulk-dc");var bulkRack=document.getElementById("dcmanage-server-bulk-rack");';
     echo 'if(!dc||!rack||!sw||!swp){return;}';
-    echo 'function filterByDc(select){var v=dc.value;for(var i=0;i<select.options.length;i++){var o=select.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute("data-dc-id");o.hidden=(v!==""&&d!==null&&d!==v);}if(select.selectedIndex>0&&select.options[select.selectedIndex].hidden){select.selectedIndex=0;}}';
+    echo 'function filterByDc(select,v){for(var i=0;i<select.options.length;i++){var o=select.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute("data-dc-id");o.hidden=(v!==""&&d!==null&&d!==v);}if(select.selectedIndex>0&&select.options[select.selectedIndex].hidden){select.selectedIndex=0;}}';
     echo 'function filterPorts(){var s=sw.value;for(var i=0;i<swp.options.length;i++){var o=swp.options[i];if(!o.value){o.hidden=false;continue;}var sid=o.getAttribute("data-switch-id");o.hidden=(s!==""&&sid!==s)||(s==="");}if(swp.selectedIndex>0&&swp.options[swp.selectedIndex].hidden){swp.selectedIndex=0;}}';
+    echo 'function filterBulkRacks(){if(!bulkDc||!bulkRack){return;}filterByDc(bulkRack,bulkDc.value);}';
     echo 'function setSensorStatus(message){if(sensorStatus){sensorStatus.textContent=message;}}';
     echo 'function parsePayload(raw){raw=String(raw||"").replace(/^\\uFEFF/,"").trim();try{return JSON.parse(raw);}catch(e){var s=raw.indexOf("DCMANAGE_JSON_START");var t=raw.indexOf("DCMANAGE_JSON_END");if(s!==-1&&t!==-1&&t>s){return JSON.parse(raw.substring(s+"DCMANAGE_JSON_START".length,t).trim());}throw e;}}';
     echo 'function apiUrl(endpoint,params){var u="addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint="+encodeURIComponent(endpoint);if(params){for(var k in params){if(Object.prototype.hasOwnProperty.call(params,k)){u+="&"+encodeURIComponent(k)+"="+encodeURIComponent(params[k]);}}}return u;}';
     echo 'function loadSensors(){if(!prtg||!sensorSel){return;}var prtgId=prtg.value;if(!prtgId){sensorSel.innerHTML="";setSensorStatus("' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '");return;}setSensorStatus("' . addslashes(I18n::t('loading', $lang)) . '");fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(sensorSearch?sensorSearch.value:""),limit:250}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];sensorSel.innerHTML="";for(var i=0;i<items.length;i++){var it=items[i];var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.id||"")+" | "+String(it.name||"");if(it.device){label+=" ["+String(it.device)+"]";}opt.textContent=label;sensorSel.appendChild(opt);}setSensorStatus(items.length+" ' . addslashes(I18n::t('server_traffic_sensors', $lang)) . '");}).catch(function(){sensorSel.innerHTML="";setSensorStatus("' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '");});}';
-    echo 'dc.addEventListener("change",function(){filterByDc(rack);filterByDc(sw);filterPorts();});';
+    echo 'dc.addEventListener("change",function(){filterByDc(rack,dc.value);filterByDc(sw,dc.value);filterPorts();});';
     echo 'sw.addEventListener("change",filterPorts);';
+    echo 'if(bulkDc){bulkDc.addEventListener("change",filterBulkRacks);}';
     echo 'if(loadBtn){loadBtn.addEventListener("click",loadSensors);}';
     echo 'if(prtg){prtg.addEventListener("change",loadSensors);}';
-    echo 'filterByDc(rack);filterByDc(sw);filterPorts();';
+    echo 'filterByDc(rack,dc.value);filterByDc(sw,dc.value);filterPorts();filterBulkRacks();';
     echo 'if(prtg&&prtg.value){loadSensors();}';
     echo '})();';
     echo '</script>';

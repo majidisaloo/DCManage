@@ -3,6 +3,17 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.29] - 2026-02-21
+### Added
+- Added `Bulk Create Servers` form in Servers tab to create hostname ranges (example: `MDP-301` to `MDP-399`).
+- Bulk form supports Datacenter/Rack selection, default `U Height`, and default notes for all created servers.
+
+### Changed
+- Server form JavaScript now also filters rack options for the bulk datacenter selector.
+
+### Fixed
+- Bulk create skips existing hostnames and returns a clear created/skipped summary after execution.
+
 ## [0.1.28] - 2026-02-21
 ### Added
 - Server create flow now supports selecting switch and switch port directly.
