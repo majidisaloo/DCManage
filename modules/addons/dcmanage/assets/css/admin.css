@@ -561,6 +561,11 @@
   color: #925a00;
 }
 
+.dcmanage-status-pill.is-absent {
+  background: #fff1dc;
+  color: #9c5f00;
+}
+
 .dcmanage-status-pill.is-untested {
   background: #fff2da;
   color: #925a00;

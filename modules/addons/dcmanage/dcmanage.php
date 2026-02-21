@@ -1423,10 +1423,43 @@ function dcmanage_port_speed_label(?int $speedMbps, ?string $speedMode, string $
     return $speedLabel;
 }
 
-function dcmanage_snmp_status_from_raw(string $raw): string
+function dcmanage_snmp_status_from_raw(string $raw, string $kind = 'generic'): string
 {
     $value = strtolower(dcmanage_snmp_parse_typed_value($raw));
     if ($value === '') {
+        return 'unknown';
+    }
+
+    $kind = strtolower(trim($kind));
+    if ($kind === 'oper') {
+        if (strpos($value, '(1)') !== false || $value === '1' || strpos($value, 'up') !== false) {
+            return 'up';
+        }
+        if (
+            strpos($value, '(6)') !== false
+            || $value === '6'
+            || strpos($value, 'notpresent') !== false
+            || strpos($value, 'not present') !== false
+            || strpos($value, 'absent') !== false
+        ) {
+            return 'absent';
+        }
+        if (
+            strpos($value, '(2)') !== false
+            || strpos($value, '(5)') !== false
+            || strpos($value, '(7)') !== false
+            || $value === '2'
+            || $value === '5'
+            || $value === '7'
+            || strpos($value, 'down') !== false
+            || strpos($value, 'dormant') !== false
+            || strpos($value, 'lowerlayerdown') !== false
+            || strpos($value, 'notconnect') !== false
+            || strpos($value, 'not connected') !== false
+        ) {
+            return 'down';
+        }
+
         return 'unknown';
     }
 
@@ -1532,8 +1565,8 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
                 'vlan' => $vlan,
                 'speed_mbps' => $speedMbps,
                 'speed_mode' => $speedMode,
-                'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
-                'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
+                'admin_status' => dcmanage_snmp_status_from_raw($adminRaw, 'admin'),
+                'oper_status' => dcmanage_snmp_status_from_raw($operRaw, 'oper'),
             ];
         }
     } else {
@@ -1600,8 +1633,8 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
                 'vlan' => $vlan,
                 'speed_mbps' => $speedMbps,
                 'speed_mode' => $speedMode,
-                'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
-                'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
+                'admin_status' => dcmanage_snmp_status_from_raw($adminRaw, 'admin'),
+                'oper_status' => dcmanage_snmp_status_from_raw($operRaw, 'oper'),
             ];
         }
     }
@@ -1693,6 +1726,35 @@ function dcmanage_render_switch_status_pill(string $status, string $lang, bool $
     }
     if ($status === 'down' || $status === 'fail') {
         return '<span class="dcmanage-status-pill is-down">' . htmlspecialchars(I18n::t('switch_status_down', $lang)) . '</span>';
+    }
+
+    return '<span class="dcmanage-status-pill is-unknown">' . htmlspecialchars(I18n::t('switch_status_unknown', $lang)) . '</span>';
+}
+
+function dcmanage_render_port_admin_pill(string $status, string $lang): string
+{
+    $status = strtolower(trim($status));
+    if ($status === 'up') {
+        return '<span class="dcmanage-status-pill is-up">' . htmlspecialchars(I18n::t('port_mode_noshut', $lang)) . '</span>';
+    }
+    if ($status === 'down') {
+        return '<span class="dcmanage-status-pill is-down">' . htmlspecialchars(I18n::t('port_mode_shut', $lang)) . '</span>';
+    }
+
+    return '<span class="dcmanage-status-pill is-unknown">' . htmlspecialchars(I18n::t('switch_status_unknown', $lang)) . '</span>';
+}
+
+function dcmanage_render_port_oper_pill(string $status, string $lang): string
+{
+    $status = strtolower(trim($status));
+    if ($status === 'up') {
+        return '<span class="dcmanage-status-pill is-up">' . htmlspecialchars(I18n::t('port_link_connected', $lang)) . '</span>';
+    }
+    if ($status === 'down') {
+        return '<span class="dcmanage-status-pill is-down">' . htmlspecialchars(I18n::t('port_link_not_connected', $lang)) . '</span>';
+    }
+    if ($status === 'absent') {
+        return '<span class="dcmanage-status-pill is-absent">' . htmlspecialchars(I18n::t('port_link_absent', $lang)) . '</span>';
     }
 
     return '<span class="dcmanage-status-pill is-unknown">' . htmlspecialchars(I18n::t('switch_status_unknown', $lang)) . '</span>';
@@ -1819,7 +1881,7 @@ function dcmanage_render_switches(string $lang): void
             $canNoShut = $adminStatus !== 'up';
 
             $speedLabel = dcmanage_port_speed_label(isset($p->speed_mbps) ? (int) $p->speed_mbps : null, (string) ($p->speed_mode ?? ''), $lang);
-            echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
+            echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . dcmanage_render_port_admin_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_port_oper_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_shut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_shut"' . ($canShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_shut', $lang)) . '</button></form>';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_noshut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-success" type="submit" name="dcmanage_action_btn" value="switch_port_noshut"' . ($canNoShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_no_shut', $lang)) . '</button></form>';
             echo '</td></tr>';
@@ -1833,8 +1895,8 @@ function dcmanage_render_switches(string $lang): void
         echo '<div class="col-md-3 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</label><input name="if_name" class="form-control form-control-sm dcmanage-input" placeholder="Ethernet1/1"></div>';
         echo '<div class="col-md-3 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</label><input name="if_desc" class="form-control form-control-sm dcmanage-input"></div>';
         echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">VLAN</label><input name="vlan" class="form-control form-control-sm dcmanage-input" placeholder="10"></div>';
-        echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</label><select name="admin_status" class="form-control form-control-sm dcmanage-input"><option>up</option><option>down</option><option>unknown</option></select></div>';
-        echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</label><select name="oper_status" class="form-control form-control-sm dcmanage-input"><option>up</option><option>down</option><option>unknown</option></select></div>';
+        echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</label><select name="admin_status" class="form-control form-control-sm dcmanage-input"><option value="up">' . htmlspecialchars(I18n::t('port_mode_noshut', $lang)) . '</option><option value="down">' . htmlspecialchars(I18n::t('port_mode_shut', $lang)) . '</option><option value="unknown">' . htmlspecialchars(I18n::t('switch_status_unknown', $lang)) . '</option></select></div>';
+        echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</label><select name="oper_status" class="form-control form-control-sm dcmanage-input"><option value="up">' . htmlspecialchars(I18n::t('port_link_connected', $lang)) . '</option><option value="down">' . htmlspecialchars(I18n::t('port_link_not_connected', $lang)) . '</option><option value="absent">' . htmlspecialchars(I18n::t('port_link_absent', $lang)) . '</option><option value="unknown">' . htmlspecialchars(I18n::t('switch_status_unknown', $lang)) . '</option></select></div>';
         echo '<div class="col-md-12 mb-2 d-flex align-items-end"><button class="btn btn-sm dcmanage-btn-soft-primary" type="submit" name="dcmanage_action_btn" value="switch_port_upsert">' . htmlspecialchars(I18n::t('switch_add_update_port', $lang)) . '</button></div>';
         echo '</div>';
         echo '</form>';

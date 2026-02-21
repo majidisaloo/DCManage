@@ -3,6 +3,19 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.31] - 2026-02-21
+### Changed
+- Replaced technical `Admin/Oper` wording in switch ports with user-facing labels:
+  - `Shut / No Shut` (port config state)
+  - `Link Status` (connected state)
+- Updated manual port status selectors to the same operational labels.
+
+### Added
+- Added explicit port link state `SFP Absent` for interfaces where transceiver/module is not present.
+
+### Fixed
+- SNMP oper-status parsing now distinguishes `absent/notPresent` from normal down state, so missing module ports are shown correctly.
+
 ## [0.1.30] - 2026-02-21
 ### Changed
 - Refined dashboard spacing in Version/Cron panels for cleaner and consistent padding.
