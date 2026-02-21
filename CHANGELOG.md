@@ -3,6 +3,18 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.40] - 2026-02-21
+### Changed
+- Port admin status label updated from `Shut/No Shut` to `Active/Suspended`.
+- Port action buttons renamed to `Activate` / `Suspend` for operational clarity.
+
+### Added
+- Added per-port `Check Port` action to run immediate SNMP check for only the selected interface and refresh its row data.
+
+### Fixed
+- Expanded absent-state parsing to detect additional raw variations such as `abcent` and platform-specific absent text patterns.
+- `SFP/OSPF absent` style raw status values now map correctly to absent state badge in port link status.
+
 ## [0.1.39] - 2026-02-21
 ### Changed
 - Removed manual `Add/Update Port` block from `Switches -> Ports`.

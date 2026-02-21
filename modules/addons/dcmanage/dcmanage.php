@@ -505,6 +505,69 @@ function dcmanage_handle_actions(string $lang): string
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('switch_port_updated', $lang)) . '</div>';
         }
 
+        if ($action === 'switch_port_check') {
+            $id = (int) ($_POST['port_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid port');
+            }
+
+            $portRow = Capsule::table('mod_dcmanage_switch_ports as p')
+                ->leftJoin('mod_dcmanage_switches as s', 's.id', '=', 'p.switch_id')
+                ->where('p.id', $id)
+                ->first([
+                    'p.id',
+                    'p.switch_id',
+                    'p.if_index',
+                    'p.if_name',
+                    's.mgmt_ip',
+                    's.snmp_community',
+                    's.snmp_port',
+                ]);
+            if ($portRow === null) {
+                throw new RuntimeException('Port not found');
+            }
+
+            $ifIndex = (int) ($portRow->if_index ?? 0);
+            if ($ifIndex <= 0) {
+                $ifIndex = dcmanage_resolve_ifindex_by_name(
+                    (string) ($portRow->mgmt_ip ?? ''),
+                    (string) ($portRow->snmp_community ?? 'public'),
+                    (int) ($portRow->snmp_port ?? 161),
+                    (string) ($portRow->if_name ?? '')
+                );
+            }
+            if ($ifIndex <= 0) {
+                throw new RuntimeException('ifIndex not found for selected port');
+            }
+
+            $probe = dcmanage_probe_single_switch_port(
+                (string) ($portRow->mgmt_ip ?? ''),
+                (string) ($portRow->snmp_community ?? 'public'),
+                (int) ($portRow->snmp_port ?? 161),
+                $ifIndex
+            );
+
+            if (empty($probe['ok'])) {
+                throw new RuntimeException((string) ($probe['message'] ?? 'SNMP port check failed'));
+            }
+
+            $payload = [
+                'if_index' => $ifIndex,
+                'if_name' => dcmanage_normalize_if_name((string) ($probe['if_name'] ?? (string) $portRow->if_name)),
+                'if_desc' => trim((string) ($probe['if_desc'] ?? '')) ?: null,
+                'vlan' => trim((string) ($probe['vlan'] ?? '')),
+                'speed_mbps' => isset($probe['speed_mbps']) && (int) $probe['speed_mbps'] > 0 ? (int) $probe['speed_mbps'] : null,
+                'speed_mode' => trim((string) ($probe['speed_mode'] ?? '')) ?: null,
+                'admin_status' => trim((string) ($probe['admin_status'] ?? 'unknown')),
+                'oper_status' => trim((string) ($probe['oper_status'] ?? 'unknown')),
+                'last_seen' => date('Y-m-d H:i:s'),
+            ];
+
+            Capsule::table('mod_dcmanage_switch_ports')->where('id', $id)->update($payload);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('switch_port_checked', $lang)) . '</div>';
+        }
+
         if ($action === 'server_create_bulk') {
             $dcId = (int) ($_POST['bulk_dc_id'] ?? 0);
             $rangeStart = trim((string) ($_POST['bulk_hostname_start'] ?? ''));
@@ -1490,6 +1553,7 @@ function dcmanage_snmp_status_from_raw(string $raw, string $kind = 'generic'): s
 
     $kind = strtolower(trim($kind));
     if ($kind === 'oper') {
+        $hasAbsentWord = strpos($value, 'absent') !== false || strpos($value, 'abcent') !== false;
         if (strpos($value, '(1)') !== false || $value === '1' || strpos($value, 'up') !== false) {
             return 'up';
         }
@@ -1498,7 +1562,8 @@ function dcmanage_snmp_status_from_raw(string $raw, string $kind = 'generic'): s
             || $value === '6'
             || strpos($value, 'notpresent') !== false
             || strpos($value, 'not present') !== false
-            || strpos($value, 'absent') !== false
+            || $hasAbsentWord
+            || ((strpos($value, 'sfp') !== false || strpos($value, 'ospf') !== false) && $hasAbsentWord)
         ) {
             return 'absent';
         }
@@ -1529,6 +1594,75 @@ function dcmanage_snmp_status_from_raw(string $raw, string $kind = 'generic'): s
     }
 
     return 'unknown';
+}
+
+function dcmanage_resolve_ifindex_by_name(string $host, string $community, int $port, string $ifName): int
+{
+    $ifName = dcmanage_normalize_if_name($ifName);
+    if ($ifName === '' || trim($host) === '') {
+        return 0;
+    }
+
+    $target = trim($host) . ':' . max(1, $port);
+    $community = trim($community) === '' ? 'public' : $community;
+    $map = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.1', 1000000, 0));
+    if ($map === []) {
+        $map = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.2', 1000000, 0));
+    }
+
+    foreach ($map as $idx => $raw) {
+        $candidate = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value((string) $raw));
+        if ($candidate !== '' && strcasecmp($candidate, $ifName) === 0) {
+            return (int) $idx;
+        }
+    }
+
+    return 0;
+}
+
+function dcmanage_probe_single_switch_port(string $host, string $community, int $port, int $ifIndex): array
+{
+    $host = trim($host);
+    if ($host === '' || $ifIndex <= 0) {
+        return ['ok' => false, 'message' => 'Invalid target'];
+    }
+
+    $target = $host . ':' . max(1, $port);
+    $community = trim($community) === '' ? 'public' : $community;
+    $timeout = 1000000;
+    $retries = 0;
+
+    $ifNameRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.31.1.1.1.1.' . $ifIndex, $timeout, $retries);
+    if ($ifNameRaw === '' || strtolower($ifNameRaw) === 'false') {
+        $ifNameRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.2.2.1.2.' . $ifIndex, $timeout, $retries);
+    }
+    $ifDescRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.31.1.1.1.18.' . $ifIndex, $timeout, $retries);
+    if ($ifDescRaw === '' || strtolower($ifDescRaw) === 'false') {
+        $ifDescRaw = $ifNameRaw;
+    }
+    $adminRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.2.2.1.7.' . $ifIndex, $timeout, $retries);
+    $operRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.2.2.1.8.' . $ifIndex, $timeout, $retries);
+    $ifHighSpeedRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.31.1.1.1.15.' . $ifIndex, $timeout, $retries);
+    $ifSpeedRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.2.2.1.5.' . $ifIndex, $timeout, $retries);
+    $autoNegRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.26.5.1.1.1.' . $ifIndex, $timeout, $retries);
+    $pvidRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $ifIndex, $timeout, $retries);
+
+    $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value($ifNameRaw));
+    if ($ifName === '') {
+        return ['ok' => false, 'message' => 'Interface not found'];
+    }
+
+    return [
+        'ok' => true,
+        'message' => 'Port checked',
+        'if_name' => $ifName,
+        'if_desc' => dcmanage_snmp_parse_typed_value($ifDescRaw),
+        'vlan' => dcmanage_snmp_parse_vlan($pvidRaw),
+        'speed_mbps' => dcmanage_snmp_speed_mbps_from_raw($ifHighSpeedRaw, $ifSpeedRaw),
+        'speed_mode' => dcmanage_snmp_autoneg_mode_from_raw($autoNegRaw),
+        'admin_status' => dcmanage_snmp_status_from_raw($adminRaw, 'admin'),
+        'oper_status' => dcmanage_snmp_status_from_raw($operRaw, 'oper'),
+    ];
 }
 
 function dcmanage_discover_switch_ports(string $host, string $community, int $port = 161): array
@@ -1939,6 +2073,7 @@ function dcmanage_render_switches(string $lang): void
 
             $speedLabel = dcmanage_port_speed_label(isset($p->speed_mbps) ? (int) $p->speed_mbps : null, (string) ($p->speed_mode ?? ''), $lang);
             echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . dcmanage_render_port_admin_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_port_oper_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
+            echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_check"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-info" type="submit" name="dcmanage_action_btn" value="switch_port_check">' . htmlspecialchars(I18n::t('switch_port_check', $lang)) . '</button></form>';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_shut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_shut"' . ($canShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_shut', $lang)) . '</button></form>';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_noshut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-success" type="submit" name="dcmanage_action_btn" value="switch_port_noshut"' . ($canNoShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_no_shut', $lang)) . '</button></form>';
             echo '</td></tr>';
