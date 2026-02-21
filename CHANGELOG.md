@@ -3,6 +3,19 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.45] - 2026-02-21
+### Changed
+- Standalone iLO top tab removed; iLO management is now inside Servers workflow.
+- Added iLO fields directly into server create/edit forms.
+
+### Added
+- Added server delete action with cleanup of linked ports and sensor mappings.
+- Added iLO proxy settings in Settings (`http`/`https`/`socks5`) with connection test.
+
+### Fixed
+- Fixed server edit panel JavaScript parse failure (`Invalid escape in identifier`) caused by malformed inline script escaping.
+- Server edit/details now opens and works correctly after JS fix.
+
 ## [0.1.44] - 2026-02-21
 ### Added
 - Added live search input in each switch ports panel.

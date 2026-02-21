@@ -83,6 +83,9 @@ function dcmanage_output(array $vars): void
     if ($activeTab === 'ports') {
         $activeTab = 'switches';
     }
+    if ($activeTab === 'ilos') {
+        $activeTab = 'servers';
+    }
 
     $flash = dcmanage_handle_actions($lang);
 
@@ -97,7 +100,6 @@ function dcmanage_output(array $vars): void
         'datacenters' => I18n::t('tab_datacenters', $lang),
         'switches' => I18n::t('tab_switches', $lang),
         'servers' => I18n::t('tab_servers', $lang),
-        'ilos' => 'iLOs',
         'monitoring' => I18n::t('tab_monitoring', $lang),
         'packages' => I18n::t('tab_packages', $lang),
         'scope' => I18n::t('tab_scope', $lang),
@@ -160,6 +162,23 @@ function dcmanage_handle_actions(string $lang): string
     $action = (string) ($_POST['dcmanage_action_btn'] ?? ($_POST['dcmanage_action'] ?? ''));
 
     try {
+        if ($action === 'settings_ilo_proxy_test') {
+            $type = strtolower(trim((string) ($_POST['ilo_proxy_type'] ?? 'http')));
+            $host = trim((string) ($_POST['ilo_proxy_host'] ?? ''));
+            $port = max(1, (int) ($_POST['ilo_proxy_port'] ?? 0));
+            $user = trim((string) ($_POST['ilo_proxy_user'] ?? ''));
+            $pass = (string) ($_POST['ilo_proxy_pass'] ?? '');
+            if ($pass === '') {
+                $storedEnc = (string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_pass_enc')->value('meta_value');
+                if ($storedEnc !== '') {
+                    $pass = Crypto::decrypt($storedEnc);
+                }
+            }
+
+            $result = dcmanage_test_proxy_connection($type, $host, $port, $user, $pass);
+            return '<div class="alert alert-' . ($result['ok'] ? 'success' : 'danger') . '">' . htmlspecialchars((string) $result['message']) . '</div>';
+        }
+
         if ($action === 'settings_save') {
             dcmanage_handle_settings_save();
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
@@ -652,6 +671,19 @@ function dcmanage_handle_actions(string $lang): string
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
 
+            $iloId = dcmanage_upsert_server_ilo(
+                $serverId,
+                $dcId,
+                $hostname,
+                trim((string) ($_POST['ilo_host'] ?? '')),
+                trim((string) ($_POST['ilo_user'] ?? '')),
+                (string) ($_POST['ilo_pass'] ?? ''),
+                trim((string) ($_POST['ilo_type'] ?? 'ilo5'))
+            );
+            if ($iloId !== null) {
+                Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->update(['ilo_id' => $iloId]);
+            }
+
             $serverPortId = 0;
             $switchIf = null;
             if ($switchPortId > 0) {
@@ -771,6 +803,48 @@ function dcmanage_handle_actions(string $lang): string
                 }
             }
 
+            $iloHost = trim((string) ($_POST['ilo_host'] ?? ''));
+            $iloUser = trim((string) ($_POST['ilo_user'] ?? ''));
+            $iloPass = (string) ($_POST['ilo_pass'] ?? '');
+            $iloType = trim((string) ($_POST['ilo_type'] ?? 'ilo5'));
+            $iloId = dcmanage_upsert_server_ilo(
+                $serverId,
+                (int) $server->dc_id,
+                'srv-' . $serverId,
+                $iloHost,
+                $iloUser,
+                $iloPass,
+                $iloType
+            );
+            Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->update(['ilo_id' => $iloId]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'server_delete') {
+            $serverId = (int) ($_POST['server_id'] ?? 0);
+            if ($serverId <= 0) {
+                throw new RuntimeException('Invalid server');
+            }
+            $server = Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->first(['id', 'ilo_id']);
+            if ($server === null) {
+                throw new RuntimeException('Server not found');
+            }
+
+            Capsule::table('mod_dcmanage_server_ports')->where('server_id', $serverId)->delete();
+            if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
+                Capsule::table('mod_dcmanage_server_traffic_sensors')->where('server_id', $serverId)->delete();
+            }
+            Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->delete();
+
+            $iloId = (int) ($server->ilo_id ?? 0);
+            if ($iloId > 0) {
+                $inUse = Capsule::table('mod_dcmanage_servers')->where('ilo_id', $iloId)->exists();
+                if (!$inUse) {
+                    Capsule::table('mod_dcmanage_ilos')->where('id', $iloId)->delete();
+                }
+            }
+
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
     } catch (Throwable $e) {
@@ -790,6 +864,10 @@ function dcmanage_system_defaults(): array
         'graph_cache_ttl_minutes' => '30',
         'log_retention_days' => '90',
         'dashboard_refresh_seconds' => '30',
+        'ilo_proxy_type' => 'http',
+        'ilo_proxy_host' => '',
+        'ilo_proxy_port' => '',
+        'ilo_proxy_user' => '',
     ];
 }
 
@@ -822,6 +900,12 @@ function dcmanage_handle_settings_save(): void
                 $value = 'default';
             }
         }
+        if ($key === 'ilo_proxy_type') {
+            $value = strtolower($value);
+            if (!in_array($value, ['http', 'https', 'socks5'], true)) {
+                $value = 'http';
+            }
+        }
         if (in_array($key, ['traffic_poll_minutes', 'switch_discovery_minutes', 'graph_cache_ttl_minutes', 'log_retention_days', 'dashboard_refresh_seconds'], true)) {
             $value = (string) max(1, (int) $value);
         }
@@ -829,6 +913,14 @@ function dcmanage_handle_settings_save(): void
         Capsule::table('mod_dcmanage_meta')->updateOrInsert(
             ['meta_key' => 'settings.' . $key],
             ['meta_value' => $value, 'updated_at' => date('Y-m-d H:i:s')]
+        );
+    }
+
+    $proxyPass = trim((string) ($_POST['ilo_proxy_pass'] ?? ''));
+    if ($proxyPass !== '') {
+        Capsule::table('mod_dcmanage_meta')->updateOrInsert(
+            ['meta_key' => 'settings.ilo_proxy_pass_enc'],
+            ['meta_value' => Crypto::encrypt($proxyPass), 'updated_at' => date('Y-m-d H:i:s')]
         );
     }
 }
@@ -995,9 +1087,24 @@ function dcmanage_render_settings_form(string $lang): void
     echo '<div class="col-md-4 mb-3"><label>Graph Cache TTL (Minutes)</label><input class="form-control dcmanage-input" name="graph_cache_ttl_minutes" value="' . htmlspecialchars($settings['graph_cache_ttl_minutes']) . '"></div>';
     echo '<div class="col-md-4 mb-3"><label>Log Retention (Days)</label><input class="form-control dcmanage-input" name="log_retention_days" value="' . htmlspecialchars($settings['log_retention_days']) . '"></div>';
     echo '<div class="col-md-4 mb-3"><label>Dashboard Refresh (Seconds)</label><input class="form-control dcmanage-input" name="dashboard_refresh_seconds" value="' . htmlspecialchars($settings['dashboard_refresh_seconds']) . '"></div>';
+    echo '<div class="col-md-12"><hr class="my-2"></div>';
+    echo '<div class="col-md-3 mb-3"><label>' . htmlspecialchars(I18n::t('ilo_proxy_type', $lang)) . '</label><select class="form-control dcmanage-input" name="ilo_proxy_type">';
+    $proxyTypes = ['http' => 'HTTP', 'https' => 'HTTPS', 'socks5' => 'SOCKS5'];
+    foreach ($proxyTypes as $k => $label) {
+        $selected = (string) ($settings['ilo_proxy_type'] ?? 'http') === $k ? ' selected' : '';
+        echo '<option value="' . htmlspecialchars($k) . '"' . $selected . '>' . htmlspecialchars($label) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="col-md-3 mb-3"><label>' . htmlspecialchars(I18n::t('ilo_proxy_host', $lang)) . '</label><input class="form-control dcmanage-input" name="ilo_proxy_host" value="' . htmlspecialchars((string) ($settings['ilo_proxy_host'] ?? '')) . '"></div>';
+    echo '<div class="col-md-2 mb-3"><label>' . htmlspecialchars(I18n::t('ilo_proxy_port', $lang)) . '</label><input class="form-control dcmanage-input" name="ilo_proxy_port" value="' . htmlspecialchars((string) ($settings['ilo_proxy_port'] ?? '')) . '"></div>';
+    echo '<div class="col-md-2 mb-3"><label>' . htmlspecialchars(I18n::t('ilo_proxy_user', $lang)) . '</label><input class="form-control dcmanage-input" name="ilo_proxy_user" value="' . htmlspecialchars((string) ($settings['ilo_proxy_user'] ?? '')) . '"></div>';
+    echo '<div class="col-md-2 mb-3"><label>' . htmlspecialchars(I18n::t('ilo_proxy_pass', $lang)) . '</label><input type="password" class="form-control dcmanage-input" name="ilo_proxy_pass" value=""></div>';
 
     echo '</div>';
-    echo '<button type="submit" class="btn btn-primary">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+    echo '<div class="d-flex flex-wrap" style="gap:8px">';
+    echo '<button type="submit" class="btn btn-primary" name="dcmanage_action_btn" value="settings_save">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+    echo '<button type="submit" class="btn btn-outline-primary" name="dcmanage_action_btn" value="settings_ilo_proxy_test">' . htmlspecialchars(I18n::t('ilo_proxy_test', $lang)) . '</button>';
+    echo '</div>';
     echo '</form>';
 
     $overallClass = $cron['overall'] === 'ok' ? 'success' : ($cron['overall'] === 'fail' ? 'danger' : 'warning');
@@ -1116,6 +1223,116 @@ function dcmanage_parse_prtg_sensor_ids($selected, string $manual): array
     }
 
     return array_values($items);
+}
+
+function dcmanage_upsert_server_ilo(
+    int $serverId,
+    int $dcId,
+    string $serverHostname,
+    string $host,
+    string $user,
+    string $pass,
+    string $type
+): ?int {
+    $host = trim($host);
+    $user = trim($user);
+    $type = strtolower(trim($type));
+    if (!in_array($type, ['ilo4', 'ilo5'], true)) {
+        $type = 'ilo5';
+    }
+
+    if ($host === '') {
+        return null;
+    }
+    if ($user === '') {
+        throw new RuntimeException('iLO username is required when iLO host is set');
+    }
+
+    $existingIloId = (int) Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->value('ilo_id');
+    if ($existingIloId > 0) {
+        $payload = [
+            'dc_id' => $dcId,
+            'name' => $serverHostname . '-iLO',
+            'host' => $host,
+            'user' => $user,
+            'type' => $type,
+        ];
+        if (trim($pass) !== '') {
+            $payload['pass_enc'] = Crypto::encrypt($pass);
+        }
+        Capsule::table('mod_dcmanage_ilos')->where('id', $existingIloId)->update($payload);
+        return $existingIloId;
+    }
+
+    if (trim($pass) === '') {
+        throw new RuntimeException('iLO password is required when attaching a new iLO');
+    }
+
+    return (int) Capsule::table('mod_dcmanage_ilos')->insertGetId([
+        'dc_id' => $dcId,
+        'name' => $serverHostname . '-iLO',
+        'host' => $host,
+        'user' => $user,
+        'pass_enc' => Crypto::encrypt($pass),
+        'type' => $type,
+        'notes' => null,
+    ]);
+}
+
+function dcmanage_test_proxy_connection(string $type, string $host, int $port, string $user = '', string $pass = ''): array
+{
+    $type = strtolower(trim($type));
+    if (!in_array($type, ['http', 'https', 'socks5'], true)) {
+        return ['ok' => false, 'message' => 'Unsupported proxy type'];
+    }
+    $host = trim($host);
+    if ($host === '' || $port <= 0) {
+        return ['ok' => false, 'message' => 'Proxy host and port are required'];
+    }
+
+    $socket = @fsockopen($host, $port, $errno, $errstr, 4.0);
+    if ($socket) {
+        fclose($socket);
+    } else {
+        return ['ok' => false, 'message' => 'Proxy TCP connection failed: ' . $errstr . ' (' . (int) $errno . ')'];
+    }
+
+    if (!function_exists('curl_init')) {
+        return ['ok' => true, 'message' => 'Proxy TCP connection is reachable'];
+    }
+
+    $ch = curl_init('https://example.com/');
+    if ($ch === false) {
+        return ['ok' => true, 'message' => 'Proxy TCP connection is reachable'];
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_NOBODY, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_PROXY, $host);
+    curl_setopt($ch, CURLOPT_PROXYPORT, $port);
+    if ($type === 'socks5') {
+        curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+    } elseif ($type === 'https') {
+        curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTPS);
+    } else {
+        curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+    }
+    if (trim($user) !== '') {
+        curl_setopt($ch, CURLOPT_PROXYUSERPWD, $user . ':' . $pass);
+    }
+    curl_exec($ch);
+    $err = curl_error($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+
+    if ($err !== '') {
+        return ['ok' => false, 'message' => 'Proxy check failed: ' . $err];
+    }
+    if ($code <= 0) {
+        return ['ok' => true, 'message' => 'Proxy reachable (no HTTP response code)'];
+    }
+
+    return ['ok' => true, 'message' => 'Proxy is reachable and responding'];
 }
 
 function dcmanage_parse_hostname_range(string $startHostname, string $endHostname): array
@@ -2148,9 +2365,14 @@ function dcmanage_render_servers(string $lang): void
     $rows = Capsule::table('mod_dcmanage_servers as s')
         ->leftJoin('mod_dcmanage_datacenters as d', 'd.id', '=', 's.dc_id')
         ->leftJoin('mod_dcmanage_racks as r', 'r.id', '=', 's.rack_id')
+        ->leftJoin('mod_dcmanage_ilos as il', 'il.id', '=', 's.ilo_id')
         ->orderBy('s.id', 'desc')
         ->limit(200)
-        ->get(['s.id', 's.dc_id', 's.hostname', 's.asset_tag', 's.serial', 's.u_start', 's.u_height', 'd.name as dc_name', 'r.name as rack_name']);
+        ->get([
+            's.id', 's.dc_id', 's.hostname', 's.asset_tag', 's.serial', 's.u_start', 's.u_height', 's.ilo_id',
+            'd.name as dc_name', 'r.name as rack_name',
+            'il.host as ilo_host', 'il.user as ilo_user', 'il.type as ilo_type'
+        ]);
 
     $serverIds = [];
     foreach ($rows as $row) {
@@ -2272,6 +2494,12 @@ function dcmanage_render_servers(string $lang): void
     echo '<div class="form-group col-md-6"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input"></div>';
     echo '<div class="form-group col-md-6"><label>U Height</label><input type="number" min="1" name="u_height" value="1" class="form-control dcmanage-input"></div>';
     echo '</div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('server_ilo_host', $lang)) . '</label><input name="ilo_host" class="form-control dcmanage-input" placeholder="192.0.2.10"></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_user', $lang)) . '</label><input name="ilo_user" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5">iLO5</option><option value="ilo4">iLO4</option></select></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input"></div>';
+    echo '</div>';
     echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="3"></textarea></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_server', $lang)) . '</button>';
     echo '</form>';
@@ -2300,7 +2528,7 @@ function dcmanage_render_servers(string $lang): void
 
     echo '<div class="col-lg-7">';
     echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_sensor_count', $lang)) . '</th><th>U</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('server_ilo', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_sensor_count', $lang)) . '</th><th>U</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
         $serverId = (int) $row->id;
         $u = ($row->u_start !== null ? (string) $row->u_start : '-') . '/' . (string) $row->u_height;
@@ -2320,8 +2548,11 @@ function dcmanage_render_servers(string $lang): void
         $sensorPrtgId = (int) ($serverSensorPrtgMap[$serverId] ?? 0);
         $mapFormId = 'dcmanage-server-map-' . $serverId;
 
-        echo '<tr><td>' . $serverId . '</td><td>' . htmlspecialchars((string) $row->hostname) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . $portLabel . '</td><td>' . $sensorLabel . '</td><td>' . htmlspecialchars($u) . '</td><td><button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-server-map-toggle" data-target="' . htmlspecialchars($mapFormId) . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button></td></tr>';
-        echo '<tr id="' . htmlspecialchars($mapFormId) . '" class="dcmanage-server-map-row" style="display:none;"><td colspan="8">';
+        $iloLabel = trim((string) ($row->ilo_host ?? '')) !== ''
+            ? htmlspecialchars((string) $row->ilo_host) . '<br><small class="text-muted">' . htmlspecialchars((string) ($row->ilo_type ?? 'iLO')) . '</small>'
+            : '-';
+        echo '<tr><td>' . $serverId . '</td><td>' . htmlspecialchars((string) $row->hostname) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . $iloLabel . '</td><td>' . $portLabel . '</td><td>' . $sensorLabel . '</td><td>' . htmlspecialchars($u) . '</td><td class="dcmanage-action-buttons"><button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-server-map-toggle" data-target="' . htmlspecialchars($mapFormId) . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button><form method="post" style="display:inline" onsubmit="return confirm(\'Delete server?\')"><input type="hidden" name="dcmanage_action" value="server_delete"><input type="hidden" name="server_id" value="' . $serverId . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="server_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td></tr>';
+        echo '<tr id="' . htmlspecialchars($mapFormId) . '" class="dcmanage-server-map-row" style="display:none;"><td colspan="9">';
         echo '<form method="post" class="dcmanage-form-card dcmanage-server-map" data-dc-id="' . (int) $row->dc_id . '">';
         echo '<input type="hidden" name="dcmanage_action" value="server_link_update">';
         echo '<input type="hidden" name="server_id" value="' . $serverId . '">';
@@ -2344,6 +2575,12 @@ function dcmanage_render_servers(string $lang): void
         }
         echo '</select></div>';
         echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_sensor_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-map-sensor-search" placeholder="sensor name / id"></div>';
+        echo '</div>';
+        echo '<div class="form-row">';
+        echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('server_ilo_host', $lang)) . '</label><input name="ilo_host" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->ilo_host ?? '')) . '"></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_user', $lang)) . '</label><input name="ilo_user" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->ilo_user ?? '')) . '"></div>';
+        echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5"' . ((string) ($row->ilo_type ?? 'ilo5') === 'ilo5' ? ' selected' : '') . '>iLO5</option><option value="ilo4"' . ((string) ($row->ilo_type ?? '') === 'ilo4' ? ' selected' : '') . '>iLO4</option></select></div>';
+        echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input" placeholder="••••••"></div>';
         echo '</div>';
         echo '<div class="form-group"><button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-map-load-sensors">' . htmlspecialchars(I18n::t('server_sensors_load', $lang)) . '</button></div>';
         echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</label><select multiple name="prtg_sensor_ids[]" class="form-control dcmanage-input dcmanage-map-sensor-select" size="6">';
@@ -2374,7 +2611,13 @@ function dcmanage_render_servers(string $lang): void
     echo 'dc.addEventListener("change",syncDcState);';
     echo 'sw.addEventListener("change",function(){loadSwitchPorts(swp,sw.value,dc.value,"");});';
     echo 'var mapRows=document.querySelectorAll(".dcmanage-server-map");';
-    echo 'for(var m=0;m<mapRows.length;m++){(function(form){var dcId=form.getAttribute("data-dc-id")||"";var swSel=form.querySelector(".dcmanage-map-switch");var portSel=form.querySelector(".dcmanage-map-port");var prtgSel=form.querySelector(".dcmanage-map-prtg");var sensorSearch=form.querySelector(".dcmanage-map-sensor-search");var loadBtn=form.querySelector(".dcmanage-map-load-sensors");var sensorSel=form.querySelector(".dcmanage-map-sensor-select");var sensorStatus=form.querySelector(".dcmanage-map-sensor-status");var sensorDefault=form.querySelector(".dcmanage-map-default-sensors");function setStatus(msg){if(sensorStatus){sensorStatus.textContent=msg;}}function filterSwitches(){if(!swSel){return;}for(var i=0;i<swSel.options.length;i++){var o=swSel.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute(\"data-dc-id\");o.hidden=(dcId!==\"\"&&d!==dcId);}if(swSel.selectedIndex>0&&swSel.options[swSel.selectedIndex].hidden){swSel.selectedIndex=0;}}function loadSensors(){if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML=\"\";setStatus(\"' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '\");return;}setStatus(\"' . addslashes(I18n::t('loading', $lang)) . '\");fetch(apiUrl(\"prtg/sensors\",{prtg_id:prtgId,q:(sensorSearch?sensorSearch.value:\"\"),limit:250}),{credentials:\"same-origin\"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||\"API error\");}var items=(res.data&&res.data.items)?res.data.items:[];var defaults=String(sensorDefault?sensorDefault.value:\"\").split(\",\").map(function(v){return v.trim();}).filter(function(v){return v!==\"\";});sensorSel.innerHTML=\"\";for(var x=0;x<items.length;x++){var it=items[x]||{};var opt=document.createElement(\"option\");opt.value=String(it.id||\"\");var label=String(it.id||\"\")+\" | \"+String(it.name||\"\");if(it.device){label+=\" [\"+String(it.device)+\"]\";}opt.textContent=label;if(defaults.indexOf(opt.value)!==-1){opt.selected=true;}sensorSel.appendChild(opt);}setStatus(items.length+\" ' . addslashes(I18n::t('server_traffic_sensors', $lang)) . '\");}).catch(function(){setStatus(\"' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '\");});}';
+    echo 'for(var m=0;m<mapRows.length;m++){(function(form){';
+    echo 'var dcId=form.getAttribute("data-dc-id")||"";var swSel=form.querySelector(".dcmanage-map-switch");var portSel=form.querySelector(".dcmanage-map-port");var prtgSel=form.querySelector(".dcmanage-map-prtg");var sensorSearch=form.querySelector(".dcmanage-map-sensor-search");var loadBtn=form.querySelector(".dcmanage-map-load-sensors");var sensorSel=form.querySelector(".dcmanage-map-sensor-select");var sensorStatus=form.querySelector(".dcmanage-map-sensor-status");var sensorDefault=form.querySelector(".dcmanage-map-default-sensors");';
+    echo 'function setStatus(msg){if(sensorStatus){sensorStatus.textContent=msg;}}';
+    echo 'function filterSwitches(){if(!swSel){return;}for(var i=0;i<swSel.options.length;i++){var o=swSel.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute("data-dc-id");o.hidden=(dcId!==""&&d!==dcId);}if(swSel.selectedIndex>0&&swSel.options[swSel.selectedIndex].hidden){swSel.selectedIndex=0;}}';
+    echo 'function loadSensors(){if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML="";setStatus("' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '");return;}';
+    echo 'setStatus("' . addslashes(I18n::t('loading', $lang)) . '");';
+    echo 'fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(sensorSearch?sensorSearch.value:""),limit:250}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];var defaults=String(sensorDefault?sensorDefault.value:"").split(",").map(function(v){return v.trim();}).filter(function(v){return v!=="";});sensorSel.innerHTML="";for(var x=0;x<items.length;x++){var it=items[x]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.id||"")+" | "+String(it.name||"");if(it.device){label+=" ["+String(it.device)+"]";}opt.textContent=label;if(defaults.indexOf(opt.value)!==-1){opt.selected=true;}sensorSel.appendChild(opt);}setStatus(items.length+" ' . addslashes(I18n::t('server_traffic_sensors', $lang)) . '");}).catch(function(){setStatus("' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '");});}';
     echo 'filterSwitches();if(portSel){loadSwitchPorts(portSel,swSel?swSel.value:"",dcId,portSel.getAttribute("data-selected")||"");}if(swSel){swSel.addEventListener("change",function(){loadSwitchPorts(portSel,swSel.value,dcId,"");});}if(loadBtn){loadBtn.addEventListener("click",loadSensors);}if(prtgSel){prtgSel.addEventListener("change",loadSensors);}})(mapRows[m]);}';
     echo 'var toggles=document.querySelectorAll(".dcmanage-server-map-toggle");for(var t=0;t<toggles.length;t++){toggles[t].addEventListener("click",function(){var target=document.getElementById(this.getAttribute("data-target"));if(!target){return;}target.style.display=(target.style.display==="none"||target.style.display==="")?"table-row":"none";});}';
     echo 'syncDcState();';

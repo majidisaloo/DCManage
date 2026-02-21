@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.44)
+## Features in this release (v0.1.45)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -76,6 +76,11 @@ DCManage is an API-first datacenter management core inside WHMCS.
     - switch ports load only after both datacenter and switch are selected
   - SNMP speed parser now normalizes abnormal raw values and prevents outputs like `2140046M`.
   - Switch ports panel now includes live search by interface name, description, and VLAN.
+  - iLO is now managed directly inside Servers create/edit forms (one iLO per server mapping).
+  - Standalone iLO tab was removed from top navigation and merged into server workflow.
+  - Servers list now includes delete action with linked mapping cleanup.
+  - Settings now include iLO proxy configuration and test (`http`, `https`, `socks5`).
+  - Fixed server edit JS crash caused by malformed escaping (`Invalid escape in identifier`).
   - Per-server edit panel now supports switch/port remap + PRTG sensor selection/update.
   - Monitoring tab now includes PRTG instance management (add/list/test/delete).
   - Datacenter rows now expose direct actions: Racks, Servers, Edit, Delete.
@@ -83,7 +88,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Rack UI is now compact and card-based with a tower-style layout (no oversized stretched rows).
   - Rack cards support inline rack rename and total-U updates.
   - Switch section now supports collapsible add flow, SNMP fields, and per-switch SNMP connectivity test with status badges.
-  - Switch section includes ports/VLAN inventory with add/update operations and per-port `Shut` / `No Shut` actions.
+  - Switch section includes ports/VLAN inventory with per-port `Check Port`, `Suspend`, and `Activate` actions.
   - Switch section now supports one-click `Discover Ports` via SNMP walk (auto-import interface/admin/oper/vlan when available).
   - Switch discovery now imports interface descriptions (`ifAlias`) and stores interface index for better mapping.
   - Switch discovery now imports port speed profile and mode and shows it as:
@@ -96,7 +101,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - VLAN resolution is improved using `dot1dBasePortIfIndex` -> `dot1qPvid` mapping for broader switch compatibility.
   - Switch and port connectivity states now use explicit green/red status pills (instead of gray badges) for clearer operational visibility.
   - Port status terminology updated to operational wording:
-    - `Shut / No Shut` for config state
+    - `Active / Suspended` for config state
     - `Connected / Not Connected / SFP Absent` for link state
   - Removed duplicated in-page section titles that matched active tabs (Switches/Servers/Monitoring), keeping only top navigation tab title.
   - Global spacing was normalized across all pages to keep controls and table borders visually separated.
