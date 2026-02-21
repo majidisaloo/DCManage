@@ -477,7 +477,7 @@ function dcmanage_cron_defs(): array
         $cronFile = __DIR__ . '/cron.php';
     }
     $phpBin = dcmanage_detect_php_binary();
-    $cronScriptArg = escapeshellarg($cronFile);
+    $cronScriptArg = dcmanage_shell_quote($cronFile);
 
     return [
         ['task' => 'poll_usage', 'interval' => 300, 'cron' => '*/5 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' poll_usage'],
@@ -514,11 +514,28 @@ function dcmanage_detect_php_binary(): string
             continue;
         }
         if (is_file($candidate) && is_executable($candidate)) {
-            return escapeshellarg($candidate);
+            return dcmanage_shell_quote($candidate);
         }
     }
 
     return 'php';
+}
+
+function dcmanage_shell_quote(string $value): string
+{
+    if (function_exists('escapeshellarg')) {
+        return escapeshellarg($value);
+    }
+
+    if ($value === '') {
+        return "''";
+    }
+
+    if (preg_match('/^[a-zA-Z0-9_\\.\\-\\/:]+$/', $value) === 1) {
+        return $value;
+    }
+
+    return "'" . str_replace("'", "'\"'\"'", $value) . "'";
 }
 
 function dcmanage_cron_status(): array

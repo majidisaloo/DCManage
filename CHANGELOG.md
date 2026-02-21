@@ -3,6 +3,12 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.16] - 2026-02-21
+### Fixed
+- Fixed settings crash on hosts where `escapeshellarg()` is disabled in PHP `disable_functions`.
+- Added internal shell-quote fallback to build cron command hints without relying on blocked PHP shell functions.
+- Cron monitor/settings now open safely even in hardened hosting environments.
+
 ## [0.1.15] - 2026-02-21
 ### Changed
 - Rack layout was redesigned to a compact card/tower UX instead of wide stretched rows.
