@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+- Maintenance:
+  - ignored local verification artifacts (`dist/`, `_verify.zip`) to keep repository clean.
+
 ## [0.1.1] - 2026-02-21
 - Fixed GitHub release package format:
   - zip name no longer contains `public_html`.

@@ -2,3 +2,5 @@
 *.log
 vendor/
 node_modules/
+dist/
+_verify.zip
