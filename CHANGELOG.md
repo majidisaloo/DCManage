@@ -3,6 +3,18 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.42] - 2026-02-21
+### Changed
+- Server create dependency flow is now strict: Datacenter must be selected before rack/switch become usable.
+- Switch-port loading now requires both Datacenter and Switch selection.
+
+### Added
+- Added explicit disable/reset behavior for rack/switch/port fields when datacenter is empty.
+
+### Fixed
+- Fixed rack options appearing/selectable before selecting datacenter.
+- Fixed switch port list loading reliability by enforcing guarded DC+Switch fetch flow.
+
 ## [0.1.41] - 2026-02-21
 ### Changed
 - Increased global spacing between top tabs and content area.
