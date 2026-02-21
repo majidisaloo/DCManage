@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DCManage\Jobs;
 
 use DCManage\Support\Logger;
+use DCManage\Support\UpdateManager;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 final class JobQueue
@@ -55,6 +56,28 @@ final class JobQueue
                 ]);
                 $done++;
             } catch (\Throwable $e) {
+                if (stripos($e->getMessage(), 'canceled') !== false) {
+                    Capsule::table('mod_dcmanage_jobs')->where('id', $job->id)->update([
+                        'status' => 'canceled',
+                        'attempts' => ((int) $job->attempts) + 1,
+                        'last_error' => $e->getMessage(),
+                        'finished_at' => date('Y-m-d H:i:s'),
+                    ]);
+                    Logger::warning('job_queue', 'Job canceled', ['job_id' => (int) $job->id, 'error' => $e->getMessage()]);
+                    continue;
+                }
+
+                if ((string) $job->type === 'update_apply') {
+                    Capsule::table('mod_dcmanage_jobs')->where('id', $job->id)->update([
+                        'status' => 'failed',
+                        'attempts' => ((int) $job->attempts) + 1,
+                        'last_error' => $e->getMessage(),
+                        'finished_at' => date('Y-m-d H:i:s'),
+                    ]);
+                    Logger::error('job_queue', 'Update job failed (no auto-retry)', ['job_id' => (int) $job->id, 'error' => $e->getMessage()]);
+                    continue;
+                }
+
                 $attempts = ((int) $job->attempts) + 1;
                 $nextRun = date('Y-m-d H:i:s', time() + min(300, 20 * $attempts));
 
@@ -75,6 +98,11 @@ final class JobQueue
 
     private static function execute(string $type, array $payload): void
     {
+        if ($type === 'update_apply') {
+            UpdateManager::runQueuedApply($payload);
+            return;
+        }
+
         if ($type === 'enforce' || $type === 'unlock' || $type === 'powercycle') {
             Logger::info('job_queue', 'Job executed (placeholder)', ['type' => $type, 'payload' => $payload]);
             return;

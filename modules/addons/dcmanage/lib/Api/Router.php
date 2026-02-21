@@ -36,6 +36,12 @@ final class Router
                 case 'update/apply':
                     $data = self::updateApply();
                     break;
+                case 'update/status':
+                    $data = self::updateStatus();
+                    break;
+                case 'update/cancel':
+                    $data = self::updateCancel();
+                    break;
                 case 'update/set-auto':
                     $data = self::updateSetAuto();
                     break;
@@ -113,7 +119,17 @@ final class Router
     private static function updateApply(): array
     {
         $force = (int) ($_GET['force'] ?? 0) === 1;
-        return UpdateManager::applyLatestIfNewer($force);
+        return UpdateManager::queueApplyLatest($force);
+    }
+
+    private static function updateStatus(): array
+    {
+        return UpdateManager::getUpdateRuntimeStatus();
+    }
+
+    private static function updateCancel(): array
+    {
+        return UpdateManager::cancelQueuedUpdate();
     }
 
     private static function updateSetAuto(): array

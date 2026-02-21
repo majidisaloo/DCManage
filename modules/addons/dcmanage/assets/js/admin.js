@@ -83,6 +83,7 @@
     latestRelease: 'آخرین ریلیز',
     checkUpdate: 'بررسی آپدیت',
     applyUpdate: 'اعمال آپدیت',
+    cancelUpdate: 'لغو آپدیت',
     autoUpdate: 'آپدیت خودکار',
     openCron: 'تنظیمات کرون',
     updateStateOutdated: 'آپدیت نشده',
@@ -90,9 +91,12 @@
     updateStateUpdated: 'آپدیت شد',
     checking: 'در حال بررسی نسخه...',
     applying: 'در حال اعمال آپدیت...',
+    queued: 'آپدیت در صف قرار گرفت...',
+    canceling: 'در حال ارسال لغو...',
     updateStatus: 'وضعیت',
     checkError: 'خطا در بررسی نسخه',
     applyError: 'خطا در آپدیت',
+    cancelError: 'خطا در لغو آپدیت',
     toggleError: 'خطا در تغییر وضعیت آپدیت خودکار',
     autoEnabled: 'آپدیت خودکار فعال شد.',
     autoDisabled: 'آپدیت خودکار غیرفعال شد.'
@@ -113,6 +117,7 @@
     latestRelease: 'Latest Release',
     checkUpdate: 'Check Update',
     applyUpdate: 'Apply Update',
+    cancelUpdate: 'Cancel Update',
     autoUpdate: 'Auto Update',
     openCron: 'Open Cron Settings',
     updateStateOutdated: 'Not Updated',
@@ -120,9 +125,12 @@
     updateStateUpdated: 'Updated',
     checking: 'Checking latest release...',
     applying: 'Applying update...',
+    queued: 'Update queued...',
+    canceling: 'Sending cancel request...',
     updateStatus: 'Status',
     checkError: 'Failed to check update',
     applyError: 'Failed to apply update',
+    cancelError: 'Failed to cancel update',
     toggleError: 'Failed to change auto update state',
     autoEnabled: 'Auto update enabled.',
     autoDisabled: 'Auto update disabled.'
@@ -278,6 +286,7 @@
         '</label>' +
         '<button type="button" class="btn btn-outline-primary btn-sm dcmanage-check-btn" id="dcmanage-check-update">' + safeText(T.checkUpdate) + '</button>' +
         '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">' + safeText(T.applyUpdate) + '</button>' +
+        '<button type="button" class="btn btn-outline-danger btn-sm" id="dcmanage-cancel-update">' + safeText(T.cancelUpdate) + '</button>' +
         '</div>' +
         '<div id="dcmanage-update-msg" class="dcmanage-update-msg is-info"></div>' +
         '</div>';
@@ -327,8 +336,51 @@
   function bindVersionActions(base) {
     var checkBtn = document.getElementById('dcmanage-check-update');
     var applyBtn = document.getElementById('dcmanage-apply-update');
+    var cancelBtn = document.getElementById('dcmanage-cancel-update');
     var autoToggle = document.getElementById('dcmanage-auto-update');
     var msg = document.getElementById('dcmanage-update-msg');
+    var statusTimer = null;
+
+    function stopStatusPoll() {
+      if (statusTimer) {
+        clearInterval(statusTimer);
+        statusTimer = null;
+      }
+    }
+
+    function startStatusPoll() {
+      stopStatusPoll();
+      statusTimer = setInterval(function () {
+        getJson(apiUrl(base, 'update/status')).then(function (res) {
+          if (!res.ok) {
+            return;
+          }
+          var data = res.data || {};
+          var state = data.state || {};
+          var active = data.active_job || null;
+          var status = String(state.status || '');
+          var message = String(state.message || '');
+
+          if (message) {
+            var kind = 'info';
+            if (status === 'updated' || status === 'up-to-date') {
+              kind = 'success';
+            } else if (status === 'failed') {
+              kind = 'danger';
+            } else if (status === 'cancel-requested' || status === 'canceled') {
+              kind = 'warning';
+            }
+            setUpdateMsg(msg, message, kind);
+          }
+
+          if (!active && (status === 'updated' || status === 'up-to-date' || status === 'failed' || status === 'canceled')) {
+            stopStatusPoll();
+            renderVersion(base);
+          }
+        }).catch(function () {
+        });
+      }, 2000);
+    }
 
     if (checkBtn) {
       checkBtn.addEventListener('click', function () {
@@ -361,10 +413,33 @@
           var d = res.data || {};
           var state = String(d.status || '');
           var kind = state === 'updated' || state === 'up-to-date' ? 'success' : 'warning';
-          setUpdateMsg(msg, (T.updateStatus + ': ' + (state || 'done')), kind);
-          renderVersion(base);
+          if (state === 'queued' || state === 'already-running') {
+            setUpdateMsg(msg, T.queued, 'warning');
+            startStatusPoll();
+          } else {
+            setUpdateMsg(msg, (T.updateStatus + ': ' + (state || 'done')), kind);
+            renderVersion(base);
+          }
         }).catch(function (e) {
           setUpdateMsg(msg, (e && e.message ? e.message : T.applyError), 'danger');
+        });
+      });
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        setUpdateMsg(msg, T.canceling, 'warning');
+        getJson(apiUrl(base, 'update/cancel')).then(function (res) {
+          if (!res.ok) {
+            setUpdateMsg(msg, res.error || T.cancelError, 'danger');
+            return;
+          }
+
+          var d = res.data || {};
+          setUpdateMsg(msg, (T.updateStatus + ': ' + String(d.status || 'cancel-requested')), 'warning');
+          startStatusPoll();
+        }).catch(function (e) {
+          setUpdateMsg(msg, (e && e.message ? e.message : T.cancelError), 'danger');
         });
       });
     }
@@ -384,6 +459,33 @@
         });
       });
     }
+
+    getJson(apiUrl(base, 'update/status')).then(function (res) {
+      if (!res.ok) {
+        return;
+      }
+      var data = res.data || {};
+      var state = data.state || {};
+      var active = data.active_job || null;
+      var status = String(state.status || '');
+      var message = String(state.message || '');
+      if (message) {
+        var kind = 'info';
+        if (status === 'updated' || status === 'up-to-date') {
+          kind = 'success';
+        } else if (status === 'failed') {
+          kind = 'danger';
+        } else if (status === 'cancel-requested' || status === 'canceled') {
+          kind = 'warning';
+        }
+        setUpdateMsg(msg, message, kind);
+      }
+      if (active) {
+        setUpdateMsg(msg, message || T.applying, 'warning');
+        startStatusPoll();
+      }
+    }).catch(function () {
+    });
   }
 
   try {

@@ -3,6 +3,19 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.47] - 2026-02-21
+### Changed
+- Updater switched to queue-based flow to prevent overlapping update tasks and false concurrent runs.
+- Dashboard update actions now support runtime status polling and explicit cancel request.
+
+### Added
+- Added update runtime endpoints: `update/status` and `update/cancel`.
+- Added release package validation before apply (required files, package version, content-length check).
+
+### Fixed
+- Fixed false-positive update logs by logging `updated` only after file copy + installed version validation.
+- Improved updater reliability with longer timeouts and retry logic for GitHub requests.
+
 ## [0.1.46] - 2026-02-21
 ### Changed
 - Cron configuration is now single-entry: one cron command (`dispatcher`) handles all module tasks by internal schedule.
