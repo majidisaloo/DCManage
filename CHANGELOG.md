@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.26] - 2026-02-21
+### Changed
+- Increased top spacing in Datacenters action bar.
+- `Add Datacenter` button now has clearer breathing room from the top border line.
+
 ## [0.1.25] - 2026-02-21
 ### Changed
 - Removed duplicate in-page `Datacenters` title under the top tabs.

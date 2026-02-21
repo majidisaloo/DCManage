@@ -400,6 +400,10 @@
   font-weight: 600;
 }
 
+.dcmanage-dc-topbar {
+  margin-top: 14px;
+}
+
 .dcmanage-btn-soft-primary,
 .dcmanage-btn-soft-info,
 .dcmanage-btn-soft-warning,
