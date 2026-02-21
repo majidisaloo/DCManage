@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.25] - 2026-02-21
+### Changed
+- Removed duplicate in-page `Datacenters` title under the top tabs.
+- Datacenters header row now shows only the `Add Datacenter` button.
+
+### Fixed
+- Resolved visual duplication where Datacenters label appeared both as active tab and as page heading.
+
 ## [0.1.24] - 2026-02-21
 ### Changed
 - Removed `Ports` tab from top navigation to avoid duplicate workflow with Switches.

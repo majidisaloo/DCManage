@@ -760,8 +760,7 @@ function dcmanage_render_datacenters(string $lang): void
             Capsule::raw('COUNT(r.id) as rack_count'),
         ]);
 
-    echo '<div class="d-flex justify-content-between align-items-center mb-3">';
-    echo '<h5 class="mb-0">' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</h5>';
+    echo '<div class="d-flex justify-content-end align-items-center mb-3">';
     echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-dc-add">' . htmlspecialchars(I18n::t('datacenter_add', $lang)) . '</button>';
     echo '</div>';
 
