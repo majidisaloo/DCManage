@@ -23,6 +23,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 16px;
 }
 
 .dcmanage-shell.dcmanage-rtl .dcmanage-tabs {
@@ -72,6 +73,10 @@
 
 .dcmanage-shell .dcmanage-page-body {
   padding: 22px 22px 24px !important;
+}
+
+.dcmanage-shell .dcmanage-page-card {
+  margin-top: 0 !important;
 }
 
 .dcmanage-shell .dcmanage-page-body > :first-child {

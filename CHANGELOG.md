@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.41] - 2026-02-21
+### Changed
+- Increased global spacing between top tabs and content area.
+- Standardized tabs-to-content vertical rhythm across module pages.
+
+### Fixed
+- Fixed visual sticking of top menus to the section/table below in pages like Servers.
+
 ## [0.1.40] - 2026-02-21
 ### Changed
 - Port admin status label updated from `Shut/No Shut` to `Active/Suspended`.
