@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.11] - 2026-02-21
+### Fixed
+- Fixed dashboard API compatibility for servers running older PHP versions by replacing PHP 8-only syntax in API/service files.
+- Fixed `Invalid API response` dashboard errors that blocked update/version/cron widgets and update buttons.
+- Restored stable API JSON responses for:
+  - dashboard health
+  - dashboard version/update
+  - dashboard cron status
+
 ## [0.1.10] - 2026-02-21
 ### Changed
 - Rack visualization is now front-only (rear view removed) for cleaner operation flow.

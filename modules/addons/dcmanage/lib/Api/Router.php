@@ -17,18 +17,37 @@ final class Router
         try {
             $endpoint = trim($endpoint, '/');
 
-            $data = match ($endpoint) {
-                'dashboard/health' => self::dashboardHealth(),
-                'dashboard/version' => self::dashboardVersion(),
-                'dashboard/cron' => self::dashboardCron(),
-                'update/check' => self::updateCheck(),
-                'update/apply' => self::updateApply(),
-                'update/set-auto' => self::updateSetAuto(),
-                'datacenters/list' => self::datacenterList(),
-                'traffic/list' => self::trafficList(),
-                'graphs/get' => self::graphGet(),
-                default => throw new \RuntimeException('Endpoint not found: ' . $endpoint),
-            };
+            switch ($endpoint) {
+                case 'dashboard/health':
+                    $data = self::dashboardHealth();
+                    break;
+                case 'dashboard/version':
+                    $data = self::dashboardVersion();
+                    break;
+                case 'dashboard/cron':
+                    $data = self::dashboardCron();
+                    break;
+                case 'update/check':
+                    $data = self::updateCheck();
+                    break;
+                case 'update/apply':
+                    $data = self::updateApply();
+                    break;
+                case 'update/set-auto':
+                    $data = self::updateSetAuto();
+                    break;
+                case 'datacenters/list':
+                    $data = self::datacenterList();
+                    break;
+                case 'traffic/list':
+                    $data = self::trafficList();
+                    break;
+                case 'graphs/get':
+                    $data = self::graphGet();
+                    break;
+                default:
+                    throw new \RuntimeException('Endpoint not found: ' . $endpoint);
+            }
 
             echo json_encode(['ok' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
         } catch (\Throwable $e) {
@@ -219,7 +238,7 @@ final class Router
                 if ($lastTs !== null) {
                     $nextAt = date('Y-m-d H:i:s', $lastTs + $interval);
                     $age = time() - $lastTs;
-                    if (str_contains((string) $last->message, 'completed') && $age <= ($interval * 2)) {
+                    if (strpos((string) $last->message, 'completed') !== false && $age <= ($interval * 2)) {
                         $status = 'ok';
                     } else {
                         $status = 'warning';

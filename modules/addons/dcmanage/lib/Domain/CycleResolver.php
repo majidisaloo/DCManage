@@ -24,15 +24,24 @@ final class CycleResolver
     private static function cycleLengthInterval(string $billingCycle): string
     {
         $normalized = strtolower(trim($billingCycle));
-
-        return match ($normalized) {
-            'monthly' => '1 month',
-            'quarterly' => '3 months',
-            'semi-annually', 'semiannually' => '6 months',
-            'annually' => '1 year',
-            'biennially' => '2 years',
-            'triennially' => '3 years',
-            default => '1 month',
-        };
+        if ($normalized === 'monthly') {
+            return '1 month';
+        }
+        if ($normalized === 'quarterly') {
+            return '3 months';
+        }
+        if ($normalized === 'semi-annually' || $normalized === 'semiannually') {
+            return '6 months';
+        }
+        if ($normalized === 'annually') {
+            return '1 year';
+        }
+        if ($normalized === 'biennially') {
+            return '2 years';
+        }
+        if ($normalized === 'triennially') {
+            return '3 years';
+        }
+        return '1 month';
     }
 }

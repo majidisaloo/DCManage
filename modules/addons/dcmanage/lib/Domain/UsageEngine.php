@@ -95,11 +95,13 @@ final class UsageEngine
         $deltaOut = $this->computeDelta($lastOut, $currentOut);
 
         $mode = strtoupper((string) ($state->mode ?? 'TOTAL'));
-        $delta = match ($mode) {
-            'IN' => $deltaIn,
-            'OUT' => $deltaOut,
-            default => ($deltaIn + $deltaOut),
-        };
+        if ($mode === 'IN') {
+            $delta = $deltaIn;
+        } elseif ($mode === 'OUT') {
+            $delta = $deltaOut;
+        } else {
+            $delta = $deltaIn + $deltaOut;
+        }
 
         $usedBytes += $delta;
 
