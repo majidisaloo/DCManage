@@ -1102,7 +1102,7 @@ function dcmanage_render_settings_form(string $lang): void
     echo '<div class="col-md-2 mb-3"><label>' . htmlspecialchars(I18n::t('ilo_proxy_pass', $lang)) . '</label><input type="password" class="form-control dcmanage-input" name="ilo_proxy_pass" value=""></div>';
 
     echo '</div>';
-    echo '<div class="d-flex flex-wrap" style="gap:8px">';
+    echo '<div class="dcmanage-form-actions d-flex flex-wrap">';
     echo '<button type="submit" class="btn btn-primary" name="dcmanage_action_btn" value="settings_save">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
     echo '<button type="submit" class="btn btn-outline-primary" name="dcmanage_action_btn" value="settings_ilo_proxy_test">' . htmlspecialchars(I18n::t('ilo_proxy_test', $lang)) . '</button>';
     echo '</div>';

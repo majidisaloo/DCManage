@@ -3,6 +3,12 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.48] - 2026-02-21
+### Fixed
+- Fixed inconsistent padding/margin in settings and form cards.
+- Added consistent spacing between labels, inputs, and action buttons.
+- Added dedicated form action area spacing so buttons no longer stick to input rows.
+
 ## [0.1.47] - 2026-02-21
 ### Changed
 - Updater switched to queue-based flow to prevent overlapping update tasks and false concurrent runs.
