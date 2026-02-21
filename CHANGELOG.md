@@ -3,6 +3,18 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.36] - 2026-02-21
+### Changed
+- Refined dashboard update control spacing and checkbox alignment for cleaner visual rhythm.
+- Auto Update checkbox label now has proper baseline and breathing space.
+
+### Added
+- Update status message area now appears only when an action result exists (check/apply/toggle error), and stays hidden by default.
+
+### Fixed
+- Removed persistent empty rounded message box under update buttons.
+- Fixed crowded `Auto Update` checkbox/text rendering seen on some screens.
+
 ## [0.1.35] - 2026-02-21
 ### Changed
 - Servers create flow is now dependency-first: `Datacenter -> Rack -> Switch -> Switch Port`.

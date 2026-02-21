@@ -166,7 +166,7 @@
 
     var text = String(message || '').trim();
     if (text === '') {
-      node.className = 'mt-3 dcmanage-update-msg is-info d-none';
+      node.className = 'dcmanage-update-msg is-info';
       node.innerHTML = '';
       return;
     }
@@ -180,7 +180,7 @@
       cls = 'is-danger';
     }
 
-    node.className = 'mt-3 dcmanage-update-msg ' + cls;
+    node.className = 'dcmanage-update-msg is-visible ' + cls;
     node.innerHTML = safeText(text);
   }
 
@@ -279,7 +279,7 @@
         '<button type="button" class="btn btn-outline-primary btn-sm dcmanage-check-btn" id="dcmanage-check-update">' + safeText(T.checkUpdate) + '</button>' +
         '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">' + safeText(T.applyUpdate) + '</button>' +
         '</div>' +
-        '<div id="dcmanage-update-msg" class="mt-3 dcmanage-update-msg is-info d-none"></div>' +
+        '<div id="dcmanage-update-msg" class="dcmanage-update-msg is-info"></div>' +
         '</div>';
 
       bindVersionActions(base);
