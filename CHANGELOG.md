@@ -3,6 +3,25 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.10] - 2026-02-21
+### Changed
+- Rack visualization is now front-only (rear view removed) for cleaner operation flow.
+- Unit selection UX improved: clicking a rack unit now targets that U directly in the unit configuration form.
+- Datacenter action area was restyled with modern grouped action buttons.
+- `Networks` tab and related Datacenter action were removed from admin navigation.
+
+### Added
+- Rack rename/update controls (rack name + total U) directly inside rack cards.
+- Switch management now follows Datacenter pattern with collapsible `Add Switch` form.
+- Switch vendor selector includes `Cisco`, `Nexus`, `MikroTik`.
+- SNMP fields added to switch create/edit flow: management IP, version, port, community.
+- SNMP connectivity test action per switch with visual status badge (`UP` green / `DOWN` red).
+- Switch port and VLAN management block per switch:
+  - list existing ports
+  - add/update port metadata
+  - delete ports
+- Added DB migration/table `mod_dcmanage_switch_ports` for switch interface/VLAN inventory.
+
 ## [0.1.9] - 2026-02-21
 ### Changed
 - Rack presentation was redesigned to a more realistic visual style with dedicated front/rear views.

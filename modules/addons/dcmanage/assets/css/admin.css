@@ -112,6 +112,18 @@
   width: 360px;
 }
 
+.dcmanage-action-buttons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dcmanage-action-buttons .btn {
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-weight: 600;
+}
+
 .dcmanage-shell code {
   color: #1a4bb5;
 }
@@ -261,16 +273,24 @@
   background: linear-gradient(90deg, #d0f6fa, #e8fcff);
 }
 
-.dcmanage-rack-frame.rear .u-wire {
+.dcmanage-rack-frame .u-wire {
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #ff2a2a, #ffd43b);
+  background: linear-gradient(90deg, #ff5a5a, #ffc84f);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .08);
+  opacity: .8;
 }
 
-.dcmanage-rack-frame.rear .dcmanage-rack-u.blank .u-wire {
+.dcmanage-rack-frame .dcmanage-rack-u.blank .u-wire {
   background: transparent;
   box-shadow: none;
+  opacity: 0;
+}
+
+.dcmanage-rack-u.selected {
+  outline: 2px solid #2f6fed;
+  border-radius: 6px;
+  background: #e9f2ff;
 }
 
 @media (max-width: 991px) {

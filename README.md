@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.9)
+## Features in this release (v0.1.10)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -41,9 +41,11 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Switch create supports Datacenter -> Rack dependent selection.
   - Switch create supports optional U position for rack placement.
   - Server create supports Datacenter -> Rack dependent selection and U position fields.
-  - Datacenter rows now expose direct actions: Racks, Networks, Servers, Edit, Delete.
-  - Rack map now supports per-U marking for reserved/cable/airflow/blank planning.
-  - Rack UI now shows realistic Front/Rear visual frames for clearer physical placement understanding.
+  - Datacenter rows now expose direct actions: Racks, Servers, Edit, Delete.
+  - Rack map is front-focused with click-to-select U workflow and per-U marking for reserved/cable/airflow/blank planning.
+  - Rack cards support inline rack rename and total-U updates.
+  - Switch section now supports collapsible add flow, SNMP fields, and per-switch SNMP connectivity test with status badges.
+  - Switch section includes ports/VLAN inventory with add/update/delete operations.
 - Logs:
   - package purchase logs are now visible inside Logs tab.
 

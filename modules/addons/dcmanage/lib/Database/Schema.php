@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 4;
+    private const SCHEMA_VERSION = 5;
 
     public static function migrate(): void
     {
@@ -34,6 +34,11 @@ final class Schema
         if ($current < 4) {
             self::migrationV4();
             self::setCurrentVersion(4);
+        }
+
+        if ($current < 5) {
+            self::migrationV5();
+            self::setCurrentVersion(5);
         }
     }
 
@@ -381,6 +386,21 @@ final class Schema
                 $table->string('label', 191)->nullable();
                 $table->timestamp('updated_at')->nullable();
                 $table->unique(['rack_id', 'u_no'], 'mod_dcmanage_rack_units_unique');
+            });
+        }
+    }
+
+    private static function migrationV5(): void
+    {
+        if (!Capsule::schema()->hasTable('mod_dcmanage_switch_ports')) {
+            Capsule::schema()->create('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
+                $table->increments('id');
+                $table->unsignedInteger('switch_id')->index();
+                $table->string('if_name', 64)->index();
+                $table->string('vlan', 64)->nullable();
+                $table->string('admin_status', 16)->nullable();
+                $table->string('oper_status', 16)->nullable();
+                $table->timestamp('last_seen')->nullable();
             });
         }
     }

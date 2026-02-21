@@ -87,7 +87,6 @@ function dcmanage_output(array $vars): void
     $tabs = [
         'dashboard' => I18n::t('tab_dashboard', $lang),
         'datacenters' => I18n::t('tab_datacenters', $lang),
-        'networks' => I18n::t('tab_networks', $lang),
         'switches' => I18n::t('tab_switches', $lang),
         'servers' => I18n::t('tab_servers', $lang),
         'ports' => I18n::t('tab_ports', $lang),
@@ -260,6 +259,25 @@ function dcmanage_handle_actions(string $lang): string
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
+        if ($action === 'rack_update') {
+            $rackId = (int) ($_POST['rack_id'] ?? 0);
+            if ($rackId <= 0) {
+                throw new RuntimeException('Invalid rack');
+            }
+            $name = trim((string) ($_POST['rack_name'] ?? ''));
+            $totalU = max(1, (int) ($_POST['rack_total_u'] ?? 42));
+            if ($name === '') {
+                throw new RuntimeException('Rack name is required');
+            }
+
+            Capsule::table('mod_dcmanage_racks')->where('id', $rackId)->update([
+                'name' => $name,
+                'total_u' => $totalU,
+            ]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
         if ($action === 'switch_create') {
             $dcId = (int) ($_POST['dc_id'] ?? 0);
             $rackId = (int) ($_POST['rack_id'] ?? 0);
@@ -275,13 +293,101 @@ function dcmanage_handle_actions(string $lang): string
                 'u_start' => (int) ($_POST['u_start'] ?? 0) ?: null,
                 'u_height' => max(1, (int) ($_POST['u_height'] ?? 1)),
                 'name' => $name,
-                'vendor' => trim((string) ($_POST['vendor'] ?? '')),
+                'vendor' => trim((string) ($_POST['vendor'] ?? 'Cisco')),
                 'model' => trim((string) ($_POST['model'] ?? '')),
                 'mgmt_ip' => trim((string) ($_POST['mgmt_ip'] ?? '')),
+                'snmp_version' => trim((string) ($_POST['snmp_version'] ?? '2c')),
+                'snmp_port' => max(1, (int) ($_POST['snmp_port'] ?? 161)),
+                'snmp_community' => trim((string) ($_POST['snmp_community'] ?? 'public')),
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
 
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('created', $lang)) . '</div>';
+        }
+
+        if ($action === 'switch_update') {
+            $id = (int) ($_POST['switch_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid switch');
+            }
+
+            Capsule::table('mod_dcmanage_switches')->where('id', $id)->update([
+                'dc_id' => max(1, (int) ($_POST['dc_id'] ?? 1)),
+                'rack_id' => (int) ($_POST['rack_id'] ?? 0) ?: null,
+                'u_start' => (int) ($_POST['u_start'] ?? 0) ?: null,
+                'u_height' => max(1, (int) ($_POST['u_height'] ?? 1)),
+                'name' => trim((string) ($_POST['name'] ?? '')),
+                'vendor' => trim((string) ($_POST['vendor'] ?? 'Cisco')),
+                'model' => trim((string) ($_POST['model'] ?? '')),
+                'mgmt_ip' => trim((string) ($_POST['mgmt_ip'] ?? '')),
+                'snmp_version' => trim((string) ($_POST['snmp_version'] ?? '2c')),
+                'snmp_port' => max(1, (int) ($_POST['snmp_port'] ?? 161)),
+                'snmp_community' => trim((string) ($_POST['snmp_community'] ?? 'public')),
+            ]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'switch_delete') {
+            $id = (int) ($_POST['switch_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid switch');
+            }
+            Capsule::table('mod_dcmanage_switch_ports')->where('switch_id', $id)->delete();
+            Capsule::table('mod_dcmanage_switches')->where('id', $id)->delete();
+            Capsule::table('mod_dcmanage_meta')->where('meta_key', 'switch.snmp.' . $id)->delete();
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'switch_snmp_test') {
+            $id = (int) ($_POST['switch_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid switch');
+            }
+            $switch = Capsule::table('mod_dcmanage_switches')->where('id', $id)->first();
+            if ($switch === null) {
+                throw new RuntimeException('Switch not found');
+            }
+            $result = dcmanage_test_snmp((string) $switch->mgmt_ip, (string) ($switch->snmp_community ?? 'public'), (int) ($switch->snmp_port ?? 161));
+            Capsule::table('mod_dcmanage_meta')->updateOrInsert(
+                ['meta_key' => 'switch.snmp.' . $id],
+                ['meta_value' => json_encode($result, JSON_UNESCAPED_UNICODE), 'updated_at' => date('Y-m-d H:i:s')]
+            );
+            return '<div class="alert alert-' . ($result['ok'] ? 'success' : 'danger') . '">' . htmlspecialchars($result['message']) . '</div>';
+        }
+
+        if ($action === 'switch_port_upsert') {
+            $id = (int) ($_POST['port_id'] ?? 0);
+            $switchId = (int) ($_POST['switch_id'] ?? 0);
+            if ($switchId <= 0) {
+                throw new RuntimeException('Invalid switch');
+            }
+            $payload = [
+                'switch_id' => $switchId,
+                'if_name' => trim((string) ($_POST['if_name'] ?? '')),
+                'vlan' => trim((string) ($_POST['vlan'] ?? '')),
+                'admin_status' => trim((string) ($_POST['admin_status'] ?? 'up')),
+                'oper_status' => trim((string) ($_POST['oper_status'] ?? 'unknown')),
+                'last_seen' => date('Y-m-d H:i:s'),
+            ];
+            if ($payload['if_name'] === '') {
+                throw new RuntimeException('Port interface name is required');
+            }
+            if ($id > 0) {
+                Capsule::table('mod_dcmanage_switch_ports')->where('id', $id)->update($payload);
+            } else {
+                Capsule::table('mod_dcmanage_switch_ports')->insert($payload);
+            }
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'switch_port_delete') {
+            $id = (int) ($_POST['port_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid port');
+            }
+            Capsule::table('mod_dcmanage_switch_ports')->where('id', $id)->delete();
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
         if ($action === 'server_create') {
@@ -545,14 +651,15 @@ function dcmanage_render_datacenters(string $lang): void
         echo '<td>' . htmlspecialchars((string) $row->location) . '</td>';
         echo '<td>' . (int) $row->rack_count . '</td>';
         echo '<td>';
-        echo '<button class="btn btn-sm btn-outline-info mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-racks-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_racks', $lang)) . '</button>';
-        echo '<button class="btn btn-sm btn-outline-secondary mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-networks-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_networks', $lang)) . '</button>';
-        echo '<button class="btn btn-sm btn-outline-primary mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-servers-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_servers', $lang)) . '</button>';
-        echo '<button class="btn btn-sm btn-outline-warning mr-1 mb-1" type="button" data-toggle="collapse" data-target="#dc-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
+        echo '<div class="dcmanage-action-buttons">';
+        echo '<button class="btn btn-sm btn-outline-info" type="button" data-toggle="collapse" data-target="#dc-racks-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_racks', $lang)) . '</button>';
+        echo '<button class="btn btn-sm btn-outline-primary" type="button" data-toggle="collapse" data-target="#dc-servers-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_servers', $lang)) . '</button>';
+        echo '<button class="btn btn-sm btn-outline-warning" type="button" data-toggle="collapse" data-target="#dc-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
         echo '<form method="post" style="display:inline" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('delete_confirm_datacenter', $lang), ENT_QUOTES, 'UTF-8') . '\')">';
         echo '<input type="hidden" name="dcmanage_action" value="datacenter_delete"><input type="hidden" name="dc_id" value="' . (int) $row->id . '">';
-        echo '<button class="btn btn-sm btn-outline-danger mb-1" type="submit">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button>';
+        echo '<button class="btn btn-sm btn-outline-danger" type="submit">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button>';
         echo '</form>';
+        echo '</div>';
         echo '</td>';
         echo '</tr>';
 
@@ -565,16 +672,6 @@ function dcmanage_render_datacenters(string $lang): void
         echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input name="notes" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->notes) . '"></div>';
         echo '</div><button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></form>';
         echo '</td></tr>';
-
-        $networks = Capsule::table('mod_dcmanage_networks')->where('dc_id', (int) $row->id)->get(['name', 'vlan', 'purpose']);
-        echo '<tr class="collapse" id="dc-networks-' . (int) $row->id . '"><td colspan="5"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>' . htmlspecialchars(I18n::t('label_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_vlan', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_purpose', $lang)) . '</th></tr></thead><tbody>';
-        foreach ($networks as $n) {
-            echo '<tr><td>' . htmlspecialchars((string) $n->name) . '</td><td>' . htmlspecialchars((string) $n->vlan) . '</td><td>' . htmlspecialchars((string) $n->purpose) . '</td></tr>';
-        }
-        if (count($networks) === 0) {
-            echo '<tr><td colspan="3">-</td></tr>';
-        }
-        echo '</tbody></table></div></td></tr>';
 
         $servers = Capsule::table('mod_dcmanage_servers as s')
             ->leftJoin('mod_dcmanage_racks as r', 'r.id', '=', 's.rack_id')
@@ -601,14 +698,23 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
     $racks = Capsule::table('mod_dcmanage_racks')->where('dc_id', $dcId)->orderBy('name')->get();
     echo '<div class="row">';
     foreach ($racks as $rack) {
+        $rackId = (int) $rack->id;
         $units = max(1, (int) $rack->total_u);
-        $usage = dcmanage_rack_usage((int) $rack->id, $units);
+        $usage = dcmanage_rack_usage($rackId, $units);
         echo '<div class="col-12 mb-4">';
         echo '<div class="card dcmanage-rack-card"><div class="card-body">';
         echo '<div class="d-flex justify-content-between align-items-center mb-2">';
         echo '<h6 class="mb-0">' . htmlspecialchars((string) $rack->name) . '</h6>';
         echo '<span class="badge badge-light">' . $units . 'U</span>';
         echo '</div>';
+
+        echo '<form method="post" class="form-inline mb-2">';
+        echo '<input type="hidden" name="dcmanage_action" value="rack_update">';
+        echo '<input type="hidden" name="rack_id" value="' . $rackId . '">';
+        echo '<input name="rack_name" class="form-control form-control-sm dcmanage-input mr-2 mb-2" value="' . htmlspecialchars((string) $rack->name) . '" placeholder="' . htmlspecialchars(I18n::t('label_name', $lang)) . '">';
+        echo '<input type="number" min="1" max="60" name="rack_total_u" class="form-control form-control-sm dcmanage-input mr-2 mb-2" value="' . $units . '" style="max-width:100px">';
+        echo '<button class="btn btn-sm btn-outline-primary mb-2" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+        echo '</form>';
 
         echo '<div class="dcmanage-rack-legend mb-2">';
         echo '<strong class="mr-2">' . htmlspecialchars(I18n::t('rack_legend', $lang)) . ':</strong>';
@@ -619,38 +725,30 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
         echo '<span class="dcmanage-dot air ml-2"></span>' . htmlspecialchars(I18n::t('unit_air', $lang));
         echo '</div>';
 
-        echo '<div class="row">';
-        foreach (['front' => I18n::t('rack_front_view', $lang), 'rear' => I18n::t('rack_rear_view', $lang)] as $view => $viewLabel) {
-            echo '<div class="col-lg-6 mb-3">';
-            echo '<div class="dcmanage-rack-frame ' . $view . '">';
-            echo '<div class="dcmanage-rack-title">' . htmlspecialchars($viewLabel) . '</div>';
-            echo '<div class="dcmanage-rack-grid">';
-            for ($u = $units; $u >= 1; $u--) {
-                $cell = $usage[$u] ?? ['kind' => 'blank', 'label' => '-'];
-                $kind = (string) $cell['kind'];
-                $label = (string) $cell['label'];
-                if ($label === '') {
-                    $label = '-';
-                }
-                echo '<div class="dcmanage-rack-u ' . htmlspecialchars($kind) . '">';
-                echo '<span class="u-num">U' . $u . '</span>';
-                echo '<span class="u-slot"><span class="u-face"></span><span class="u-item">' . htmlspecialchars($label) . '</span></span>';
-                if ($view === 'rear' && $kind !== 'blank') {
-                    echo '<span class="u-wire"></span>';
-                }
-                echo '</div>';
+        echo '<div class="dcmanage-rack-frame front mb-2">';
+        echo '<div class="dcmanage-rack-title">' . htmlspecialchars(I18n::t('rack_front_view', $lang)) . '</div>';
+        echo '<div class="dcmanage-rack-grid">';
+        for ($u = $units; $u >= 1; $u--) {
+            $cell = $usage[$u] ?? ['kind' => 'blank', 'label' => '-'];
+            $kind = (string) $cell['kind'];
+            $label = (string) $cell['label'];
+            if ($label === '') {
+                $label = '-';
             }
-            echo '</div>';
-            echo '</div>';
+            echo '<div class="dcmanage-rack-u ' . htmlspecialchars($kind) . '" data-rack-id="' . $rackId . '" data-u="' . $u . '">';
+            echo '<span class="u-num">U' . $u . '</span>';
+            echo '<span class="u-slot"><span class="u-face"></span><span class="u-item">' . htmlspecialchars($label) . '</span></span>';
+            echo '<span class="u-wire"></span>';
             echo '</div>';
         }
+        echo '</div>';
         echo '</div>';
 
         echo '<form method="post" class="mt-2">';
         echo '<input type="hidden" name="dcmanage_action" value="rack_unit_set">';
-        echo '<input type="hidden" name="rack_id" value="' . (int) $rack->id . '">';
+        echo '<input type="hidden" name="rack_id" value="' . $rackId . '">';
         echo '<div class="form-row">';
-        echo '<div class="col-3"><input type="number" min="1" max="' . $units . '" name="u_no" class="form-control form-control-sm dcmanage-input" placeholder="U"></div>';
+        echo '<div class="col-3"><input type="number" min="1" max="' . $units . '" id="dcmanage-u-no-' . $rackId . '" name="u_no" class="form-control form-control-sm dcmanage-input" placeholder="U"></div>';
         echo '<div class="col-4"><select name="unit_type" class="form-control form-control-sm dcmanage-input"><option value="blank">' . htmlspecialchars(I18n::t('unit_blank', $lang)) . '</option><option value="reserved">' . htmlspecialchars(I18n::t('unit_reserved', $lang)) . '</option><option value="cable">' . htmlspecialchars(I18n::t('unit_cable', $lang)) . '</option><option value="air">' . htmlspecialchars(I18n::t('unit_air', $lang)) . '</option></select></div>';
         echo '<div class="col-5"><input name="label" class="form-control form-control-sm dcmanage-input" placeholder="' . htmlspecialchars(I18n::t('label_name', $lang)) . '"></div>';
         echo '</div>';
@@ -660,6 +758,7 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
         echo '</div></div></div>';
     }
     echo '</div>';
+    echo '<script>(function(){var units=document.querySelectorAll(".dcmanage-rack-u[data-rack-id]");for(var i=0;i<units.length;i++){units[i].addEventListener("click",function(){var rid=this.getAttribute("data-rack-id");var u=this.getAttribute("data-u");var input=document.getElementById("dcmanage-u-no-"+rid);if(input){input.value=u;}var list=document.querySelectorAll(".dcmanage-rack-u[data-rack-id=\'"+rid+"\']");for(var j=0;j<list.length;j++){list[j].classList.remove("selected");}this.classList.add("selected");});}})();</script>';
 }
 
 function dcmanage_rack_usage(int $rackId, int $totalU): array
@@ -708,6 +807,51 @@ function dcmanage_rack_usage(int $rackId, int $totalU): array
     return $usage;
 }
 
+function dcmanage_test_snmp(string $host, string $community, int $port = 161): array
+{
+    $host = trim($host);
+    if ($host === '') {
+        return ['ok' => false, 'message' => 'Management IP is empty'];
+    }
+
+    if (function_exists('snmp2_get')) {
+        $timeoutMicros = 1000000;
+        $retries = 0;
+        $target = $host . ':' . max(1, $port);
+        $value = @snmp2_get($target, $community === '' ? 'public' : $community, '.1.3.6.1.2.1.1.1.0', $timeoutMicros, $retries);
+        if ($value !== false) {
+            return ['ok' => true, 'message' => 'SNMP connected'];
+        }
+    }
+
+    $errno = 0;
+    $errstr = '';
+    $sock = @fsockopen('udp://' . $host, max(1, $port), $errno, $errstr, 2.0);
+    if (is_resource($sock)) {
+        fclose($sock);
+        return ['ok' => true, 'message' => 'UDP port reachable'];
+    }
+
+    return ['ok' => false, 'message' => 'SNMP connection failed'];
+}
+
+function dcmanage_switch_snmp_state(int $switchId): array
+{
+    $raw = Capsule::table('mod_dcmanage_meta')->where('meta_key', 'switch.snmp.' . $switchId)->value('meta_value');
+    if ($raw === null || $raw === '') {
+        return ['ok' => false, 'message' => '-', 'tested' => false];
+    }
+    $parsed = json_decode((string) $raw, true);
+    if (!is_array($parsed)) {
+        return ['ok' => false, 'message' => '-', 'tested' => false];
+    }
+    return [
+        'ok' => !empty($parsed['ok']),
+        'message' => (string) ($parsed['message'] ?? '-'),
+        'tested' => true,
+    ];
+}
+
 function dcmanage_render_switches(string $lang): void
 {
     $dcs = Capsule::table('mod_dcmanage_datacenters')->orderBy('name')->get(['id', 'name']);
@@ -718,53 +862,125 @@ function dcmanage_render_switches(string $lang): void
         ->leftJoin('mod_dcmanage_racks as r', 'r.id', '=', 's.rack_id')
         ->orderBy('s.id', 'desc')
         ->limit(200)
-        ->get(['s.id', 's.name', 's.vendor', 's.model', 's.mgmt_ip', 's.u_start', 's.u_height', 'd.name as dc_name', 'r.name as rack_name']);
+        ->get(['s.id', 's.name', 's.vendor', 's.model', 's.mgmt_ip', 's.snmp_community', 's.snmp_version', 's.snmp_port', 's.u_start', 's.u_height', 'd.name as dc_name', 'r.name as rack_name', 's.dc_id', 's.rack_id']);
 
-    echo '<div class="row">';
-    echo '<div class="col-lg-5 mb-4">';
-    echo '<h5>' . htmlspecialchars(I18n::t('switch_add', $lang)) . '</h5>';
+    echo '<div class="d-flex justify-content-between align-items-center mb-3">';
+    echo '<h5 class="mb-0">' . htmlspecialchars(I18n::t('tab_switches', $lang)) . '</h5>';
+    echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-switch-add">' . htmlspecialchars(I18n::t('switch_add', $lang)) . '</button>';
+    echo '</div>';
+
+    echo '<div class="collapse mb-4" id="dcmanage-switch-add">';
     echo '<form method="post" action="" class="dcmanage-form-card">';
     echo '<input type="hidden" name="dcmanage_action" value="switch_create">';
-
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" id="dcmanage-switch-dc" required class="form-control dcmanage-input">';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" id="dcmanage-switch-dc" required class="form-control dcmanage-input">';
     echo '<option value="">--</option>';
     foreach ($dcs as $dc) {
         echo '<option value="' . (int) $dc->id . '">' . htmlspecialchars((string) $dc->name) . '</option>';
     }
     echo '</select></div>';
-
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" id="dcmanage-switch-rack" class="form-control dcmanage-input">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" id="dcmanage-switch-rack" class="form-control dcmanage-input">';
     echo '<option value="">--</option>';
     foreach ($racks as $rack) {
         echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '">' . htmlspecialchars((string) $rack->name) . '</option>';
     }
     echo '</select></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</label><input required name="name" class="form-control dcmanage-input"></div>';
+    echo '</div>';
 
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</label><input required name="name" class="form-control dcmanage-input"></div>';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</label><input name="vendor" class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('switch_model', $lang)) . '</label><input name="model" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</label><select name="vendor" class="form-control dcmanage-input"><option>Cisco</option><option>Nexus</option><option>MikroTik</option></select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_model', $lang)) . '</label><input name="model" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>U Height</label><input type="number" min="1" name="u_height" value="1" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>SNMP Port</label><input type="number" min="1" name="snmp_port" value="161" class="form-control dcmanage-input"></div>';
     echo '</div>';
+
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-6"><label>U Height</label><input type="number" min="1" name="u_height" value="1" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</label><input name="mgmt_ip" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-4"><label>SNMP Version</label><select name="snmp_version" class="form-control dcmanage-input"><option value="2c">2c</option><option value="3">3</option></select></div>';
+    echo '<div class="form-group col-md-4"><label>SNMP Community</label><input name="snmp_community" value="public" class="form-control dcmanage-input"></div>';
     echo '</div>';
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</label><input name="mgmt_ip" class="form-control dcmanage-input"></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_switch', $lang)) . '</button>';
     echo '</form>';
     echo '</div>';
 
-    echo '<div class="col-lg-7">';
-    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('tab_switches', $lang)) . '</h5>';
-    echo '<div class="table-responsive"><table class="table table-sm table-striped">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>U</th><th>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</th></tr></thead><tbody>';
+    echo '<div class="table-responsive"><table class="table table-sm table-striped dcmanage-dc-table">';
+    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</th><th>SNMP</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
-        $u = ($row->u_start !== null ? (string) $row->u_start : '-') . '/' . (string) ($row->u_height ?? 1);
-        echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->name) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . htmlspecialchars($u) . '</td><td>' . htmlspecialchars((string) $row->mgmt_ip) . '</td></tr>';
+        $snmp = dcmanage_switch_snmp_state((int) $row->id);
+        $snmpCls = $snmp['tested'] ? ($snmp['ok'] ? 'success' : 'danger') : 'secondary';
+        $snmpLabel = $snmp['tested'] ? ($snmp['ok'] ? 'UP' : 'DOWN') : '-';
+        echo '<tr>';
+        echo '<td>' . (int) $row->id . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->name) . '<br><small class="text-muted">' . htmlspecialchars((string) $row->mgmt_ip) . '</small></td>';
+        echo '<td>' . htmlspecialchars((string) $row->dc_name) . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->rack_name) . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->vendor) . ' ' . htmlspecialchars((string) $row->model) . '</td>';
+        echo '<td><span class="badge badge-' . $snmpCls . '">' . $snmpLabel . '</span><br><small class="text-muted">' . htmlspecialchars((string) $snmp['message']) . '</small></td>';
+        echo '<td><div class="dcmanage-action-buttons">';
+        echo '<button class="btn btn-sm btn-outline-info" type="button" data-toggle="collapse" data-target="#sw-ports-' . (int) $row->id . '">Ports</button>';
+        echo '<button class="btn btn-sm btn-outline-warning" type="button" data-toggle="collapse" data-target="#sw-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
+        echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_snmp_test"><input type="hidden" name="switch_id" value="' . (int) $row->id . '"><button class="btn btn-sm btn-outline-success" type="submit">' . htmlspecialchars(I18n::t('switch_snmp_test', $lang)) . '</button></form>';
+        echo '<form method="post" style="display:inline" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('delete_confirm_switch', $lang), ENT_QUOTES, 'UTF-8') . '\')"><input type="hidden" name="dcmanage_action" value="switch_delete"><input type="hidden" name="switch_id" value="' . (int) $row->id . '"><button class="btn btn-sm btn-outline-danger" type="submit">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form>';
+        echo '</div></td>';
+        echo '</tr>';
+
+        echo '<tr class="collapse" id="sw-edit-' . (int) $row->id . '"><td colspan="7">';
+        echo '<form method="post" class="dcmanage-form-card">';
+        echo '<input type="hidden" name="dcmanage_action" value="switch_update"><input type="hidden" name="switch_id" value="' . (int) $row->id . '">';
+        echo '<div class="form-row">';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" class="form-control dcmanage-input">';
+        foreach ($dcs as $dc) {
+            $sel = (int) $row->dc_id === (int) $dc->id ? ' selected' : '';
+            echo '<option value="' . (int) $dc->id . '"' . $sel . '>' . htmlspecialchars((string) $dc->name) . '</option>';
+        }
+        echo '</select></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" class="form-control dcmanage-input"><option value="">--</option>';
+        foreach ($racks as $rack) {
+            $sel = (int) $row->rack_id === (int) $rack->id ? ' selected' : '';
+            echo '<option value="' . (int) $rack->id . '"' . $sel . '>' . htmlspecialchars((string) $rack->name) . '</option>';
+        }
+        echo '</select></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</label><input name="name" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</label><select name="vendor" class="form-control dcmanage-input">';
+        foreach (['Cisco', 'Nexus', 'MikroTik'] as $v) {
+            $sel = strcasecmp((string) $row->vendor, $v) === 0 ? ' selected' : '';
+            echo '<option' . $sel . '>' . htmlspecialchars($v) . '</option>';
+        }
+        echo '</select></div>';
+        echo '</div>';
+        echo '<div class="form-row">';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_model', $lang)) . '</label><input name="model" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->model) . '"></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</label><input name="mgmt_ip" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->mgmt_ip) . '"></div>';
+        echo '<div class="form-group col-md-2"><label>SNMP Port</label><input type="number" min="1" name="snmp_port" class="form-control dcmanage-input" value="' . (int) ($row->snmp_port ?? 161) . '"></div>';
+        echo '<div class="form-group col-md-2"><label>SNMP Version</label><select name="snmp_version" class="form-control dcmanage-input"><option value="2c"' . ((string) $row->snmp_version === '2c' ? ' selected' : '') . '>2c</option><option value="3"' . ((string) $row->snmp_version === '3' ? ' selected' : '') . '>3</option></select></div>';
+        echo '<div class="form-group col-md-2"><label>Community</label><input name="snmp_community" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->snmp_community) . '"></div>';
+        echo '</div>';
+        echo '<div class="form-row"><div class="form-group col-md-2"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_start ?? '')) . '"></div><div class="form-group col-md-2"><label>U Height</label><input type="number" min="1" name="u_height" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_height ?? 1)) . '"></div></div>';
+        echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+        echo '</form>';
+        echo '</td></tr>';
+
+        $ports = Capsule::table('mod_dcmanage_switch_ports')->where('switch_id', (int) $row->id)->orderBy('if_name')->get();
+        echo '<tr class="collapse" id="sw-ports-' . (int) $row->id . '"><td colspan="7">';
+        echo '<div class="dcmanage-form-card">';
+        echo '<h6 class="mb-2">' . htmlspecialchars(I18n::t('switch_ports_vlans', $lang)) . '</h6>';
+        echo '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Interface</th><th>VLAN</th><th>Admin</th><th>Oper</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+        foreach ($ports as $p) {
+            echo '<tr><td>' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars((string) $p->admin_status) . '</td><td>' . htmlspecialchars((string) $p->oper_status) . '</td><td>';
+            echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_delete"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm btn-outline-danger" type="submit">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form>';
+            echo '</td></tr>';
+        }
+        if (count($ports) === 0) {
+            echo '<tr><td colspan="5">-</td></tr>';
+        }
+        echo '</tbody></table></div>';
+        echo '<form method="post" class="mt-2"><input type="hidden" name="dcmanage_action" value="switch_port_upsert"><input type="hidden" name="switch_id" value="' . (int) $row->id . '"><div class="form-row"><div class="col-md-3 mb-2"><input name="if_name" class="form-control form-control-sm dcmanage-input" placeholder="Ethernet1/1"></div><div class="col-md-2 mb-2"><input name="vlan" class="form-control form-control-sm dcmanage-input" placeholder="10"></div><div class="col-md-2 mb-2"><select name="admin_status" class="form-control form-control-sm dcmanage-input"><option>up</option><option>down</option></select></div><div class="col-md-2 mb-2"><select name="oper_status" class="form-control form-control-sm dcmanage-input"><option>up</option><option>down</option><option>unknown</option></select></div><div class="col-md-3 mb-2"><button class="btn btn-sm btn-outline-primary" type="submit">' . htmlspecialchars(I18n::t('switch_add_update_port', $lang)) . '</button></div></div></form>';
+        echo '</div>';
+        echo '</td></tr>';
     }
     echo '</tbody></table></div>';
-    echo '</div>';
-    echo '</div>';
 
     echo '<script>';
     echo '(function(){var dc=document.getElementById("dcmanage-switch-dc");var rack=document.getElementById("dcmanage-switch-rack");if(!dc||!rack){return;}';
