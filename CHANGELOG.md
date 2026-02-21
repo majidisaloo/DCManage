@@ -4,6 +4,11 @@
 - Maintenance:
   - ignored local verification artifacts (`dist/`, `_verify.zip`) to keep repository clean.
 
+## [0.1.2] - 2026-02-21
+- Fixed release zip deployment layout for direct extraction in `public_html`:
+  - release zip now contains `modules/addons/dcmanage` path.
+  - unzip in WHMCS root (`public_html`) now places files in the expected module folder automatically.
+
 ## [0.1.1] - 2026-02-21
 - Fixed GitHub release package format:
   - zip name no longer contains `public_html`.

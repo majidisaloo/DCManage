@@ -16,13 +16,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build module package
+      - name: Build WHMCS-ready package
         run: |
           set -euo pipefail
-          mkdir -p dist
-          cp -R modules/addons/dcmanage dist/dcmanage
+          mkdir -p dist/modules/addons
+          cp -R modules/addons/dcmanage dist/modules/addons/dcmanage
           cd dist
-          zip -r ../DCManage-${GITHUB_REF_NAME}.zip dcmanage
+          zip -r ../DCManage-${GITHUB_REF_NAME}.zip modules
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.1)
+## Features in this release (v0.1.2)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -26,10 +26,11 @@ DCManage is an API-first datacenter management core inside WHMCS.
 
 ## Installation From GitHub Releases
 1. Download asset: `DCManage-vX.Y.Z.zip` from repository Releases.
-2. Extract the zip and confirm it contains only one folder: `dcmanage`.
-3. Copy folder to WHMCS: `public_html/modules/addons/dcmanage`.
-4. Activate addon in WHMCS Admin > System Settings > Addon Modules.
-5. Grant admin role access to `DCManage`.
+2. Upload zip to WHMCS root (`public_html`).
+3. Extract zip in `public_html`.
+4. The zip automatically places files at `modules/addons/dcmanage`.
+5. Activate addon in WHMCS Admin > System Settings > Addon Modules.
+6. Grant admin role access to `DCManage`.
 
 ## Cron Setup
 Add these server cron entries:
