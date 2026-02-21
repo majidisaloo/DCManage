@@ -507,7 +507,6 @@ function dcmanage_handle_actions(string $lang): string
 
         if ($action === 'server_create_bulk') {
             $dcId = (int) ($_POST['bulk_dc_id'] ?? 0);
-            $rackId = (int) ($_POST['bulk_rack_id'] ?? 0);
             $rangeStart = trim((string) ($_POST['bulk_hostname_start'] ?? ''));
             $rangeEnd = trim((string) ($_POST['bulk_hostname_end'] ?? ''));
             $uHeight = max(1, (int) ($_POST['bulk_u_height'] ?? 1));
@@ -544,7 +543,7 @@ function dcmanage_handle_actions(string $lang): string
                 }
                 $insertRows[] = [
                     'dc_id' => $dcId,
-                    'rack_id' => $rackId > 0 ? $rackId : null,
+                    'rack_id' => null,
                     'hostname' => $hostname,
                     'asset_tag' => '',
                     'serial' => '',
@@ -2117,12 +2116,6 @@ function dcmanage_render_servers(string $lang): void
         echo '<option value="' . (int) $dc->id . '">' . htmlspecialchars((string) $dc->name) . '</option>';
     }
     echo '</select></div>';
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="bulk_rack_id" id="dcmanage-server-bulk-rack" class="form-control dcmanage-input">';
-    echo '<option value="">--</option>';
-    foreach ($racks as $rack) {
-        echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '">' . htmlspecialchars((string) $rack->name) . '</option>';
-    }
-    echo '</select></div>';
     echo '<div class="form-row">';
     echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_range_start', $lang)) . '</label><input required name="bulk_hostname_start" class="form-control dcmanage-input" placeholder="MDP-301"></div>';
     echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_range_end', $lang)) . '</label><input required name="bulk_hostname_end" class="form-control dcmanage-input" placeholder="MDP-399"></div>';
@@ -2200,22 +2193,20 @@ function dcmanage_render_servers(string $lang): void
 
     echo '<script>';
     echo '(function(){';
-    echo 'var dc=document.getElementById("dcmanage-server-dc");var rack=document.getElementById("dcmanage-server-rack");var sw=document.getElementById("dcmanage-server-switch");var swp=document.getElementById("dcmanage-server-switch-port");var bulkDc=document.getElementById("dcmanage-server-bulk-dc");var bulkRack=document.getElementById("dcmanage-server-bulk-rack");';
+    echo 'var dc=document.getElementById("dcmanage-server-dc");var rack=document.getElementById("dcmanage-server-rack");var sw=document.getElementById("dcmanage-server-switch");var swp=document.getElementById("dcmanage-server-switch-port");';
     echo 'if(!dc||!rack||!sw||!swp){return;}';
     echo 'function filterByDc(select,v){for(var i=0;i<select.options.length;i++){var o=select.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute("data-dc-id");o.hidden=(v!==""&&d!==null&&d!==v);}if(select.selectedIndex>0&&select.options[select.selectedIndex].hidden){select.selectedIndex=0;}}';
-    echo 'function filterBulkRacks(){if(!bulkDc||!bulkRack){return;}filterByDc(bulkRack,bulkDc.value);}';
     echo 'function parsePayload(raw){raw=String(raw||"").replace(/^\\uFEFF/,"").trim();try{return JSON.parse(raw);}catch(e){var s=raw.indexOf("DCMANAGE_JSON_START");var t=raw.indexOf("DCMANAGE_JSON_END");if(s!==-1&&t!==-1&&t>s){return JSON.parse(raw.substring(s+"DCMANAGE_JSON_START".length,t).trim());}throw e;}}';
     echo 'function apiUrl(endpoint,params){var u="addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint="+encodeURIComponent(endpoint);if(params){for(var k in params){if(Object.prototype.hasOwnProperty.call(params,k)){u+="&"+encodeURIComponent(k)+"="+encodeURIComponent(params[k]);}}}return u;}';
     echo 'function portOperLabel(status){var s=String(status||"").toLowerCase();if(s==="up"){return "' . addslashes(I18n::t('port_link_connected', $lang)) . '";}if(s==="down"){return "' . addslashes(I18n::t('port_link_not_connected', $lang)) . '";}if(s==="absent"){return "' . addslashes(I18n::t('port_link_absent', $lang)) . '";}return "' . addslashes(I18n::t('switch_status_unknown', $lang)) . '";}';
     echo 'function loadSwitchPorts(selectEl,switchId,dcId,selectedId){if(!selectEl){return;}selectEl.innerHTML="";var first=document.createElement("option");first.value="";first.textContent="' . addslashes(I18n::t('select_switch_port', $lang)) . '";selectEl.appendChild(first);if(!switchId){return;}fetch(apiUrl("switch/ports",{switch_id:switchId,dc_id:(dcId||"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];for(var i=0;i<items.length;i++){var it=items[i]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.if_name||"-");if(String(it.if_desc||"").trim()!==""){label+=" | "+String(it.if_desc);}label+=" | "+portOperLabel(it.oper_status||"");opt.textContent=label;if(String(selectedId||"")!==""&&String(selectedId)===String(opt.value)){opt.selected=true;}selectEl.appendChild(opt);}}).catch(function(){/* ignore */});}';
     echo 'dc.addEventListener("change",function(){filterByDc(rack,dc.value);filterByDc(sw,dc.value);swp.innerHTML="<option value=\"\">' . addslashes(I18n::t('select_switch_port', $lang)) . '</option>";});';
     echo 'sw.addEventListener("change",function(){loadSwitchPorts(swp,sw.value,dc.value,"");});';
-    echo 'if(bulkDc){bulkDc.addEventListener("change",filterBulkRacks);}';
     echo 'var mapRows=document.querySelectorAll(".dcmanage-server-map");';
     echo 'for(var m=0;m<mapRows.length;m++){(function(form){var dcId=form.getAttribute("data-dc-id")||"";var swSel=form.querySelector(".dcmanage-map-switch");var portSel=form.querySelector(".dcmanage-map-port");var prtgSel=form.querySelector(".dcmanage-map-prtg");var sensorSearch=form.querySelector(".dcmanage-map-sensor-search");var loadBtn=form.querySelector(".dcmanage-map-load-sensors");var sensorSel=form.querySelector(".dcmanage-map-sensor-select");var sensorStatus=form.querySelector(".dcmanage-map-sensor-status");var sensorDefault=form.querySelector(".dcmanage-map-default-sensors");function setStatus(msg){if(sensorStatus){sensorStatus.textContent=msg;}}function filterSwitches(){if(!swSel){return;}for(var i=0;i<swSel.options.length;i++){var o=swSel.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute(\"data-dc-id\");o.hidden=(dcId!==\"\"&&d!==dcId);}if(swSel.selectedIndex>0&&swSel.options[swSel.selectedIndex].hidden){swSel.selectedIndex=0;}}function loadSensors(){if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML=\"\";setStatus(\"' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '\");return;}setStatus(\"' . addslashes(I18n::t('loading', $lang)) . '\");fetch(apiUrl(\"prtg/sensors\",{prtg_id:prtgId,q:(sensorSearch?sensorSearch.value:\"\"),limit:250}),{credentials:\"same-origin\"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||\"API error\");}var items=(res.data&&res.data.items)?res.data.items:[];var defaults=String(sensorDefault?sensorDefault.value:\"\").split(\",\").map(function(v){return v.trim();}).filter(function(v){return v!==\"\";});sensorSel.innerHTML=\"\";for(var x=0;x<items.length;x++){var it=items[x]||{};var opt=document.createElement(\"option\");opt.value=String(it.id||\"\");var label=String(it.id||\"\")+\" | \"+String(it.name||\"\");if(it.device){label+=\" [\"+String(it.device)+\"]\";}opt.textContent=label;if(defaults.indexOf(opt.value)!==-1){opt.selected=true;}sensorSel.appendChild(opt);}setStatus(items.length+\" ' . addslashes(I18n::t('server_traffic_sensors', $lang)) . '\");}).catch(function(){setStatus(\"' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '\");});}';
     echo 'filterSwitches();if(portSel){loadSwitchPorts(portSel,swSel?swSel.value:"",dcId,portSel.getAttribute("data-selected")||"");}if(swSel){swSel.addEventListener("change",function(){loadSwitchPorts(portSel,swSel.value,dcId,"");});}if(loadBtn){loadBtn.addEventListener("click",loadSensors);}if(prtgSel){prtgSel.addEventListener("change",loadSensors);}})(mapRows[m]);}';
     echo 'var toggles=document.querySelectorAll(".dcmanage-server-map-toggle");for(var t=0;t<toggles.length;t++){toggles[t].addEventListener("click",function(){var target=document.getElementById(this.getAttribute("data-target"));if(!target){return;}target.style.display=(target.style.display==="none"||target.style.display==="")?"table-row":"none";});}';
-    echo 'filterByDc(rack,dc.value);filterByDc(sw,dc.value);filterBulkRacks();if(sw.value){loadSwitchPorts(swp,sw.value,dc.value,"");}';
+    echo 'filterByDc(rack,dc.value);filterByDc(sw,dc.value);if(sw.value){loadSwitchPorts(swp,sw.value,dc.value,"");}';
     echo '})();';
     echo '</script>';
 }

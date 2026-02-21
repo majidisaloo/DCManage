@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.38] - 2026-02-21
+### Changed
+- Bulk server creation form no longer requests rack selection.
+- Bulk provisioning is now datacenter-level only for safer high-volume pre-create workflow.
+
+### Fixed
+- Prevented rack over-assignment when creating large hostname ranges (example: 100+ servers).
+- Bulk-created servers now always save with empty rack mapping (`rack_id = null`) for later manual placement.
+
 ## [0.1.37] - 2026-02-21
 ### Fixed
 - Fixed crowded spacing between bulk server example hint and `Create Range` button.
