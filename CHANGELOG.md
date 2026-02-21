@@ -3,6 +3,16 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.20] - 2026-02-21
+### Added
+- Added robust switch port auto-discovery flow reuse helper to store discovered ports consistently.
+- SNMP test action now auto-syncs/discovers switch ports when connectivity is successful.
+
+### Fixed
+- Fixed wrong-action form submits in Switches tab by prioritizing submit button action values (`dcmanage_action_btn`).
+- Fixed `Port interface name is required` false error by auto-triggering discovery fallback when interface input is empty.
+- Fixed Discover/Update/Delete port actions to use explicit button-bound action routing, even in wrapped WHMCS form contexts.
+
 ## [0.1.19] - 2026-02-21
 ### Changed
 - Dashboard KPI cards were redesigned with vector icons, stronger color hierarchy, and cleaner card composition.
