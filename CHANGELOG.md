@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.34] - 2026-02-21
+### Fixed
+- Removed button-to-border crowding by enforcing a global top margin for section table wrappers.
+- Added explicit bottom spacing under top toolbars (including Datacenters top action row) so action buttons no longer stick to the next section line.
+
+### Changed
+- Unified vertical rhythm between action rows and table blocks across all implemented pages.
+
 ## [0.1.33] - 2026-02-21
 ### Changed
 - Applied global spacing normalization across module pages for consistent vertical and horizontal rhythm.

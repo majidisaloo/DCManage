@@ -493,6 +493,7 @@
 
 .dcmanage-dc-topbar {
   margin-top: 20px;
+  margin-bottom: 14px;
   padding-inline: 6px;
 }
 
@@ -507,6 +508,7 @@
   background: #fcfdff;
   overflow: auto;
   padding: 0;
+  margin-top: 12px;
 }
 
 .dcmanage-table-wrap > .table {
@@ -526,6 +528,7 @@
   border-radius: 14px;
   background: #fcfdff;
   padding: 12px;
+  margin-top: 12px;
 }
 
 .dcmanage-dc-table-wrap .table-responsive {
