@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.37] - 2026-02-21
+### Fixed
+- Fixed crowded spacing between bulk server example hint and `Create Range` button.
+- Added explicit block spacing so hint text and submit action render with consistent vertical rhythm.
+
 ## [0.1.36] - 2026-02-21
 ### Changed
 - Refined dashboard update control spacing and checkbox alignment for cleaner visual rhythm.

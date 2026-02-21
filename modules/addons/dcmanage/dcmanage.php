@@ -2131,8 +2131,8 @@ function dcmanage_render_servers(string $lang): void
     echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('server_bulk_u_height', $lang)) . '</label><input type="number" min="1" name="bulk_u_height" value="1" class="form-control dcmanage-input"></div>';
     echo '<div class="form-group col-md-8"><label>' . htmlspecialchars(I18n::t('server_bulk_notes', $lang)) . '</label><input name="bulk_notes" class="form-control dcmanage-input"></div>';
     echo '</div>';
-    echo '<small class="form-text text-muted mb-3">' . htmlspecialchars(I18n::t('server_bulk_hint', $lang)) . '</small>';
-    echo '<button class="btn btn-outline-primary" type="submit">' . htmlspecialchars(I18n::t('create_servers_bulk', $lang)) . '</button>';
+    echo '<small class="form-text text-muted dcmanage-bulk-hint">' . htmlspecialchars(I18n::t('server_bulk_hint', $lang)) . '</small>';
+    echo '<div class="dcmanage-bulk-submit"><button class="btn btn-outline-primary" type="submit">' . htmlspecialchars(I18n::t('create_servers_bulk', $lang)) . '</button></div>';
     echo '</form>';
     echo '</div>';
 
