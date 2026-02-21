@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.50] - 2026-02-21
+### Fixed
+- Fixed cron health false-fail in dispatcher mode by writing per-task completion logs (`task:<name> completed`) when dispatcher executes tasks.
+- Dispatcher now isolates task failures (logs failure per task and continues with remaining tasks) instead of aborting the full run.
+
 ## [0.1.49] - 2026-02-21
 ### Added
 - Logs page now has search, level/source filters, level/date sorting, and clear actions (system/purchase/all).

@@ -69,6 +69,9 @@ function runDispatcher(): void
         ['task' => 'self_update', 'interval' => 86400],
     ];
 
+    $failed = 0;
+    $ran = 0;
+
     try {
         foreach ($tasks as $item) {
             $name = (string) $item['task'];
@@ -77,27 +80,36 @@ function runDispatcher(): void
                 continue;
             }
 
-            switch ($name) {
-                case 'poll_usage':
-                    runPollUsage();
-                    break;
-                case 'enforce_queue':
-                    runEnforceQueue();
-                    break;
-                case 'graph_warm':
-                    runGraphWarm();
-                    break;
-                case 'cleanup':
-                    runCleanup();
-                    break;
-                case 'switch_discovery':
-                    runSwitchDiscovery();
-                    break;
-                case 'self_update':
-                    runSelfUpdate();
-                    break;
+            try {
+                switch ($name) {
+                    case 'poll_usage':
+                        runPollUsage();
+                        break;
+                    case 'enforce_queue':
+                        runEnforceQueue();
+                        break;
+                    case 'graph_warm':
+                        runGraphWarm();
+                        break;
+                    case 'cleanup':
+                        runCleanup();
+                        break;
+                    case 'switch_discovery':
+                        runSwitchDiscovery();
+                        break;
+                    case 'self_update':
+                        runSelfUpdate();
+                        break;
+                }
+
+                $ran++;
+                Logger::info('cron', 'task:' . $name . ' completed', ['via' => 'dispatcher']);
+            } catch (Throwable $taskError) {
+                $failed++;
+                Logger::error('cron', 'task:' . $name . ' failed', ['error' => $taskError->getMessage(), 'via' => 'dispatcher']);
             }
         }
+        Logger::info('cron', 'dispatcher summary', ['ran' => $ran, 'failed' => $failed]);
     } finally {
         LockManager::release('cron:dispatcher');
     }
