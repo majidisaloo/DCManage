@@ -12,10 +12,11 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 $whmcsRoot = dirname(__DIR__, 3);
 require_once $whmcsRoot . '/init.php';
 require_once __DIR__ . '/lib/Bootstrap.php';
+require_once __DIR__ . '/dcmanage.php';
 
 $task = $argv[1] ?? '';
 if ($task === '') {
-    fwrite(STDERR, "Usage: php cron.php [poll_usage|enforce_queue|graph_warm|cleanup|self_update]\n");
+    fwrite(STDERR, "Usage: php cron.php [poll_usage|enforce_queue|graph_warm|cleanup|switch_discovery|self_update]\n");
     exit(1);
 }
 
@@ -32,6 +33,9 @@ try {
             break;
         case 'cleanup':
             runCleanup();
+            break;
+        case 'switch_discovery':
+            runSwitchDiscovery();
             break;
         case 'self_update':
             runSelfUpdate();
@@ -123,5 +127,80 @@ function runSelfUpdate(): void
         Logger::info('cron', 'self_update executed', $result);
     } finally {
         LockManager::release('cron:self_update');
+    }
+}
+
+function runSwitchDiscovery(): void
+{
+    if (!LockManager::acquire('cron:switch_discovery', 290)) {
+        return;
+    }
+
+    try {
+        $intervalRaw = Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.switch_discovery_minutes')->value('meta_value');
+        $intervalMinutes = max(1, min(1440, (int) ($intervalRaw ?: 30)));
+        $intervalSeconds = $intervalMinutes * 60;
+
+        $lastRunRaw = Capsule::table('mod_dcmanage_meta')->where('meta_key', 'switch_discovery.last_run_at')->value('meta_value');
+        $lastRunTs = $lastRunRaw ? strtotime((string) $lastRunRaw) : false;
+        if ($lastRunTs !== false && (time() - $lastRunTs) < $intervalSeconds) {
+            Logger::info('cron', 'switch_discovery skipped', ['interval_minutes' => $intervalMinutes]);
+            return;
+        }
+
+        $switches = Capsule::table('mod_dcmanage_switches')
+            ->whereNotNull('mgmt_ip')
+            ->where('mgmt_ip', '!=', '')
+            ->get(['id', 'mgmt_ip', 'snmp_community', 'snmp_port']);
+
+        $ok = 0;
+        $failed = 0;
+        $saved = 0;
+
+        foreach ($switches as $switch) {
+            $switchId = (int) $switch->id;
+            $discover = dcmanage_discover_switch_ports(
+                (string) $switch->mgmt_ip,
+                (string) ($switch->snmp_community ?? 'public'),
+                (int) ($switch->snmp_port ?? 161)
+            );
+
+            $statePayload = [
+                'ok' => !empty($discover['ok']),
+                'message' => (string) ($discover['message'] ?? ''),
+                'checked_at' => date('Y-m-d H:i:s'),
+            ];
+
+            Capsule::table('mod_dcmanage_meta')->updateOrInsert(
+                ['meta_key' => 'switch.snmp.' . $switchId],
+                ['meta_value' => json_encode($statePayload, JSON_UNESCAPED_UNICODE), 'updated_at' => date('Y-m-d H:i:s')]
+            );
+
+            if (empty($discover['ok'])) {
+                $failed++;
+                continue;
+            }
+
+            $saved += dcmanage_store_discovered_switch_ports(
+                $switchId,
+                is_array($discover['ports'] ?? null) ? $discover['ports'] : []
+            );
+            $ok++;
+        }
+
+        Capsule::table('mod_dcmanage_meta')->updateOrInsert(
+            ['meta_key' => 'switch_discovery.last_run_at'],
+            ['meta_value' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]
+        );
+
+        Logger::info('cron', 'switch_discovery executed', [
+            'switches' => count($switches),
+            'ok' => $ok,
+            'failed' => $failed,
+            'saved' => $saved,
+            'interval_minutes' => $intervalMinutes,
+        ]);
+    } finally {
+        LockManager::release('cron:switch_discovery');
     }
 }

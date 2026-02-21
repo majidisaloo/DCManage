@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.21)
+## Features in this release (v0.1.22)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -17,11 +17,12 @@ DCManage is an API-first datacenter management core inside WHMCS.
 - Bilingual admin UI:
   - Persian (`fa`) and English (`en`) labels/messages.
   - Automatic language detection from WHMCS session (`Language`/`adminlang`).
-- Cron entrypoint with 5 tasks:
+- Cron entrypoint with 6 tasks:
   - `poll_usage` (every 5 min)
   - `enforce_queue` (every 1 min)
   - `graph_warm` (every 30 min)
   - `cleanup` (daily)
+  - `switch_discovery` (every 5 min scheduler, interval-aware by settings)
   - `self_update` (daily/weekly)
 - Dashboard update center:
   - Shows current installed version and latest GitHub release.
@@ -39,7 +40,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - KPI cards now include dedicated vector-style icons per parameter.
   - Shows cron overall status (`green/yellow/red`) and per-task status.
 - System Settings tab inside module:
-  - timezone, locale, traffic poll interval, graph cache TTL, log retention, dashboard refresh interval.
+  - timezone, locale, traffic poll interval, switch discovery interval, graph cache TTL, log retention, dashboard refresh interval.
   - cron commands with auto-detected real server path, last run, next run, and health check panel.
   - compatible with hardened PHP setups where shell-related functions are disabled.
   - resilient shell-quote fallback keeps settings/cron pages stable even when `escapeshellarg` is blocked by host policy.
@@ -55,10 +56,12 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Rack UI is now compact and card-based with a tower-style layout (no oversized stretched rows).
   - Rack cards support inline rack rename and total-U updates.
   - Switch section now supports collapsible add flow, SNMP fields, and per-switch SNMP connectivity test with status badges.
-  - Switch section includes ports/VLAN inventory with add/update/delete operations.
+  - Switch section includes ports/VLAN inventory with add/update operations and per-port `Shut` / `No Shut` actions.
   - Switch section now supports one-click `Discover Ports` via SNMP walk (auto-import interface/admin/oper/vlan when available).
+  - Switch discovery now imports interface descriptions (`ifAlias`) and stores interface index for better mapping.
   - Switch SNMP test now auto-discovers and stores ports when connection succeeds.
   - SNMP compatibility added for environments that do not provide `snmp2_real_walk` but expose `snmprealwalk` or `snmp2_walk/snmpwalk`.
+  - VLAN resolution is improved using `dot1dBasePortIfIndex` -> `dot1qPvid` mapping for broader switch compatibility.
   - Switch and port connectivity states now use explicit green/red status pills (instead of gray badges) for clearer operational visibility.
   - Dashboard ports counter now includes both switch ports and server ports.
   - Switch action buttons now use explicit submit-bound action routing to prevent wrong action execution in wrapped WHMCS forms.
@@ -80,6 +83,7 @@ Add these server cron entries:
 * * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php enforce_queue
 */30 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php graph_warm
 12 2 * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php cleanup
+*/5 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php switch_discovery
 30 3 * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php self_update
 ```
 

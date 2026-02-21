@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 5;
+    private const SCHEMA_VERSION = 6;
 
     public static function migrate(): void
     {
@@ -39,6 +39,11 @@ final class Schema
         if ($current < 5) {
             self::migrationV5();
             self::setCurrentVersion(5);
+        }
+
+        if ($current < 6) {
+            self::migrationV6();
+            self::setCurrentVersion(6);
         }
     }
 
@@ -401,6 +406,21 @@ final class Schema
                 $table->string('admin_status', 16)->nullable();
                 $table->string('oper_status', 16)->nullable();
                 $table->timestamp('last_seen')->nullable();
+            });
+        }
+    }
+
+    private static function migrationV6(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports') && !Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'if_desc')) {
+            Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
+                $table->string('if_desc', 191)->nullable()->after('if_name');
+            });
+        }
+
+        if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports') && !Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'if_index')) {
+            Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
+                $table->unsignedInteger('if_index')->nullable()->after('switch_id')->index();
             });
         }
     }

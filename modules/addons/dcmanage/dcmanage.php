@@ -404,6 +404,7 @@ function dcmanage_handle_actions(string $lang): string
             $payload = [
                 'switch_id' => $switchId,
                 'if_name' => dcmanage_normalize_if_name((string) ($_POST['if_name'] ?? '')),
+                'if_desc' => trim((string) ($_POST['if_desc'] ?? '')),
                 'vlan' => trim((string) ($_POST['vlan'] ?? '')),
                 'admin_status' => trim((string) ($_POST['admin_status'] ?? 'up')),
                 'oper_status' => trim((string) ($_POST['oper_status'] ?? 'unknown')),
@@ -434,13 +435,24 @@ function dcmanage_handle_actions(string $lang): string
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
-        if ($action === 'switch_port_delete') {
+        if ($action === 'switch_port_shut' || $action === 'switch_port_noshut') {
             $id = (int) ($_POST['port_id'] ?? 0);
             if ($id <= 0) {
                 throw new RuntimeException('Invalid port');
             }
-            Capsule::table('mod_dcmanage_switch_ports')->where('id', $id)->delete();
-            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+
+            $adminStatus = $action === 'switch_port_shut' ? 'down' : 'up';
+            $operStatus = $action === 'switch_port_shut' ? 'down' : 'unknown';
+
+            Capsule::table('mod_dcmanage_switch_ports')
+                ->where('id', $id)
+                ->update([
+                    'admin_status' => $adminStatus,
+                    'oper_status' => $operStatus,
+                    'last_seen' => date('Y-m-d H:i:s'),
+                ]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('switch_port_updated', $lang)) . '</div>';
         }
 
         if ($action === 'server_create') {
@@ -478,6 +490,7 @@ function dcmanage_system_defaults(): array
         'timezone' => 'Asia/Tehran',
         'locale' => 'default',
         'traffic_poll_minutes' => '5',
+        'switch_discovery_minutes' => '30',
         'graph_cache_ttl_minutes' => '30',
         'log_retention_days' => '90',
         'dashboard_refresh_seconds' => '30',
@@ -513,6 +526,9 @@ function dcmanage_handle_settings_save(): void
                 $value = 'default';
             }
         }
+        if (in_array($key, ['traffic_poll_minutes', 'switch_discovery_minutes', 'graph_cache_ttl_minutes', 'log_retention_days', 'dashboard_refresh_seconds'], true)) {
+            $value = (string) max(1, (int) $value);
+        }
 
         Capsule::table('mod_dcmanage_meta')->updateOrInsert(
             ['meta_key' => 'settings.' . $key],
@@ -535,6 +551,7 @@ function dcmanage_cron_defs(): array
         ['task' => 'enforce_queue', 'interval' => 60, 'cron' => '* * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' enforce_queue'],
         ['task' => 'graph_warm', 'interval' => 1800, 'cron' => '*/30 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' graph_warm'],
         ['task' => 'cleanup', 'interval' => 86400, 'cron' => '12 2 * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' cleanup'],
+        ['task' => 'switch_discovery', 'interval' => 300, 'cron' => '*/5 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' switch_discovery'],
         ['task' => 'self_update', 'interval' => 86400, 'cron' => '30 3 * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' self_update'],
     ];
 }
@@ -678,6 +695,7 @@ function dcmanage_render_settings_form(string $lang): void
     echo '</select></div>';
 
     echo '<div class="col-md-4 mb-3"><label>Traffic Poll Minutes</label><input class="form-control dcmanage-input" name="traffic_poll_minutes" value="' . htmlspecialchars($settings['traffic_poll_minutes']) . '"></div>';
+    echo '<div class="col-md-4 mb-3"><label>' . htmlspecialchars(I18n::t('settings_discovery_minutes', $lang)) . '</label><input class="form-control dcmanage-input" name="switch_discovery_minutes" value="' . htmlspecialchars($settings['switch_discovery_minutes']) . '"></div>';
     echo '<div class="col-md-4 mb-3"><label>Graph Cache TTL (Minutes)</label><input class="form-control dcmanage-input" name="graph_cache_ttl_minutes" value="' . htmlspecialchars($settings['graph_cache_ttl_minutes']) . '"></div>';
     echo '<div class="col-md-4 mb-3"><label>Log Retention (Days)</label><input class="form-control dcmanage-input" name="log_retention_days" value="' . htmlspecialchars($settings['log_retention_days']) . '"></div>';
     echo '<div class="col-md-4 mb-3"><label>Dashboard Refresh (Seconds)</label><input class="form-control dcmanage-input" name="dashboard_refresh_seconds" value="' . htmlspecialchars($settings['dashboard_refresh_seconds']) . '"></div>';
@@ -1032,6 +1050,34 @@ function dcmanage_snmp_parse_typed_value(string $raw): string
     return $raw;
 }
 
+function dcmanage_snmp_walk_to_index_map(array $walk): array
+{
+    $indexed = [];
+    foreach ($walk as $oid => $raw) {
+        $oid = (string) $oid;
+        if (!preg_match('/\.(\d+)$/', $oid, $m)) {
+            continue;
+        }
+        $indexed[(int) $m[1]] = (string) $raw;
+    }
+
+    return $indexed;
+}
+
+function dcmanage_snmp_parse_vlan(string $raw): string
+{
+    $value = dcmanage_snmp_parse_typed_value($raw);
+    if ($value === '') {
+        return '';
+    }
+
+    if (preg_match('/\d+/', $value, $m)) {
+        return (string) $m[0];
+    }
+
+    return '';
+}
+
 function dcmanage_snmp_status_from_raw(string $raw): string
 {
     $value = strtolower(dcmanage_snmp_parse_typed_value($raw));
@@ -1081,16 +1127,40 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
     }
 
     if (count($ifNameWalk) > 0) {
-        $adminWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries);
-        $operWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries);
-        $pvidWalk = dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1', $timeoutMicros, $retries);
+        $ifNameMap = dcmanage_snmp_walk_to_index_map($ifNameWalk);
+        $ifDescMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.18', $timeoutMicros, $retries));
+        if (count($ifDescMap) === 0) {
+            $ifDescMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.2', $timeoutMicros, $retries));
+        }
+        $adminMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries));
+        $operMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries));
 
-        foreach ($ifNameWalk as $oid => $rawName) {
-            $oid = (string) $oid;
-            if (!preg_match('/\.(\d+)$/', $oid, $m)) {
+        // dot1dBasePortIfIndex => maps bridge-port index to ifIndex for reliable VLAN mapping.
+        $bridgeIfIndexRaw = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.17.1.4.1.2', $timeoutMicros, $retries));
+        $bridgeToIfIndex = [];
+        foreach ($bridgeIfIndexRaw as $bridgePort => $ifIndexRaw) {
+            $ifIndex = (int) preg_replace('/[^0-9]/', '', dcmanage_snmp_parse_typed_value($ifIndexRaw));
+            if ($bridgePort > 0 && $ifIndex > 0) {
+                $bridgeToIfIndex[(int) $bridgePort] = $ifIndex;
+            }
+        }
+
+        $pvidRawMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1', $timeoutMicros, $retries));
+        $pvidByIfIndex = [];
+        foreach ($pvidRawMap as $bridgeOrIfIndex => $vlanRaw) {
+            $vlan = dcmanage_snmp_parse_vlan($vlanRaw);
+            if ($vlan === '') {
                 continue;
             }
-            $index = (int) $m[1];
+            if (isset($bridgeToIfIndex[(int) $bridgeOrIfIndex])) {
+                $pvidByIfIndex[$bridgeToIfIndex[(int) $bridgeOrIfIndex]] = $vlan;
+            } else {
+                // Some devices expose ifIndex directly on this OID.
+                $pvidByIfIndex[(int) $bridgeOrIfIndex] = $vlan;
+            }
+        }
+
+        foreach ($ifNameMap as $index => $rawName) {
             if ($index <= 0) {
                 continue;
             }
@@ -1100,14 +1170,16 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
                 continue;
             }
 
-            $adminRaw = is_array($adminWalk) && isset($adminWalk['.1.3.6.1.2.1.2.2.1.7.' . $index]) ? (string) $adminWalk['.1.3.6.1.2.1.2.2.1.7.' . $index] : '';
-            $operRaw = is_array($operWalk) && isset($operWalk['.1.3.6.1.2.1.2.2.1.8.' . $index]) ? (string) $operWalk['.1.3.6.1.2.1.2.2.1.8.' . $index] : '';
-            $pvidRaw = is_array($pvidWalk) && isset($pvidWalk['.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $index]) ? (string) $pvidWalk['.1.3.6.1.2.1.17.7.1.4.5.1.1.' . $index] : '';
+            $adminRaw = isset($adminMap[$index]) ? (string) $adminMap[$index] : '';
+            $operRaw = isset($operMap[$index]) ? (string) $operMap[$index] : '';
+            $ifDesc = dcmanage_snmp_parse_typed_value((string) ($ifDescMap[$index] ?? ''));
+            $vlan = (string) ($pvidByIfIndex[$index] ?? '');
 
-            $vlan = dcmanage_snmp_parse_typed_value($pvidRaw);
             $ports[] = [
                 'if_name' => $ifName,
-                'vlan' => preg_replace('/[^0-9,\\-]/', '', $vlan) ?: '',
+                'if_desc' => $ifDesc,
+                'if_index' => $index,
+                'vlan' => $vlan,
                 'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
                 'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
             ];
@@ -1123,7 +1195,35 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
 
         $adminList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries);
         $operList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries);
+        $ifDescList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.18', $timeoutMicros, $retries);
+        if (count($ifDescList) === 0) {
+            $ifDescList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.2', $timeoutMicros, $retries);
+        }
+
+        $bridgeIfIndexList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.17.1.4.1.2', $timeoutMicros, $retries);
         $pvidList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.17.7.1.4.5.1.1', $timeoutMicros, $retries);
+
+        $bridgeToIfIndex = [];
+        foreach ($bridgeIfIndexList as $i => $rawIfIndex) {
+            $ifIndex = (int) preg_replace('/[^0-9]/', '', dcmanage_snmp_parse_typed_value((string) $rawIfIndex));
+            if ($ifIndex > 0) {
+                $bridgeToIfIndex[$i + 1] = $ifIndex;
+            }
+        }
+
+        $pvidByIfIndex = [];
+        foreach ($pvidList as $i => $rawPvid) {
+            $vlan = dcmanage_snmp_parse_vlan((string) $rawPvid);
+            if ($vlan === '') {
+                continue;
+            }
+            $bridgePort = $i + 1;
+            if (isset($bridgeToIfIndex[$bridgePort])) {
+                $pvidByIfIndex[$bridgeToIfIndex[$bridgePort]] = $vlan;
+            } else {
+                $pvidByIfIndex[$bridgePort] = $vlan;
+            }
+        }
 
         foreach ($ifNameList as $i => $rawName) {
             $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value((string) $rawName));
@@ -1133,12 +1233,14 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
 
             $adminRaw = isset($adminList[$i]) ? (string) $adminList[$i] : '';
             $operRaw = isset($operList[$i]) ? (string) $operList[$i] : '';
-            $pvidRaw = isset($pvidList[$i]) ? (string) $pvidList[$i] : '';
-
-            $vlan = dcmanage_snmp_parse_typed_value($pvidRaw);
+            $ifDesc = dcmanage_snmp_parse_typed_value((string) ($ifDescList[$i] ?? ''));
+            $ifIndex = $i + 1;
+            $vlan = (string) ($pvidByIfIndex[$ifIndex] ?? '');
             $ports[] = [
                 'if_name' => $ifName,
-                'vlan' => preg_replace('/[^0-9,\\-]/', '', $vlan) ?: '',
+                'if_desc' => $ifDesc,
+                'if_index' => $ifIndex,
+                'vlan' => $vlan,
                 'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
                 'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
             ];
@@ -1172,7 +1274,9 @@ function dcmanage_store_discovered_switch_ports(int $switchId, array $ports): in
 
         $payload = [
             'switch_id' => $switchId,
+            'if_index' => isset($port['if_index']) && (int) $port['if_index'] > 0 ? (int) $port['if_index'] : null,
             'if_name' => $ifName,
+            'if_desc' => trim((string) ($port['if_desc'] ?? '')) ?: null,
             'vlan' => trim((string) ($port['vlan'] ?? '')),
             'admin_status' => trim((string) ($port['admin_status'] ?? 'unknown')),
             'oper_status' => trim((string) ($port['oper_status'] ?? 'unknown')),
@@ -1343,27 +1447,33 @@ function dcmanage_render_switches(string $lang): void
         echo '</form>';
         echo '</td></tr>';
 
-        $ports = Capsule::table('mod_dcmanage_switch_ports')->where('switch_id', (int) $row->id)->orderBy('if_name')->get();
+        $ports = Capsule::table('mod_dcmanage_switch_ports')->where('switch_id', (int) $row->id)->orderBy('if_index')->orderBy('if_name')->get();
         echo '<tr class="collapse" id="sw-ports-' . (int) $row->id . '"><td colspan="7">';
         echo '<div class="dcmanage-form-card dcmanage-switch-ports-card">';
         echo '<h6 class="mb-2">' . htmlspecialchars(I18n::t('switch_ports_vlans', $lang)) . '</h6>';
-        echo '<div class="table-responsive"><table class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+        echo '<div class="table-responsive"><table class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
         foreach ($ports as $p) {
-            echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->oper_status, $lang) . '</td><td>';
-            echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_delete"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form>';
+            $adminStatus = strtolower(trim((string) $p->admin_status));
+            $canShut = $adminStatus !== 'down';
+            $canNoShut = $adminStatus !== 'up';
+
+            echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
+            echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_shut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_shut"' . ($canShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_shut', $lang)) . '</button></form>';
+            echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_noshut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-success" type="submit" name="dcmanage_action_btn" value="switch_port_noshut"' . ($canNoShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_no_shut', $lang)) . '</button></form>';
             echo '</td></tr>';
         }
         if (count($ports) === 0) {
-            echo '<tr><td colspan="5">-</td></tr>';
+            echo '<tr><td colspan="6">-</td></tr>';
         }
         echo '</tbody></table></div>';
         echo '<form method="post" class="mt-3 dcmanage-port-upsert"><input type="hidden" name="dcmanage_action" value="switch_port_upsert"><input type="hidden" name="switch_id" value="' . (int) $row->id . '">';
         echo '<div class="form-row">';
-        echo '<div class="col-md-4 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</label><input name="if_name" class="form-control form-control-sm dcmanage-input" placeholder="Ethernet1/1"></div>';
+        echo '<div class="col-md-3 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</label><input name="if_name" class="form-control form-control-sm dcmanage-input" placeholder="Ethernet1/1"></div>';
+        echo '<div class="col-md-3 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</label><input name="if_desc" class="form-control form-control-sm dcmanage-input"></div>';
         echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">VLAN</label><input name="vlan" class="form-control form-control-sm dcmanage-input" placeholder="10"></div>';
         echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</label><select name="admin_status" class="form-control form-control-sm dcmanage-input"><option>up</option><option>down</option><option>unknown</option></select></div>';
         echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</label><select name="oper_status" class="form-control form-control-sm dcmanage-input"><option>up</option><option>down</option><option>unknown</option></select></div>';
-        echo '<div class="col-md-2 mb-2 d-flex align-items-end"><button class="btn btn-sm dcmanage-btn-soft-primary btn-block" type="submit" name="dcmanage_action_btn" value="switch_port_upsert">' . htmlspecialchars(I18n::t('switch_add_update_port', $lang)) . '</button></div>';
+        echo '<div class="col-md-12 mb-2 d-flex align-items-end"><button class="btn btn-sm dcmanage-btn-soft-primary" type="submit" name="dcmanage_action_btn" value="switch_port_upsert">' . htmlspecialchars(I18n::t('switch_add_update_port', $lang)) . '</button></div>';
         echo '</div>';
         echo '</form>';
         echo '</div>';

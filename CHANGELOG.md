@@ -3,6 +3,20 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.22] - 2026-02-21
+### Changed
+- Replaced per-port `Delete` action with `Shut` / `No Shut` operational actions in Switches -> Ports table.
+- Added configurable switch discovery interval in Settings (`Switch Discovery Interval (Minutes)`).
+
+### Added
+- Added automatic switch-port discovery cron task (`switch_discovery`) with lock protection and interval-aware execution.
+- Added interface description (`ifAlias`) and interface index persistence for discovered switch ports.
+- Added new cron monitor row and command hint for `switch_discovery`.
+
+### Fixed
+- Fixed VLAN detection by mapping `dot1qPvid` through `dot1dBasePortIfIndex` so VLAN values are resolved correctly on more switches.
+- Improved discovery fallback path to keep VLAN/description detection working across different SNMP function availability.
+
 ## [0.1.21] - 2026-02-21
 ### Added
 - Added SNMP compatibility layer for discovery:

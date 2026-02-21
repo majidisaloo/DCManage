@@ -225,6 +225,7 @@ final class Router
             ['task' => 'enforce_queue', 'interval' => 60],
             ['task' => 'graph_warm', 'interval' => 1800],
             ['task' => 'cleanup', 'interval' => 86400],
+            ['task' => 'switch_discovery', 'interval' => 300],
             ['task' => 'self_update', 'interval' => 86400],
         ];
 
