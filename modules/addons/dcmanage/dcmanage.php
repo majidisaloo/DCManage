@@ -20,6 +20,28 @@ function dcmanage_config(): array
         'version' => DCManage\Version::CURRENT,
         'author' => 'MAJID ISALOO',
         'language' => 'english',
+        'fields' => [
+            'update_auto' => [
+                'FriendlyName' => 'Enable Auto Update',
+                'Type' => 'yesno',
+                'Description' => 'Automatically check and apply new GitHub releases',
+                'Default' => 'on',
+            ],
+            'update_repo' => [
+                'FriendlyName' => 'GitHub Repository',
+                'Type' => 'text',
+                'Size' => '64',
+                'Default' => 'majidisaloo/DCManage',
+                'Description' => 'owner/repository',
+            ],
+            'update_branch' => [
+                'FriendlyName' => 'Update Branch',
+                'Type' => 'text',
+                'Size' => '32',
+                'Default' => 'main',
+                'Description' => 'Fallback branch when release tag is unavailable',
+            ],
+        ],
     ];
 }
 

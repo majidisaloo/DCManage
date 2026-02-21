@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v1.1.0)
+## Features in this release (v0.1.0)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -18,23 +18,46 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Persian (`fa`) and English (`en`) labels/messages.
   - Automatic language detection from WHMCS session (`Language`/`adminlang`).
 - Cron entrypoint with 4 tasks:
+ - Cron entrypoint with 5 tasks:
   - `poll_usage` (every 5 min)
   - `enforce_queue` (every 1 min)
   - `graph_warm` (every 30 min)
   - `cleanup` (daily)
+  - `self_update` (daily/weekly)
 
-## Installation
-1. Copy `modules/addons/dcmanage` into WHMCS root.
-2. Activate addon in WHMCS Admin > System Settings > Addon Modules.
-3. Grant admin role access to `DCManage`.
-4. Add server cron entries:
+## Installation From GitHub Releases
+1. Download asset: `DCManage-vX.Y.Z-public_html.zip` from repository Releases.
+2. Upload the zip into WHMCS `public_html`.
+3. Extract zip in `public_html`.
+4. Verify path exists: `public_html/modules/addons/dcmanage`.
+5. Activate addon in WHMCS Admin > System Settings > Addon Modules.
+6. Grant admin role access to `DCManage`.
 
+## Cron Setup
+Add these server cron entries:
 ```bash
 */5 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php poll_usage
 * * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php enforce_queue
 */30 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php graph_warm
 12 2 * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php cleanup
+30 3 * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php self_update
 ```
+
+## Auto Update
+The addon can pull new releases from GitHub automatically without `shell_exec`.
+- Module settings:
+  - `Enable Auto Update`: on/off
+  - `GitHub Repository`: default `majidisaloo/DCManage`
+  - `Update Branch`: fallback reference
+- Runtime behavior:
+  - `self_update` cron checks `releases/latest`.
+  - If release tag version is newer than installed version, zip is downloaded and files are replaced in `modules/addons/dcmanage`.
+  - Lock `cron:self_update` prevents parallel update runs.
+
+## Legacy manual install
+1. Copy `modules/addons/dcmanage` into WHMCS root.
+2. Activate addon in WHMCS Admin > System Settings > Addon Modules.
+3. Grant admin role access to `DCManage`.
 
 ## Upgrade and zero-downtime strategy
 - Versioned migrations run in `dcmanage_upgrade($vars)`.

@@ -6,6 +6,7 @@ use DCManage\Domain\UsageEngine;
 use DCManage\Jobs\JobQueue;
 use DCManage\Support\LockManager;
 use DCManage\Support\Logger;
+use DCManage\Support\UpdateManager;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 $whmcsRoot = dirname(__DIR__, 3);
@@ -14,7 +15,7 @@ require_once __DIR__ . '/lib/Bootstrap.php';
 
 $task = $argv[1] ?? '';
 if ($task === '') {
-    fwrite(STDERR, "Usage: php cron.php [poll_usage|enforce_queue|graph_warm|cleanup]\n");
+    fwrite(STDERR, "Usage: php cron.php [poll_usage|enforce_queue|graph_warm|cleanup|self_update]\n");
     exit(1);
 }
 
@@ -31,6 +32,9 @@ try {
             break;
         case 'cleanup':
             runCleanup();
+            break;
+        case 'self_update':
+            runSelfUpdate();
             break;
         default:
             throw new RuntimeException('Unknown task: ' . $task);
@@ -80,7 +84,7 @@ function runGraphWarm(): void
     }
 
     try {
-        // Intentionally lightweight in v1.0.0: cleanup stale short cache only.
+        // Intentionally lightweight in v0.1.0: cleanup stale short cache only.
         Capsule::table('mod_dcmanage_graph_cache')->where('expires_at', '<', date('Y-m-d H:i:s'))->delete();
         Logger::info('cron', 'graph_warm executed');
     } finally {
@@ -105,5 +109,19 @@ function runCleanup(): void
         Logger::info('cron', 'cleanup executed');
     } finally {
         LockManager::release('cron:cleanup');
+    }
+}
+
+function runSelfUpdate(): void
+{
+    if (!LockManager::acquire('cron:self_update', 3500)) {
+        return;
+    }
+
+    try {
+        $result = UpdateManager::autoUpdateIfNeeded();
+        Logger::info('cron', 'self_update executed', $result);
+    } finally {
+        LockManager::release('cron:self_update');
     }
 }

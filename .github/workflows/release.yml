@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build public_html package
+        run: |
+          set -euo pipefail
+          mkdir -p dist/public_html/modules/addons
+          cp -R modules/addons/dcmanage dist/public_html/modules/addons/dcmanage
+          cp README.md dist/public_html/README-DCManage.md
+          cp CHANGELOG.md dist/public_html/CHANGELOG-DCManage.md
+          cd dist/public_html
+          zip -r ../DCManage-${GITHUB_REF_NAME}-public_html.zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/DCManage-${{ github.ref_name }}-public_html.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
