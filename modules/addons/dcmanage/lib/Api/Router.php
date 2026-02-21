@@ -51,6 +51,9 @@ final class Router
                 case 'prtg/sensors':
                     $data = self::prtgSensors();
                     break;
+                case 'switch/ports':
+                    $data = self::switchPorts();
+                    break;
                 default:
                     throw new \RuntimeException('Endpoint not found: ' . $endpoint);
             }
@@ -237,6 +240,35 @@ final class Router
         return [
             'items' => $items,
             'count' => count($items),
+        ];
+    }
+
+    private static function switchPorts(): array
+    {
+        $switchId = (int) ($_GET['switch_id'] ?? 0);
+        if ($switchId <= 0) {
+            throw new \InvalidArgumentException('switch_id is required');
+        }
+
+        $dcId = (int) ($_GET['dc_id'] ?? 0);
+        $switchQuery = Capsule::table('mod_dcmanage_switches')->where('id', $switchId);
+        if ($dcId > 0) {
+            $switchQuery->where('dc_id', $dcId);
+        }
+        $switch = $switchQuery->first(['id', 'dc_id']);
+        if ($switch === null) {
+            throw new \RuntimeException('Switch not found for selected datacenter');
+        }
+
+        $rows = Capsule::table('mod_dcmanage_switch_ports')
+            ->where('switch_id', $switchId)
+            ->orderBy('if_name')
+            ->get(['id', 'if_name', 'if_desc', 'vlan', 'admin_status', 'oper_status'])
+            ->toArray();
+
+        return [
+            'items' => $rows,
+            'count' => count($rows),
         ];
     }
 

@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.34)
+## Features in this release (v0.1.35)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -56,9 +56,13 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Datacenter page shows rack U-level maps and occupancy.
   - Switch create supports Datacenter -> Rack dependent selection.
   - Switch create supports optional U position for rack placement.
-  - Server create supports Datacenter -> Rack dependent selection, Switch selection, Switch Port selection, and U position fields.
+  - Server create flow is dependency-first:
+    - Datacenter -> Rack (same datacenter only)
+    - Switch (same datacenter only)
+    - Switch Port (only selected switch ports, loaded on-demand)
   - Added bulk server creation by hostname range (example: `MDP-301` -> `MDP-399`) with duplicate-skip behavior.
-  - Server create supports PRTG instance selection and multi-sensor traffic mapping.
+  - Traffic sensor mapping moved to post-create server edit panel for safer operations in multi-datacenter environments.
+  - Per-server edit panel now supports switch/port remap + PRTG sensor selection/update.
   - Monitoring tab now includes PRTG instance management (add/list/test/delete).
   - Datacenter rows now expose direct actions: Racks, Servers, Edit, Delete.
   - Rack map is front-focused with click-to-select U workflow and per-U marking for reserved/cable/airflow/blank planning.
@@ -146,6 +150,7 @@ Example endpoints:
 - `datacenters/list`
 - `traffic/list`
 - `graphs/get`
+- `switch/ports`
 
 ## Security notes
 - `shell_exec` is not used.

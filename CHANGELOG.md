@@ -3,6 +3,20 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.35] - 2026-02-21
+### Changed
+- Servers create flow is now dependency-first: `Datacenter -> Rack -> Switch -> Switch Port`.
+- Add Server form no longer preloads all switch ports; ports are loaded only for the selected switch.
+- Port selector labels now include interface name, interface description, and link state (`Connected / Not Connected / SFP Absent`).
+
+### Added
+- New internal API endpoint `switch/ports` for datacenter-safe, switch-scoped port listing.
+- New per-server inline mapping editor in Servers list (post-create) for switch/port and traffic sensor mapping.
+
+### Fixed
+- Prevented cross-datacenter switch assignment while updating server mappings.
+- Reduced create-form over-selection risk by moving traffic sensor/PRTG mapping to server-level edit workflow.
+
 ## [0.1.34] - 2026-02-21
 ### Fixed
 - Removed button-to-border crowding by enforcing a global top margin for section table wrappers.
