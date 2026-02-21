@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.14] - 2026-02-21
+### Changed
+- Removed `Automation / Cron` tab from main navigation; cron monitoring remains consolidated under `Settings`.
+- Queue KPI card now routes to `Settings` instead of removed automation tab.
+
+### Fixed
+- Cron commands in settings now use auto-detected real server paths (no `/path/to/whmcs` placeholder).
+- PHP binary path in cron command hints is auto-detected from available CLI binaries.
+
 ## [0.1.13] - 2026-02-21
 ### Changed
 - Dashboard KPI cards were redesigned with cleaner card hierarchy, centered values, and stronger visual emphasis.

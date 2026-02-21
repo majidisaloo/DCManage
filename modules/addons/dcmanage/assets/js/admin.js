@@ -126,7 +126,7 @@
         { key: 'servers', label: T.servers, tab: 'servers' },
         { key: 'ports', label: T.ports, tab: 'ports' },
         { key: 'usage_breaches_today', label: T.breaches, tab: 'traffic' },
-        { key: 'jobs_pending', label: T.queue, tab: 'automation' }
+        { key: 'jobs_pending', label: T.queue, tab: 'settings' }
       ];
 
       var html = '<div class="row dcmanage-kpi">';

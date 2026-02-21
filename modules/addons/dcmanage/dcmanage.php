@@ -75,6 +75,9 @@ function dcmanage_output(array $vars): void
     $lang = I18n::resolveCurrentLanguage();
     $isRtl = $lang === 'fa';
     $activeTab = $_GET['tab'] ?? 'dashboard';
+    if ($activeTab === 'automation') {
+        $activeTab = 'settings';
+    }
 
     $flash = dcmanage_handle_actions($lang);
 
@@ -95,7 +98,6 @@ function dcmanage_output(array $vars): void
         'packages' => I18n::t('tab_packages', $lang),
         'scope' => I18n::t('tab_scope', $lang),
         'traffic' => I18n::t('tab_traffic', $lang),
-        'automation' => I18n::t('tab_automation', $lang),
         'settings' => I18n::t('tab_settings', $lang),
         'logs' => I18n::t('tab_logs', $lang),
     ];
@@ -470,13 +472,53 @@ function dcmanage_handle_settings_save(): void
 
 function dcmanage_cron_defs(): array
 {
+    $cronFile = realpath(__DIR__ . '/cron.php');
+    if ($cronFile === false) {
+        $cronFile = __DIR__ . '/cron.php';
+    }
+    $phpBin = dcmanage_detect_php_binary();
+    $cronScriptArg = escapeshellarg($cronFile);
+
     return [
-        ['task' => 'poll_usage', 'interval' => 300, 'cron' => '*/5 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php poll_usage'],
-        ['task' => 'enforce_queue', 'interval' => 60, 'cron' => '* * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php enforce_queue'],
-        ['task' => 'graph_warm', 'interval' => 1800, 'cron' => '*/30 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php graph_warm'],
-        ['task' => 'cleanup', 'interval' => 86400, 'cron' => '12 2 * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php cleanup'],
-        ['task' => 'self_update', 'interval' => 86400, 'cron' => '30 3 * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php self_update'],
+        ['task' => 'poll_usage', 'interval' => 300, 'cron' => '*/5 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' poll_usage'],
+        ['task' => 'enforce_queue', 'interval' => 60, 'cron' => '* * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' enforce_queue'],
+        ['task' => 'graph_warm', 'interval' => 1800, 'cron' => '*/30 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' graph_warm'],
+        ['task' => 'cleanup', 'interval' => 86400, 'cron' => '12 2 * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' cleanup'],
+        ['task' => 'self_update', 'interval' => 86400, 'cron' => '30 3 * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' self_update'],
     ];
+}
+
+function dcmanage_detect_php_binary(): string
+{
+    $candidates = [];
+
+    if (defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '') {
+        $candidates[] = PHP_BINARY;
+    }
+
+    $candidates = array_merge($candidates, [
+        '/usr/local/bin/php',
+        '/usr/bin/php',
+        '/opt/cpanel/ea-php83/root/usr/bin/php',
+        '/opt/cpanel/ea-php82/root/usr/bin/php',
+        '/opt/cpanel/ea-php81/root/usr/bin/php',
+        '/opt/cpanel/ea-php80/root/usr/bin/php',
+        '/opt/plesk/php/8.3/bin/php',
+        '/opt/plesk/php/8.2/bin/php',
+        '/opt/plesk/php/8.1/bin/php',
+        '/opt/plesk/php/8.0/bin/php',
+    ]);
+
+    foreach ($candidates as $candidate) {
+        if ($candidate === '' || stripos($candidate, 'php-cgi') !== false || stripos($candidate, 'php-fpm') !== false) {
+            continue;
+        }
+        if (is_file($candidate) && is_executable($candidate)) {
+            return escapeshellarg($candidate);
+        }
+    }
+
+    return 'php';
 }
 
 function dcmanage_cron_status(): array
