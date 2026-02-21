@@ -3,6 +3,16 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.15] - 2026-02-21
+### Changed
+- Rack layout was redesigned to a compact card/tower UX instead of wide stretched rows.
+- Rack unit rows now use fixed visual width, stronger hierarchy, and selectable interactive states.
+- Rack editor controls are now grouped in modern side panels inside each rack card.
+
+### Fixed
+- Datacenter rack view responsiveness was improved for desktop and mobile breakpoints.
+- Resolved oversized horizontal rack rendering that made the page visually unbalanced.
+
 ## [0.1.14] - 2026-02-21
 ### Changed
 - Removed `Automation / Cron` tab from main navigation; cron monitoring remains consolidated under `Settings`.

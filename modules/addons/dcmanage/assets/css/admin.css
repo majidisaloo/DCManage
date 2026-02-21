@@ -211,24 +211,33 @@
   color: #1a4bb5;
 }
 
-.dcmanage-rack-block .card {
-  border: 1px solid #d9e4ff;
+.dcmanage-rack-card {
+  border: 1px solid #d6e2ff;
+  background: linear-gradient(160deg, #f9fbff, #eef4ff);
 }
 
-.dcmanage-rack-card {
-  border: 1px solid #d9e4ff;
-  background: linear-gradient(180deg, #fcfdff, #f4f7ff);
+.dcmanage-rack-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.dcmanage-rack-visual {
+  position: sticky;
+  top: 8px;
 }
 
 .dcmanage-rack-legend {
-  font-size: 12px;
-  color: #344567;
+  font-size: 11px;
+  color: #33496f;
+  line-height: 1.8;
 }
 
 .dcmanage-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   margin-inline-end: 6px;
   vertical-align: middle;
@@ -241,80 +250,89 @@
 .dcmanage-dot.air { background: #25bcd1; }
 
 .dcmanage-rack-frame {
-  border: 2px solid #8895b7;
-  border-radius: 10px;
-  background: #d9deec;
-  padding: 10px 8px 8px;
+  border: 2px solid #8498c7;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #d9e3fb, #cfd9f1);
+  padding: 12px 10px 10px;
   position: relative;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 8px 18px rgba(31, 62, 128, .14);
 }
 
 .dcmanage-rack-frame::before,
 .dcmanage-rack-frame::after {
   content: '';
   position: absolute;
-  top: 8px;
-  bottom: 8px;
+  top: 10px;
+  bottom: 10px;
   width: 8px;
-  background: linear-gradient(180deg, #747f9e, #5f6b88);
+  background: linear-gradient(180deg, #6f81ad, #5c6f9a);
   border-radius: 6px;
 }
 
-.dcmanage-rack-frame::before { left: 6px; }
-.dcmanage-rack-frame::after { right: 6px; }
+.dcmanage-rack-frame::before { left: 7px; }
+.dcmanage-rack-frame::after { right: 7px; }
 
 .dcmanage-rack-title {
   text-align: center;
-  font-weight: 700;
-  color: #20335f;
-  margin-bottom: 8px;
+  font-weight: 800;
+  color: #1f3362;
+  margin-bottom: 10px;
+  font-size: 13px;
+  letter-spacing: .3px;
 }
 
 .dcmanage-rack-grid {
   max-height: 460px;
   overflow: auto;
-  border: 1px solid #aeb8d1;
+  border: 1px solid #a6b5d7;
   border-radius: 10px;
-  background: #eef1f8;
-  padding: 8px;
+  background: linear-gradient(180deg, #eff4ff, #e8effd);
+  padding: 8px 6px;
 }
 
 .dcmanage-rack-u {
   display: grid;
-  grid-template-columns: 44px 1fr 48px;
+  grid-template-columns: 44px minmax(170px, 220px) 8px;
+  justify-content: center;
   align-items: center;
   font-size: 12px;
-  gap: 8px;
-  padding: 3px 4px;
-  border-bottom: 1px dashed #cad2e6;
+  gap: 6px;
+  padding: 2px 3px;
+  border-bottom: 1px dashed #cad8f1;
+  cursor: pointer;
+  border-radius: 7px;
 }
 
 .dcmanage-rack-u .u-num {
-  font-weight: 700;
-  color: #2d3a59;
+  font-weight: 800;
+  color: #2a3d68;
+  font-size: 12px;
+  text-align: center;
 }
 
 .dcmanage-rack-u .u-slot {
-  height: 20px;
+  height: 22px;
   border-radius: 4px;
   position: relative;
-  background: #d6dbe8;
-  border: 1px solid #b2bbcf;
+  background: #dde5f5;
+  border: 1px solid #adb9d5;
   overflow: hidden;
   display: flex;
   align-items: center;
 }
 
 .dcmanage-rack-u .u-face {
-  width: 28px;
+  width: 26px;
   height: 100%;
-  border-inline-end: 1px solid #8e9bb9;
-  background: repeating-linear-gradient(90deg, #5f6982 0, #5f6982 2px, #6d7792 2px, #6d7792 4px);
+  border-inline-end: 1px solid #8696ba;
+  background: repeating-linear-gradient(90deg, #5f7198 0, #5f7198 2px, #6c7ea5 2px, #6c7ea5 4px);
 }
 
 .dcmanage-rack-u .u-item {
   padding: 0 6px;
-  font-size: 11px;
-  color: #243455;
+  font-size: 10px;
+  color: #1f335d;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -345,7 +363,7 @@
 }
 
 .dcmanage-rack-u.reserved .u-slot {
-  background: linear-gradient(90deg, #e5d7ff, #f0e9ff);
+  background: linear-gradient(90deg, #e7dbff, #f2edff);
 }
 
 .dcmanage-rack-u.cable .u-slot {
@@ -357,11 +375,12 @@
 }
 
 .dcmanage-rack-frame .u-wire {
-  height: 4px;
+  height: 10px;
+  width: 3px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #ff5a5a, #ffc84f);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, .08);
-  opacity: .8;
+  background: linear-gradient(180deg, #ff5a5a, #ffc84f);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .06);
+  opacity: .65;
 }
 
 .dcmanage-rack-frame .dcmanage-rack-u.blank .u-wire {
@@ -371,14 +390,40 @@
 }
 
 .dcmanage-rack-u.selected {
-  outline: 2px solid #2f6fed;
-  border-radius: 6px;
-  background: #e9f2ff;
+  outline: 2px solid #2d72f7;
+  background: linear-gradient(180deg, #e7f1ff, #ddeaff);
+}
+
+.dcmanage-rack-controls {
+  border: 1px solid #d6e1f9;
+  border-radius: 12px;
+  background: #f7faff;
+  padding: 10px;
+}
+
+.dcmanage-rack-form {
+  border: 1px solid #dde7fb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.dcmanage-rack-form .btn {
+  border-radius: 10px;
+  font-weight: 700;
 }
 
 @media (max-width: 991px) {
+  .dcmanage-rack-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .dcmanage-rack-visual {
+    position: static;
+  }
+
   .dcmanage-rack-grid {
-    max-height: 320px;
+    max-height: 360px;
   }
 
   .dcmanage-update-actions {

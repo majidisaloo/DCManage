@@ -738,26 +738,20 @@ function dcmanage_render_datacenters(string $lang): void
 function dcmanage_render_rack_cards(int $dcId, string $lang): void
 {
     $racks = Capsule::table('mod_dcmanage_racks')->where('dc_id', $dcId)->orderBy('name')->get();
-    echo '<div class="row">';
+    echo '<div class="row dcmanage-rack-layout">';
     foreach ($racks as $rack) {
         $rackId = (int) $rack->id;
         $units = max(1, (int) $rack->total_u);
         $usage = dcmanage_rack_usage($rackId, $units);
-        echo '<div class="col-12 mb-4">';
+        echo '<div class="col-12 col-xl-6 mb-4">';
         echo '<div class="card dcmanage-rack-card"><div class="card-body">';
-        echo '<div class="d-flex justify-content-between align-items-center mb-2">';
+        echo '<div class="d-flex justify-content-between align-items-center mb-3">';
         echo '<h6 class="mb-0">' . htmlspecialchars((string) $rack->name) . '</h6>';
-        echo '<span class="badge badge-light">' . $units . 'U</span>';
+        echo '<span class="badge badge-pill badge-primary">' . $units . 'U</span>';
         echo '</div>';
 
-        echo '<form method="post" class="form-inline mb-2">';
-        echo '<input type="hidden" name="dcmanage_action" value="rack_update">';
-        echo '<input type="hidden" name="rack_id" value="' . $rackId . '">';
-        echo '<input name="rack_name" class="form-control form-control-sm dcmanage-input mr-2 mb-2" value="' . htmlspecialchars((string) $rack->name) . '" placeholder="' . htmlspecialchars(I18n::t('label_name', $lang)) . '">';
-        echo '<input type="number" min="1" max="60" name="rack_total_u" class="form-control form-control-sm dcmanage-input mr-2 mb-2" value="' . $units . '" style="max-width:100px">';
-        echo '<button class="btn btn-sm btn-outline-primary mb-2" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
-        echo '</form>';
-
+        echo '<div class="dcmanage-rack-shell">';
+        echo '<div class="dcmanage-rack-visual">';
         echo '<div class="dcmanage-rack-legend mb-2">';
         echo '<strong class="mr-2">' . htmlspecialchars(I18n::t('rack_legend', $lang)) . ':</strong>';
         echo '<span class="dcmanage-dot server"></span>SRV';
@@ -785,17 +779,31 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
         }
         echo '</div>';
         echo '</div>';
+        echo '</div>';
 
-        echo '<form method="post" class="mt-2">';
+        echo '<div class="dcmanage-rack-controls">';
+        echo '<form method="post" class="dcmanage-rack-form mb-3">';
+        echo '<input type="hidden" name="dcmanage_action" value="rack_update">';
+        echo '<input type="hidden" name="rack_id" value="' . $rackId . '">';
+        echo '<div class="form-row align-items-end">';
+        echo '<div class="col-8"><label class="small mb-1">' . htmlspecialchars(I18n::t('label_name', $lang)) . '</label><input name="rack_name" class="form-control form-control-sm dcmanage-input" value="' . htmlspecialchars((string) $rack->name) . '"></div>';
+        echo '<div class="col-4"><label class="small mb-1">U</label><input type="number" min="1" max="60" name="rack_total_u" class="form-control form-control-sm dcmanage-input" value="' . $units . '"></div>';
+        echo '</div>';
+        echo '<button class="btn btn-sm btn-outline-primary mt-2 btn-block" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+        echo '</form>';
+
+        echo '<form method="post" class="dcmanage-rack-form">';
         echo '<input type="hidden" name="dcmanage_action" value="rack_unit_set">';
         echo '<input type="hidden" name="rack_id" value="' . $rackId . '">';
         echo '<div class="form-row">';
-        echo '<div class="col-3"><input type="number" min="1" max="' . $units . '" id="dcmanage-u-no-' . $rackId . '" name="u_no" class="form-control form-control-sm dcmanage-input" placeholder="U"></div>';
-        echo '<div class="col-4"><select name="unit_type" class="form-control form-control-sm dcmanage-input"><option value="blank">' . htmlspecialchars(I18n::t('unit_blank', $lang)) . '</option><option value="reserved">' . htmlspecialchars(I18n::t('unit_reserved', $lang)) . '</option><option value="cable">' . htmlspecialchars(I18n::t('unit_cable', $lang)) . '</option><option value="air">' . htmlspecialchars(I18n::t('unit_air', $lang)) . '</option></select></div>';
-        echo '<div class="col-5"><input name="label" class="form-control form-control-sm dcmanage-input" placeholder="' . htmlspecialchars(I18n::t('label_name', $lang)) . '"></div>';
+        echo '<div class="col-12 mb-2"><label class="small mb-1">U</label><input type="number" min="1" max="' . $units . '" id="dcmanage-u-no-' . $rackId . '" name="u_no" class="form-control form-control-sm dcmanage-input" placeholder="U"></div>';
+        echo '<div class="col-12 mb-2"><label class="small mb-1">' . htmlspecialchars(I18n::t('unit_blank', $lang)) . '/' . htmlspecialchars(I18n::t('unit_reserved', $lang)) . '/' . htmlspecialchars(I18n::t('unit_cable', $lang)) . '/' . htmlspecialchars(I18n::t('unit_air', $lang)) . '</label><select name="unit_type" class="form-control form-control-sm dcmanage-input"><option value="blank">' . htmlspecialchars(I18n::t('unit_blank', $lang)) . '</option><option value="reserved">' . htmlspecialchars(I18n::t('unit_reserved', $lang)) . '</option><option value="cable">' . htmlspecialchars(I18n::t('unit_cable', $lang)) . '</option><option value="air">' . htmlspecialchars(I18n::t('unit_air', $lang)) . '</option></select></div>';
+        echo '<div class="col-12"><label class="small mb-1">' . htmlspecialchars(I18n::t('label_name', $lang)) . '</label><input name="label" class="form-control form-control-sm dcmanage-input" placeholder="' . htmlspecialchars(I18n::t('label_name', $lang)) . '"></div>';
         echo '</div>';
-        echo '<button class="btn btn-sm btn-outline-primary mt-2" type="submit">' . htmlspecialchars(I18n::t('set_unit', $lang)) . '</button>';
+        echo '<button class="btn btn-sm btn-primary mt-2 btn-block" type="submit">' . htmlspecialchars(I18n::t('set_unit', $lang)) . '</button>';
         echo '</form>';
+        echo '</div>';
+        echo '</div>';
 
         echo '</div></div></div>';
     }
