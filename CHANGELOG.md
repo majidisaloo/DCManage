@@ -3,6 +3,21 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.23] - 2026-02-21
+### Added
+- Added switch port speed visibility in Switches -> Ports table.
+- Discovery now collects and stores:
+  - `speed_mbps` from `ifHighSpeed` (fallback `ifSpeed`)
+  - `speed_mode` from MAU auto-negotiation status
+
+### Changed
+- Port speed now renders with operational mode labels:
+  - `1G`, `10G`
+  - `Auto 1G`, `Auto 10G`
+
+### Fixed
+- Improved SNMP port profiling so speed and auto-negotiation status are recognized instead of remaining unknown.
+
 ## [0.1.22] - 2026-02-21
 ### Changed
 - Replaced per-port `Delete` action with `Shut` / `No Shut` operational actions in Switches -> Ports table.

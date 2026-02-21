@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 6;
+    private const SCHEMA_VERSION = 7;
 
     public static function migrate(): void
     {
@@ -44,6 +44,11 @@ final class Schema
         if ($current < 6) {
             self::migrationV6();
             self::setCurrentVersion(6);
+        }
+
+        if ($current < 7) {
+            self::migrationV7();
+            self::setCurrentVersion(7);
         }
     }
 
@@ -421,6 +426,21 @@ final class Schema
         if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports') && !Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'if_index')) {
             Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
                 $table->unsignedInteger('if_index')->nullable()->after('switch_id')->index();
+            });
+        }
+    }
+
+    private static function migrationV7(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports') && !Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'speed_mbps')) {
+            Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
+                $table->unsignedInteger('speed_mbps')->nullable()->after('vlan');
+            });
+        }
+
+        if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports') && !Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'speed_mode')) {
+            Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
+                $table->string('speed_mode', 16)->nullable()->after('speed_mbps');
             });
         }
     }

@@ -1078,6 +1078,70 @@ function dcmanage_snmp_parse_vlan(string $raw): string
     return '';
 }
 
+function dcmanage_snmp_parse_int(string $raw): int
+{
+    $value = dcmanage_snmp_parse_typed_value($raw);
+    if ($value === '') {
+        return 0;
+    }
+    if (preg_match('/\d+/', $value, $m)) {
+        return (int) $m[0];
+    }
+
+    return 0;
+}
+
+function dcmanage_snmp_speed_mbps_from_raw(string $highSpeedRaw, string $ifSpeedRaw): ?int
+{
+    $high = dcmanage_snmp_parse_int($highSpeedRaw);
+    if ($high > 0) {
+        return $high;
+    }
+
+    $ifSpeedBps = dcmanage_snmp_parse_int($ifSpeedRaw);
+    if ($ifSpeedBps > 0) {
+        return (int) round($ifSpeedBps / 1000000);
+    }
+
+    return null;
+}
+
+function dcmanage_snmp_autoneg_mode_from_raw(string $raw): string
+{
+    $value = strtolower(dcmanage_snmp_parse_typed_value($raw));
+    if ($value === '') {
+        return 'unknown';
+    }
+
+    if (strpos($value, '(1)') !== false || strpos($value, 'enabled') !== false || $value === '1') {
+        return 'auto';
+    }
+    if (strpos($value, '(2)') !== false || strpos($value, 'disabled') !== false || $value === '2') {
+        return 'fixed';
+    }
+
+    return 'unknown';
+}
+
+function dcmanage_port_speed_label(?int $speedMbps, ?string $speedMode, string $lang): string
+{
+    if ($speedMbps === null || $speedMbps <= 0) {
+        return '-';
+    }
+
+    $speedLabel = $speedMbps . 'M';
+    if ($speedMbps >= 1000 && $speedMbps % 1000 === 0) {
+        $speedLabel = ((string) ($speedMbps / 1000)) . 'G';
+    }
+
+    $mode = strtolower(trim((string) $speedMode));
+    if ($mode === 'auto') {
+        return I18n::t('label_auto', $lang) . ' ' . $speedLabel;
+    }
+
+    return $speedLabel;
+}
+
 function dcmanage_snmp_status_from_raw(string $raw): string
 {
     $value = strtolower(dcmanage_snmp_parse_typed_value($raw));
@@ -1134,6 +1198,9 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
         }
         $adminMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries));
         $operMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries));
+        $ifHighSpeedMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.15', $timeoutMicros, $retries));
+        $ifSpeedMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.2.2.1.5', $timeoutMicros, $retries));
+        $autoNegMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.26.5.1.1.1', $timeoutMicros, $retries));
 
         // dot1dBasePortIfIndex => maps bridge-port index to ifIndex for reliable VLAN mapping.
         $bridgeIfIndexRaw = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.2.1.17.1.4.1.2', $timeoutMicros, $retries));
@@ -1174,12 +1241,16 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
             $operRaw = isset($operMap[$index]) ? (string) $operMap[$index] : '';
             $ifDesc = dcmanage_snmp_parse_typed_value((string) ($ifDescMap[$index] ?? ''));
             $vlan = (string) ($pvidByIfIndex[$index] ?? '');
+            $speedMbps = dcmanage_snmp_speed_mbps_from_raw((string) ($ifHighSpeedMap[$index] ?? ''), (string) ($ifSpeedMap[$index] ?? ''));
+            $speedMode = dcmanage_snmp_autoneg_mode_from_raw((string) ($autoNegMap[$index] ?? ''));
 
             $ports[] = [
                 'if_name' => $ifName,
                 'if_desc' => $ifDesc,
                 'if_index' => $index,
                 'vlan' => $vlan,
+                'speed_mbps' => $speedMbps,
+                'speed_mode' => $speedMode,
                 'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
                 'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
             ];
@@ -1195,6 +1266,9 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
 
         $adminList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.7', $timeoutMicros, $retries);
         $operList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.8', $timeoutMicros, $retries);
+        $ifHighSpeedList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.15', $timeoutMicros, $retries);
+        $ifSpeedList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.5', $timeoutMicros, $retries);
+        $autoNegList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.26.5.1.1.1', $timeoutMicros, $retries);
         $ifDescList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.31.1.1.1.18', $timeoutMicros, $retries);
         if (count($ifDescList) === 0) {
             $ifDescList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.2.1.2.2.1.2', $timeoutMicros, $retries);
@@ -1236,11 +1310,15 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
             $ifDesc = dcmanage_snmp_parse_typed_value((string) ($ifDescList[$i] ?? ''));
             $ifIndex = $i + 1;
             $vlan = (string) ($pvidByIfIndex[$ifIndex] ?? '');
+            $speedMbps = dcmanage_snmp_speed_mbps_from_raw((string) ($ifHighSpeedList[$i] ?? ''), (string) ($ifSpeedList[$i] ?? ''));
+            $speedMode = dcmanage_snmp_autoneg_mode_from_raw((string) ($autoNegList[$i] ?? ''));
             $ports[] = [
                 'if_name' => $ifName,
                 'if_desc' => $ifDesc,
                 'if_index' => $ifIndex,
                 'vlan' => $vlan,
+                'speed_mbps' => $speedMbps,
+                'speed_mode' => $speedMode,
                 'admin_status' => dcmanage_snmp_status_from_raw($adminRaw),
                 'oper_status' => dcmanage_snmp_status_from_raw($operRaw),
             ];
@@ -1278,6 +1356,8 @@ function dcmanage_store_discovered_switch_ports(int $switchId, array $ports): in
             'if_name' => $ifName,
             'if_desc' => trim((string) ($port['if_desc'] ?? '')) ?: null,
             'vlan' => trim((string) ($port['vlan'] ?? '')),
+            'speed_mbps' => isset($port['speed_mbps']) && (int) $port['speed_mbps'] > 0 ? (int) $port['speed_mbps'] : null,
+            'speed_mode' => trim((string) ($port['speed_mode'] ?? '')) ?: null,
             'admin_status' => trim((string) ($port['admin_status'] ?? 'unknown')),
             'oper_status' => trim((string) ($port['oper_status'] ?? 'unknown')),
             'last_seen' => date('Y-m-d H:i:s'),
@@ -1451,19 +1531,20 @@ function dcmanage_render_switches(string $lang): void
         echo '<tr class="collapse" id="sw-ports-' . (int) $row->id . '"><td colspan="7">';
         echo '<div class="dcmanage-form-card dcmanage-switch-ports-card">';
         echo '<h6 class="mb-2">' . htmlspecialchars(I18n::t('switch_ports_vlans', $lang)) . '</h6>';
-        echo '<div class="table-responsive"><table class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+        echo '<div class="table-responsive"><table class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_if_speed', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
         foreach ($ports as $p) {
             $adminStatus = strtolower(trim((string) $p->admin_status));
             $canShut = $adminStatus !== 'down';
             $canNoShut = $adminStatus !== 'up';
 
-            echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
+            $speedLabel = dcmanage_port_speed_label(isset($p->speed_mbps) ? (int) $p->speed_mbps : null, (string) ($p->speed_mode ?? ''), $lang);
+            echo '<tr><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . '</td><td>' . htmlspecialchars((string) ($p->if_desc ?? '')) . '</td><td>' . htmlspecialchars((string) $p->vlan) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->admin_status, $lang) . '</td><td>' . dcmanage_render_switch_status_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_shut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_shut"' . ($canShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_shut', $lang)) . '</button></form>';
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_port_noshut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-success" type="submit" name="dcmanage_action_btn" value="switch_port_noshut"' . ($canNoShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_no_shut', $lang)) . '</button></form>';
             echo '</td></tr>';
         }
         if (count($ports) === 0) {
-            echo '<tr><td colspan="6">-</td></tr>';
+            echo '<tr><td colspan="7">-</td></tr>';
         }
         echo '</tbody></table></div>';
         echo '<form method="post" class="mt-3 dcmanage-port-upsert"><input type="hidden" name="dcmanage_action" value="switch_port_upsert"><input type="hidden" name="switch_id" value="' . (int) $row->id . '">';
