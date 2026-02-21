@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.46] - 2026-02-21
+### Changed
+- Cron configuration is now single-entry: one cron command (`dispatcher`) handles all module tasks by internal schedule.
+- Settings Cron Monitor now shows one install command and keeps per-task health without requiring separate cron lines.
+
+### Added
+- Added dispatcher mode in `cron.php` and made it the default behavior when no task argument is provided.
+
 ## [0.1.45] - 2026-02-21
 ### Changed
 - Standalone iLO top tab removed; iLO management is now inside Servers workflow.

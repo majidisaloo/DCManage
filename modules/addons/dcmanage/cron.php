@@ -14,14 +14,16 @@ require_once $whmcsRoot . '/init.php';
 require_once __DIR__ . '/lib/Bootstrap.php';
 require_once __DIR__ . '/dcmanage.php';
 
-$task = $argv[1] ?? '';
+$task = strtolower(trim((string) ($argv[1] ?? 'dispatcher')));
 if ($task === '') {
-    fwrite(STDERR, "Usage: php cron.php [poll_usage|enforce_queue|graph_warm|cleanup|switch_discovery|self_update]\n");
-    exit(1);
+    $task = 'dispatcher';
 }
 
 try {
     switch ($task) {
+        case 'dispatcher':
+            runDispatcher();
+            break;
         case 'poll_usage':
             runPollUsage();
             break;
@@ -41,7 +43,7 @@ try {
             runSelfUpdate();
             break;
         default:
-            throw new RuntimeException('Unknown task: ' . $task);
+            throw new RuntimeException('Unknown task: ' . $task . '. Allowed: dispatcher, poll_usage, enforce_queue, graph_warm, cleanup, switch_discovery, self_update');
     }
 
     Logger::info('cron', 'task:' . $task . ' completed');
@@ -50,6 +52,75 @@ try {
     Logger::error('cron', 'task:' . $task . ' failed', ['error' => $e->getMessage()]);
     fwrite(STDERR, 'ERROR: ' . $e->getMessage() . "\n");
     exit(1);
+}
+
+function runDispatcher(): void
+{
+    if (!LockManager::acquire('cron:dispatcher', 55)) {
+        return;
+    }
+
+    $tasks = [
+        ['task' => 'poll_usage', 'interval' => 300],
+        ['task' => 'enforce_queue', 'interval' => 60],
+        ['task' => 'graph_warm', 'interval' => 1800],
+        ['task' => 'cleanup', 'interval' => 86400],
+        ['task' => 'switch_discovery', 'interval' => 300],
+        ['task' => 'self_update', 'interval' => 86400],
+    ];
+
+    try {
+        foreach ($tasks as $item) {
+            $name = (string) $item['task'];
+            $interval = (int) $item['interval'];
+            if (!dcmanage_should_run_task($name, $interval)) {
+                continue;
+            }
+
+            switch ($name) {
+                case 'poll_usage':
+                    runPollUsage();
+                    break;
+                case 'enforce_queue':
+                    runEnforceQueue();
+                    break;
+                case 'graph_warm':
+                    runGraphWarm();
+                    break;
+                case 'cleanup':
+                    runCleanup();
+                    break;
+                case 'switch_discovery':
+                    runSwitchDiscovery();
+                    break;
+                case 'self_update':
+                    runSelfUpdate();
+                    break;
+            }
+        }
+    } finally {
+        LockManager::release('cron:dispatcher');
+    }
+}
+
+function dcmanage_should_run_task(string $task, int $interval): bool
+{
+    $lastOk = Capsule::table('mod_dcmanage_logs')
+        ->where('source', 'cron')
+        ->where('message', 'task:' . $task . ' completed')
+        ->orderBy('id', 'desc')
+        ->value('created_at');
+
+    if (empty($lastOk)) {
+        return true;
+    }
+
+    $lastTs = strtotime((string) $lastOk);
+    if ($lastTs === false) {
+        return true;
+    }
+
+    return (time() - $lastTs) >= max(60, $interval);
 }
 
 function runPollUsage(): void

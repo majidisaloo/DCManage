@@ -933,14 +933,15 @@ function dcmanage_cron_defs(): array
     }
     $phpBin = dcmanage_detect_php_binary();
     $cronScriptArg = dcmanage_shell_quote($cronFile);
+    $singleCron = '* * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' dispatcher';
 
     return [
-        ['task' => 'poll_usage', 'interval' => 300, 'cron' => '*/5 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' poll_usage'],
-        ['task' => 'enforce_queue', 'interval' => 60, 'cron' => '* * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' enforce_queue'],
-        ['task' => 'graph_warm', 'interval' => 1800, 'cron' => '*/30 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' graph_warm'],
-        ['task' => 'cleanup', 'interval' => 86400, 'cron' => '12 2 * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' cleanup'],
-        ['task' => 'switch_discovery', 'interval' => 300, 'cron' => '*/5 * * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' switch_discovery'],
-        ['task' => 'self_update', 'interval' => 86400, 'cron' => '30 3 * * * ' . $phpBin . ' -q ' . $cronScriptArg . ' self_update'],
+        ['task' => 'poll_usage', 'interval' => 300, 'cron' => $singleCron],
+        ['task' => 'enforce_queue', 'interval' => 60, 'cron' => I18n::t('cron_managed_internally')],
+        ['task' => 'graph_warm', 'interval' => 1800, 'cron' => I18n::t('cron_managed_internally')],
+        ['task' => 'cleanup', 'interval' => 86400, 'cron' => I18n::t('cron_managed_internally')],
+        ['task' => 'switch_discovery', 'interval' => 300, 'cron' => I18n::t('cron_managed_internally')],
+        ['task' => 'self_update', 'interval' => 86400, 'cron' => I18n::t('cron_managed_internally')],
     ];
 }
 
@@ -1109,10 +1110,13 @@ function dcmanage_render_settings_form(string $lang): void
 
     $overallClass = $cron['overall'] === 'ok' ? 'success' : ($cron['overall'] === 'fail' ? 'danger' : 'warning');
     echo '<hr class="my-4">';
+    if (!empty($cron['items'][0]['cron'])) {
+        echo '<div class="alert alert-info text-break mb-3"><strong>' . htmlspecialchars(I18n::t('cron_single_entry', $lang)) . ':</strong> <code>' . htmlspecialchars((string) $cron['items'][0]['cron']) . '</code></div>';
+    }
     echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('cron_monitor', $lang)) . ' <span class="badge badge-' . $overallClass . '">' . htmlspecialchars(I18n::t('cron_overall', $lang)) . '</span></h5>';
     echo '<div class="table-responsive dcmanage-table-wrap">';
     echo '<table class="table table-sm table-bordered">';
-    echo '<thead><tr><th>' . htmlspecialchars(I18n::t('cron_task', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_last_run', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_next_run', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_command', $lang)) . '</th></tr></thead><tbody>';
+    echo '<thead><tr><th>' . htmlspecialchars(I18n::t('cron_task', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_last_run', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_next_run', $lang)) . '</th></tr></thead><tbody>';
 
     foreach ($cron['items'] as $item) {
         $cls = $item['status'] === 'ok' ? 'success' : ($item['status'] === 'fail' ? 'danger' : 'warning');
@@ -1122,7 +1126,6 @@ function dcmanage_render_settings_form(string $lang): void
         echo '<td><span class="badge badge-' . $cls . '">' . htmlspecialchars($label) . '</span></td>';
         echo '<td>' . htmlspecialchars($item['last']) . '</td>';
         echo '<td>' . htmlspecialchars($item['next']) . '</td>';
-        echo '<td><code>' . htmlspecialchars($item['cron']) . '</code></td>';
         echo '</tr>';
     }
 

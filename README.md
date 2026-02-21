@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.45)
+## Features in this release (v0.1.46)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -17,13 +17,9 @@ DCManage is an API-first datacenter management core inside WHMCS.
 - Bilingual admin UI:
   - Persian (`fa`) and English (`en`) labels/messages.
   - Automatic language detection from WHMCS session (`Language`/`adminlang`).
-- Cron entrypoint with 6 tasks:
-  - `poll_usage` (every 5 min)
-  - `enforce_queue` (every 1 min)
-  - `graph_warm` (every 30 min)
-  - `cleanup` (daily)
-  - `switch_discovery` (every 5 min scheduler, interval-aware by settings)
-  - `self_update` (daily/weekly)
+- Cron entrypoint with single command dispatcher:
+  - Install one cron line only: `* * * * * php -q .../modules/addons/dcmanage/cron.php dispatcher`
+  - Internal scheduler runs `poll_usage`, `enforce_queue`, `graph_warm`, `cleanup`, `switch_discovery`, and `self_update`.
   - Dashboard update center:
   - Shows current installed version and latest GitHub release.
   - Supports one-click `Check Update` and one-click `Apply Update`.
