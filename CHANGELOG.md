@@ -3,6 +3,17 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.43] - 2026-02-21
+### Changed
+- Port speed normalization now handles oversized/non-standard SNMP raw values.
+- Speed labels now render compact G-units with decimal support when needed.
+
+### Added
+- Added heuristic snap-to-common-Ethernet-speeds logic for clearer operational speed display.
+
+### Fixed
+- Fixed abnormal speed outputs like `2140046M` by normalizing scale and mapping to realistic speeds.
+
 ## [0.1.42] - 2026-02-21
 ### Changed
 - Server create dependency flow is now strict: Datacenter must be selected before rack/switch become usable.

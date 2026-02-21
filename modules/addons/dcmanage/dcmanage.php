@@ -1497,15 +1497,47 @@ function dcmanage_snmp_speed_mbps_from_raw(string $highSpeedRaw, string $ifSpeed
 {
     $high = dcmanage_snmp_parse_int($highSpeedRaw);
     if ($high > 0) {
-        return $high;
+        return dcmanage_normalize_speed_mbps($high);
     }
 
     $ifSpeedBps = dcmanage_snmp_parse_int($ifSpeedRaw);
     if ($ifSpeedBps > 0) {
-        return (int) round($ifSpeedBps / 1000000);
+        return dcmanage_normalize_speed_mbps((int) round($ifSpeedBps / 1000000));
     }
 
     return null;
+}
+
+function dcmanage_normalize_speed_mbps(int $speedMbps): ?int
+{
+    if ($speedMbps <= 0) {
+        return null;
+    }
+
+    // Some devices report non-Mbps units; normalize oversized values heuristically.
+    if ($speedMbps > 1000000 && $speedMbps < 1000000000) {
+        $speedMbps = (int) round($speedMbps / 1000);
+    } elseif ($speedMbps >= 1000000000) {
+        $speedMbps = (int) round($speedMbps / 1000000);
+    }
+
+    $known = [10, 100, 1000, 2500, 5000, 10000, 25000, 40000, 50000, 100000, 200000, 400000, 800000];
+    $closest = $speedMbps;
+    $closestDiff = PHP_INT_MAX;
+    foreach ($known as $candidate) {
+        $diff = abs($candidate - $speedMbps);
+        if ($diff < $closestDiff) {
+            $closestDiff = $diff;
+            $closest = $candidate;
+        }
+    }
+
+    // Snap to nearest common Ethernet speed if reasonably close.
+    if ($closest > 0 && ($closestDiff / $closest) <= 0.30) {
+        return $closest;
+    }
+
+    return $speedMbps;
 }
 
 function dcmanage_snmp_autoneg_mode_from_raw(string $raw): string
@@ -1531,9 +1563,18 @@ function dcmanage_port_speed_label(?int $speedMbps, ?string $speedMode, string $
         return '-';
     }
 
+    $speedMbps = dcmanage_normalize_speed_mbps($speedMbps);
+    if ($speedMbps === null || $speedMbps <= 0) {
+        return '-';
+    }
+
     $speedLabel = $speedMbps . 'M';
-    if ($speedMbps >= 1000 && $speedMbps % 1000 === 0) {
-        $speedLabel = ((string) ($speedMbps / 1000)) . 'G';
+    if ($speedMbps >= 1000) {
+        if ($speedMbps % 1000 === 0) {
+            $speedLabel = ((string) ($speedMbps / 1000)) . 'G';
+        } else {
+            $speedLabel = rtrim(rtrim(number_format($speedMbps / 1000, 1, '.', ''), '0'), '.') . 'G';
+        }
     }
 
     $mode = strtolower(trim((string) $speedMode));
