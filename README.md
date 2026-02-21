@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.31)
+## Features in this release (v0.1.32)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -80,6 +80,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - Port status terminology updated to operational wording:
     - `Shut / No Shut` for config state
     - `Connected / Not Connected / SFP Absent` for link state
+  - Removed duplicated in-page section titles that matched active tabs (Switches/Servers/Monitoring), keeping only top navigation tab title.
   - Dashboard ports counter now includes both switch ports and server ports.
   - Switch action buttons now use explicit submit-bound action routing to prevent wrong action execution in wrapped WHMCS forms.
 - Logs:

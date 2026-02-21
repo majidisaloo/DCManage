@@ -906,7 +906,6 @@ function dcmanage_render_monitoring(string $lang): void
     $provider = strtolower(trim((string) ($provider ?: 'prtg')));
     $instances = Capsule::table('mod_dcmanage_prtg_instances')->orderBy('id', 'desc')->get(['id', 'name', 'base_url', 'user', 'verify_ssl', 'created_at']);
 
-    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('tab_monitoring', $lang)) . '</h5>';
     echo '<form method="post" action="" class="dcmanage-form-card">';
     echo '<input type="hidden" name="dcmanage_action" value="monitoring_save">';
     echo '<div class="form-group mb-3"><label>' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . '</label>';
@@ -1772,8 +1771,7 @@ function dcmanage_render_switches(string $lang): void
         ->limit(200)
         ->get(['s.id', 's.name', 's.vendor', 's.model', 's.mgmt_ip', 's.snmp_community', 's.snmp_version', 's.snmp_port', 's.u_start', 's.u_height', 'd.name as dc_name', 'r.name as rack_name', 's.dc_id', 's.rack_id']);
 
-    echo '<div class="d-flex justify-content-between align-items-center mb-3">';
-    echo '<h5 class="mb-0">' . htmlspecialchars(I18n::t('tab_switches', $lang)) . '</h5>';
+    echo '<div class="d-flex justify-content-end align-items-center mb-3">';
     echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-switch-add">' . htmlspecialchars(I18n::t('switch_add', $lang)) . '</button>';
     echo '</div>';
 
@@ -2063,7 +2061,6 @@ function dcmanage_render_servers(string $lang): void
     echo '</div>';
 
     echo '<div class="col-lg-7">';
-    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('tab_servers', $lang)) . '</h5>';
     echo '<div class="table-responsive"><table class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_sensor_count', $lang)) . '</th><th>U</th></tr></thead><tbody>';
     foreach ($rows as $row) {

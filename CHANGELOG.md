@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.32] - 2026-02-21
+### Changed
+- Removed duplicate in-page tab headings from implemented pages so the active tab title appears only once in top navigation.
+- Updated `Switches` page header row to right-aligned action-only layout (`Add Switch` button) without repeated section title.
+
+### Fixed
+- Resolved repeated `Switches/Servers/Monitoring` labels that appeared both in tab and page content.
+
 ## [0.1.31] - 2026-02-21
 ### Changed
 - Replaced technical `Admin/Oper` wording in switch ports with user-facing labels:
