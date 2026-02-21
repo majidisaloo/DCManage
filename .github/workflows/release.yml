@@ -24,11 +24,29 @@ jobs:
           cd dist
           zip -r ../DCManage-${GITHUB_REF_NAME}.zip modules
 
+      - name: Resolve release notes
+        run: |
+          set -euo pipefail
+          NOTES_FILE="release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            cp "$NOTES_FILE" dist/RELEASE_BODY.md
+          else
+            cat > dist/RELEASE_BODY.md <<EOF
+            Changed
+            - Packaging updated for this release.
+            Added
+            - No additional notes were provided for this tag.
+            Fixed
+            - Stability and maintenance improvements.
+            EOF
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             DCManage-${{ github.ref_name }}.zip
-          generate_release_notes: true
+          body_path: dist/RELEASE_BODY.md
+          generate_release_notes: false
           draft: false
           prerelease: false

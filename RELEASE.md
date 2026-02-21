@@ -2,7 +2,7 @@
 
 ## Versioning
 - Semantic Versioning is used: `MAJOR.MINOR.PATCH`.
-- Current release: `0.1.2`.
+- Current release: `0.1.3`.
 
 ## Release checklist
 1. Update `VERSION`.
@@ -13,6 +13,7 @@
 6. Tag release in git: `vX.Y.Z` and push tag.
 7. GitHub Actions `Release` workflow creates release asset `DCManage-vX.Y.Z.zip`.
 8. Verify zip contains `modules/addons/dcmanage` for direct extraction in WHMCS `public_html`.
+9. Add `release-notes/vX.Y.Z.md` to publish structured release text (`Changed / Added / Fixed`).
 
 ## Safe auto-update policy
 - Only additive database migrations run in activation/upgrade path.

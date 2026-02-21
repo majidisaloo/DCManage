@@ -4,6 +4,18 @@
 - Maintenance:
   - ignored local verification artifacts (`dist/`, `_verify.zip`) to keep repository clean.
 
+## [0.1.3] - 2026-02-21
+### Changed
+- GitHub release notes strategy moved from generic auto-generated changelog links to structured manual notes (`Changed / Added / Fixed`).
+- Release pipeline now resolves a per-tag note body before publishing a release.
+
+### Added
+- Added versioned release note document support via `release-notes/<tag>.md`.
+- Added fallback release note template when a dedicated note file is missing.
+
+### Fixed
+- Fixed release page readability for operators by replacing minimal `Full Changelog` output with explicit release summary sections.
+
 ## [0.1.2] - 2026-02-21
 - Fixed release zip deployment layout for direct extraction in `public_html`:
   - release zip now contains `modules/addons/dcmanage` path.
