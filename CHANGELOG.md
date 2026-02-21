@@ -3,6 +3,16 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.33] - 2026-02-21
+### Changed
+- Applied global spacing normalization across module pages for consistent vertical and horizontal rhythm.
+- Unified action/button presentation and checkbox styling in dashboard update controls.
+- Added unified table wrapper style to Settings, Monitoring, Switches, Servers, and Logs to prevent controls sticking to border lines.
+
+### Fixed
+- Fixed line-to-button crowding issue visible near top section borders across tabs.
+- Improved responsive behavior on large monitors and mobile by adding dedicated wide-screen and small-screen layout tuning.
+
 ## [0.1.32] - 2026-02-21
 ### Changed
 - Removed duplicate in-page tab headings from implemented pages so the active tab title appears only once in top navigation.

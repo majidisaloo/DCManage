@@ -272,10 +272,10 @@
         '</div>' +
         '</div>' +
         '<div class="dcmanage-update-actions-row">' +
-        '<div class="custom-control custom-switch">' +
-        '<input type="checkbox" class="custom-control-input" id="dcmanage-auto-update"' + autoChecked + '>' +
-        '<label class="custom-control-label" for="dcmanage-auto-update">' + safeText(T.autoUpdate) + '</label>' +
-        '</div>' +
+        '<label class="dcmanage-check-inline" for="dcmanage-auto-update">' +
+        '<input type="checkbox" id="dcmanage-auto-update"' + autoChecked + '>' +
+        '<span>' + safeText(T.autoUpdate) + '</span>' +
+        '</label>' +
         '<button type="button" class="btn btn-outline-primary btn-sm dcmanage-check-btn" id="dcmanage-check-update">' + safeText(T.checkUpdate) + '</button>' +
         '<button type="button" class="btn btn-primary btn-sm" id="dcmanage-apply-update">' + safeText(T.applyUpdate) + '</button>' +
         '</div>' +

@@ -3,6 +3,9 @@
   --dc-accent: #12b3c7;
   --dc-soft: #eef4ff;
   --dc-text: #173063;
+  max-width: 1820px;
+  margin: 0 auto;
+  padding: 0 16px 26px;
 }
 
 .dcmanage-shell.dcmanage-rtl {
@@ -61,6 +64,18 @@
   border-radius: 16px;
   border: 1px solid #dbe6ff;
   box-shadow: 0 8px 24px rgba(19, 54, 124, .08);
+}
+
+.dcmanage-shell .dcmanage-page-card {
+  overflow: hidden;
+}
+
+.dcmanage-shell .dcmanage-page-body {
+  padding: 22px 22px 24px !important;
+}
+
+.dcmanage-shell .dcmanage-page-body > :first-child {
+  margin-top: 0 !important;
 }
 
 .dcmanage-shell .alert {
@@ -313,19 +328,6 @@
   padding-top: 2px;
 }
 
-.dcmanage-update-actions-row .custom-control {
-  margin-bottom: 0;
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  padding-top: 0;
-}
-
-.dcmanage-update-actions-row .custom-control-label {
-  font-weight: 700;
-  line-height: 1.3;
-}
-
 .dcmanage-check-btn {
   margin-inline-start: auto;
 }
@@ -333,6 +335,27 @@
 .dcmanage-update-actions-row .btn {
   min-height: 40px;
   padding-inline: 18px;
+}
+
+.dcmanage-check-inline {
+  margin: 0;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid #c9d8fb;
+  border-radius: 11px;
+  background: #f4f8ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #243a6c;
+  cursor: pointer;
+}
+
+.dcmanage-check-inline input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 
 .dcmanage-update-msg {
@@ -389,7 +412,30 @@
   border: 1px solid #dde7ff;
   background: #f9fbff;
   border-radius: 14px;
-  padding: 14px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.dcmanage-shell .dcmanage-page-body > .dcmanage-form-card:first-of-type {
+  margin-top: 0;
+}
+
+.dcmanage-shell .form-group {
+  margin-bottom: .92rem;
+}
+
+.dcmanage-shell .form-row {
+  margin-left: -8px;
+  margin-right: -8px;
+  margin-inline-start: -8px;
+  margin-inline-end: -8px;
+}
+
+.dcmanage-shell .form-row > [class*="col-"] {
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-inline-start: 8px;
+  padding-inline-end: 8px;
 }
 
 .dcmanage-shell .form-control.dcmanage-input,
@@ -423,6 +469,16 @@
   width: 360px;
 }
 
+.dcmanage-shell .btn {
+  border-radius: 11px;
+  min-height: 38px;
+  font-weight: 700;
+}
+
+.dcmanage-shell .btn.btn-sm {
+  min-height: 34px;
+}
+
 .dcmanage-action-buttons {
   display: inline-flex;
   flex-wrap: wrap;
@@ -438,6 +494,27 @@
 .dcmanage-dc-topbar {
   margin-top: 20px;
   padding-inline: 6px;
+}
+
+.dcmanage-section-toolbar {
+  margin-top: 6px;
+  margin-bottom: 14px !important;
+}
+
+.dcmanage-table-wrap {
+  border: 1px solid #d9e3fb;
+  border-radius: 14px;
+  background: #fcfdff;
+  overflow: auto;
+  padding: 0;
+}
+
+.dcmanage-table-wrap > .table {
+  margin-bottom: 0;
+}
+
+.dcmanage-section-toolbar + .dcmanage-table-wrap {
+  margin-top: 12px;
 }
 
 .dcmanage-dc-add-wrap {
@@ -783,6 +860,26 @@
 }
 
 @media (max-width: 991px) {
+  .dcmanage-shell {
+    padding: 0 10px 18px;
+  }
+
+  .dcmanage-shell .dcmanage-page-body {
+    padding: 14px !important;
+  }
+
+  .dcmanage-shell .dcmanage-tabs {
+    gap: 6px;
+  }
+
+  .dcmanage-shell .dcmanage-tabs .nav-link {
+    padding: 8px 12px;
+  }
+
+  .dcmanage-shell .dcmanage-form-card {
+    padding: 12px;
+  }
+
   .dcmanage-rack-shell {
     grid-template-columns: 1fr;
   }
@@ -802,6 +899,7 @@
   .dcmanage-update-actions-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
   }
 
   .dcmanage-check-btn {
@@ -812,14 +910,9 @@
     width: 100%;
   }
 
-  .dcmanage-update-actions-row .custom-control {
+  .dcmanage-check-inline {
     width: 100%;
-  }
-
-  .dcmanage-update-actions-row .custom-control-label {
-    display: inline-flex;
-    align-items: center;
-    min-height: 22px;
+    justify-content: flex-start;
   }
 
   .dcmanage-action-buttons {
@@ -829,5 +922,19 @@
   .dcmanage-action-buttons .btn {
     font-size: 12px;
     padding: 4px 8px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .dcmanage-shell .dcmanage-page-body {
+    padding: 28px 30px 30px !important;
+  }
+
+  .dcmanage-shell .dcmanage-tabs {
+    gap: 10px;
+  }
+
+  .dcmanage-shell .dcmanage-tabs .nav-link {
+    padding: 10px 20px;
   }
 }

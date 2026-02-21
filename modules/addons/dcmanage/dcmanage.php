@@ -115,7 +115,7 @@ function dcmanage_output(array $vars): void
     }
     echo '</ul>';
 
-    echo '<div class="card mt-3 border-0 shadow-sm"><div class="card-body">';
+    echo '<div class="card mt-3 border-0 shadow-sm dcmanage-page-card"><div class="card-body dcmanage-page-body">';
 
     if ($activeTab === 'dashboard') {
         echo '<div class="dcmanage-header mb-3"><h2 class="mb-1">' . htmlspecialchars(I18n::t('title', $lang)) . '</h2><p class="text-muted mb-0">' . htmlspecialchars(I18n::t('subtitle', $lang)) . ' - v' . htmlspecialchars(DCManage\Version::CURRENT) . '</p></div>';
@@ -851,7 +851,7 @@ function dcmanage_render_settings_form(string $lang): void
     $cron = dcmanage_cron_status();
 
     echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('system_settings', $lang)) . '</h5>';
-    echo '<form method="post" action="">';
+    echo '<form method="post" action="" class="dcmanage-form-card">';
     echo '<input type="hidden" name="dcmanage_action" value="settings_save">';
     echo '<div class="row">';
 
@@ -881,7 +881,7 @@ function dcmanage_render_settings_form(string $lang): void
     $overallClass = $cron['overall'] === 'ok' ? 'success' : ($cron['overall'] === 'fail' ? 'danger' : 'warning');
     echo '<hr class="my-4">';
     echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('cron_monitor', $lang)) . ' <span class="badge badge-' . $overallClass . '">' . htmlspecialchars(I18n::t('cron_overall', $lang)) . '</span></h5>';
-    echo '<div class="table-responsive">';
+    echo '<div class="table-responsive dcmanage-table-wrap">';
     echo '<table class="table table-sm table-bordered">';
     echo '<thead><tr><th>' . htmlspecialchars(I18n::t('cron_task', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_last_run', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_next_run', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_command', $lang)) . '</th></tr></thead><tbody>';
 
@@ -942,7 +942,7 @@ function dcmanage_render_monitoring(string $lang): void
 
     echo '<div class="col-lg-7">';
     echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('prtg_instances', $lang)) . '</h6>';
-    echo '<div class="table-responsive"><table class="table table-sm table-striped">';
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('prtg_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('prtg_base_url', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('prtg_user', $lang)) . '</th><th>SSL</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($instances as $instance) {
         echo '<tr>';
@@ -1771,7 +1771,7 @@ function dcmanage_render_switches(string $lang): void
         ->limit(200)
         ->get(['s.id', 's.name', 's.vendor', 's.model', 's.mgmt_ip', 's.snmp_community', 's.snmp_version', 's.snmp_port', 's.u_start', 's.u_height', 'd.name as dc_name', 'r.name as rack_name', 's.dc_id', 's.rack_id']);
 
-    echo '<div class="d-flex justify-content-end align-items-center mb-3">';
+    echo '<div class="d-flex justify-content-end align-items-center mb-3 dcmanage-section-toolbar">';
     echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-switch-add">' . htmlspecialchars(I18n::t('switch_add', $lang)) . '</button>';
     echo '</div>';
 
@@ -1811,7 +1811,7 @@ function dcmanage_render_switches(string $lang): void
     echo '</form>';
     echo '</div>';
 
-    echo '<div class="table-responsive"><table class="table table-sm table-striped dcmanage-dc-table dcmanage-switch-table">';
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped dcmanage-dc-table dcmanage-switch-table">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</th><th>SNMP</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
         $snmp = dcmanage_switch_snmp_state((int) $row->id);
@@ -2061,7 +2061,7 @@ function dcmanage_render_servers(string $lang): void
     echo '</div>';
 
     echo '<div class="col-lg-7">';
-    echo '<div class="table-responsive"><table class="table table-sm table-striped">';
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_sensor_count', $lang)) . '</th><th>U</th></tr></thead><tbody>';
     foreach ($rows as $row) {
         $serverId = (int) $row->id;
@@ -2116,7 +2116,7 @@ function dcmanage_render_logs(string $lang): void
     $logRows = Capsule::table('mod_dcmanage_logs')->orderBy('id', 'desc')->limit(200)->get(['id', 'level', 'source', 'message', 'created_at']);
 
     echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('purchase_logs', $lang)) . '</h5>';
-    echo '<div class="table-responsive mb-4"><table class="table table-sm table-striped">';
+    echo '<div class="table-responsive mb-4 dcmanage-table-wrap"><table class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>Service</th><th>User</th><th>Package</th><th>GB</th><th>Price</th><th>Invoice</th><th>Date</th></tr></thead><tbody>';
     foreach ($purchaseRows as $row) {
         echo '<tr><td>' . (int) $row->id . '</td><td>' . (int) $row->whmcs_serviceid . '</td><td>' . (int) $row->userid . '</td><td>' . htmlspecialchars((string) $row->package_name) . '</td><td>' . htmlspecialchars((string) $row->size_gb) . '</td><td>' . htmlspecialchars((string) $row->price) . '</td><td>' . htmlspecialchars((string) $row->invoiceid) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
@@ -2124,7 +2124,7 @@ function dcmanage_render_logs(string $lang): void
     echo '</tbody></table></div>';
 
     echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('logs_system', $lang)) . '</h5>';
-    echo '<div class="table-responsive"><table class="table table-sm table-striped">';
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>Level</th><th>Source</th><th>Message</th><th>Date</th></tr></thead><tbody>';
     foreach ($logRows as $row) {
         echo '<tr><td>' . (int) $row->id . '</td><td>' . htmlspecialchars((string) $row->level) . '</td><td>' . htmlspecialchars((string) $row->source) . '</td><td>' . htmlspecialchars((string) $row->message) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
