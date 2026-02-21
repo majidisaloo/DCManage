@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.17] - 2026-02-21
+### Fixed
+- Hardened shell argument quoting in cron command generation to prevent fatal errors on hosts with restricted/disabled `escapeshellarg`.
+- Added safe callable fallback path so Settings and Cron Monitor always render even on hardened PHP environments.
+
 ## [0.1.16] - 2026-02-21
 ### Fixed
 - Fixed settings crash on hosts where `escapeshellarg()` is disabled in PHP `disable_functions`.

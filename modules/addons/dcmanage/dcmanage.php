@@ -524,7 +524,14 @@ function dcmanage_detect_php_binary(): string
 function dcmanage_shell_quote(string $value): string
 {
     if (function_exists('escapeshellarg')) {
-        return escapeshellarg($value);
+        try {
+            $quoted = call_user_func('escapeshellarg', $value);
+            if (is_string($quoted) && $quoted !== '') {
+                return $quoted;
+            }
+        } catch (\Throwable $e) {
+            // Fall back to internal quoting when escapeshellarg is disabled/restricted.
+        }
     }
 
     if ($value === '') {

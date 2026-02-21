@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.16)
+## Features in this release (v0.1.17)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -37,6 +37,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - timezone, locale, traffic poll interval, graph cache TTL, log retention, dashboard refresh interval.
   - cron commands with auto-detected real server path, last run, next run, and health check panel.
   - compatible with hardened PHP setups where shell-related functions are disabled.
+  - resilient shell-quote fallback keeps settings/cron pages stable even when `escapeshellarg` is blocked by host policy.
 - Inventory workflows:
   - Datacenter create supports auto rack generation by count + rack unit size.
   - Datacenter add form is opened by Add button (collapsed by default).
