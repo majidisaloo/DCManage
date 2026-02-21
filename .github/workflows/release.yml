@@ -31,14 +31,14 @@ jobs:
           if [ -f "$NOTES_FILE" ]; then
             cp "$NOTES_FILE" dist/RELEASE_BODY.md
           else
-            cat > dist/RELEASE_BODY.md <<EOF
-            Changed
-            - Packaging updated for this release.
-            Added
-            - No additional notes were provided for this tag.
-            Fixed
-            - Stability and maintenance improvements.
-            EOF
+            {
+              echo "Changed"
+              echo "- Packaging updated for this release."
+              echo "Added"
+              echo "- No additional notes were provided for this tag."
+              echo "Fixed"
+              echo "- Stability and maintenance improvements."
+            } > dist/RELEASE_BODY.md
           fi
 
       - name: Create GitHub Release

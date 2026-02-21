@@ -3,6 +3,7 @@
 ## [Unreleased]
 - Maintenance:
   - ignored local verification artifacts (`dist/`, `_verify.zip`) to keep repository clean.
+  - fixed release workflow note-body generation bug for tag-based releases.
 
 ## [0.1.3] - 2026-02-21
 ### Changed
