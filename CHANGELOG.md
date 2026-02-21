@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.8] - 2026-02-21
+### Changed
+- Settings field label was renamed from `Locale` to `Language` for clearer UX.
+- Language selector now includes `Default` plus explicit `English` and `Persian` options.
+
+### Fixed
+- Default language mode now correctly follows active WHMCS admin language instead of forcing a stored override.
+- Settings validation now restricts language values to `default`, `en`, or `fa` to prevent invalid state.
+
 ## [0.1.7] - 2026-02-21
 ### Changed
 - Persian UI navigation now renders from the right side consistently in module tabs.

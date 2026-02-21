@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.7)
+## Features in this release (v0.1.8)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -109,7 +109,8 @@ Example endpoints:
 The admin shell uses Bootstrap 4-compatible markup and responsive layout.
 
 ## Language behavior
-- Saved locale is honored first, then session/system language is used as fallback.
+- Language setting supports `Default`, `Persian`, and `English`.
+- In `Default` mode, module language follows WHMCS admin/session language.
 - If the account/session language is Persian, module UI labels load in Persian.
 - If the account/session language is English, module UI labels load in English.
 - Persian menu/tabs are rendered RTL and start from the right side.

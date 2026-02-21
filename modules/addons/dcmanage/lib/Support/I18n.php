@@ -33,6 +33,10 @@ final class I18n
             'section' => 'Section',
             'system_settings' => 'System Settings',
             'save_settings' => 'Save Settings',
+            'settings_language' => 'Language',
+            'settings_language_default' => 'Default (WHMCS admin language)',
+            'settings_language_fa' => 'Persian',
+            'settings_language_en' => 'English',
             'settings_saved' => 'Settings saved successfully.',
             'datacenter_add' => 'Add Datacenter',
             'datacenter_name' => 'Datacenter Name',
@@ -118,6 +122,10 @@ final class I18n
             'section' => 'بخش',
             'system_settings' => 'تنظیمات کلی سیستم',
             'save_settings' => 'ذخیره تنظیمات',
+            'settings_language' => 'زبان',
+            'settings_language_default' => 'پیش‌فرض (زبان ادمین WHMCS)',
+            'settings_language_fa' => 'فارسی',
+            'settings_language_en' => 'انگلیسی',
             'settings_saved' => 'تنظیمات با موفقیت ذخیره شد.',
             'datacenter_add' => 'افزودن دیتاسنتر',
             'datacenter_name' => 'نام دیتاسنتر',
@@ -191,14 +199,19 @@ final class I18n
             $candidate = (string) $_GET['lang'];
         } elseif (class_exists(Capsule::class) && Capsule::schema()->hasTable('mod_dcmanage_meta')) {
             $stored = Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.locale')->value('meta_value');
-            if (!empty($stored)) {
+            $stored = strtolower(trim((string) $stored));
+            if ($stored !== '' && $stored !== 'default') {
                 $candidate = (string) $stored;
             }
-        } elseif (!empty($_SESSION['Language'])) {
+        }
+
+        if ($candidate === '' && !empty($_SESSION['Language'])) {
             $candidate = (string) $_SESSION['Language'];
-        } elseif (!empty($_SESSION['adminlang'])) {
+        }
+        if ($candidate === '' && !empty($_SESSION['adminlang'])) {
             $candidate = (string) $_SESSION['adminlang'];
-        } elseif (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+        }
+        if ($candidate === '' && !empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
             $candidate = substr((string) $_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
         }
 

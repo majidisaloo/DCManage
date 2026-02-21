@@ -317,7 +317,7 @@ function dcmanage_system_defaults(): array
 {
     return [
         'timezone' => 'Asia/Tehran',
-        'locale' => I18n::resolveCurrentLanguage(),
+        'locale' => 'default',
         'traffic_poll_minutes' => '5',
         'graph_cache_ttl_minutes' => '30',
         'log_retention_days' => '90',
@@ -347,6 +347,12 @@ function dcmanage_handle_settings_save(): void
         $value = isset($_POST[$key]) ? trim((string) $_POST[$key]) : '';
         if ($value === '') {
             $value = $defaults[$key];
+        }
+        if ($key === 'locale') {
+            $value = strtolower($value);
+            if (!in_array($value, ['default', 'fa', 'en'], true)) {
+                $value = 'default';
+            }
         }
 
         Capsule::table('mod_dcmanage_meta')->updateOrInsert(
@@ -436,8 +442,12 @@ function dcmanage_render_settings_form(string $lang): void
     echo '<div class="row">';
 
     echo '<div class="col-md-4 mb-3"><label>Timezone</label><input class="form-control dcmanage-input" name="timezone" value="' . htmlspecialchars($settings['timezone']) . '"></div>';
-    echo '<div class="col-md-4 mb-3"><label>Locale</label><select class="form-control dcmanage-input" name="locale">';
-    $locales = ['fa' => 'Persian', 'en' => 'English'];
+    echo '<div class="col-md-4 mb-3"><label>' . htmlspecialchars(I18n::t('settings_language', $lang)) . '</label><select class="form-control dcmanage-input" name="locale">';
+    $locales = [
+        'default' => I18n::t('settings_language_default', $lang),
+        'fa' => I18n::t('settings_language_fa', $lang),
+        'en' => I18n::t('settings_language_en', $lang),
+    ];
     foreach ($locales as $k => $v) {
         $selected = $settings['locale'] === $k ? ' selected' : '';
         echo '<option value="' . htmlspecialchars($k) . '"' . $selected . '>' . htmlspecialchars($v) . '</option>';
