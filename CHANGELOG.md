@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.39] - 2026-02-21
+### Changed
+- Removed manual `Add/Update Port` block from `Switches -> Ports`.
+- Port management is now discover/sync-first instead of manual entry.
+
+### Fixed
+- Prevented manual uplink/interface input confusion and wrong source data entry.
+
 ## [0.1.38] - 2026-02-21
 ### Changed
 - Bulk server creation form no longer requests rack selection.

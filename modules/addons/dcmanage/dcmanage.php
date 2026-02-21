@@ -1947,16 +1947,6 @@ function dcmanage_render_switches(string $lang): void
             echo '<tr><td colspan="7">-</td></tr>';
         }
         echo '</tbody></table></div>';
-        echo '<form method="post" class="mt-3 dcmanage-port-upsert"><input type="hidden" name="dcmanage_action" value="switch_port_upsert"><input type="hidden" name="switch_id" value="' . (int) $row->id . '">';
-        echo '<div class="form-row">';
-        echo '<div class="col-md-3 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</label><input name="if_name" class="form-control form-control-sm dcmanage-input" placeholder="Ethernet1/1"></div>';
-        echo '<div class="col-md-3 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</label><input name="if_desc" class="form-control form-control-sm dcmanage-input"></div>';
-        echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">VLAN</label><input name="vlan" class="form-control form-control-sm dcmanage-input" placeholder="10"></div>';
-        echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</label><select name="admin_status" class="form-control form-control-sm dcmanage-input"><option value="up">' . htmlspecialchars(I18n::t('port_mode_noshut', $lang)) . '</option><option value="down">' . htmlspecialchars(I18n::t('port_mode_shut', $lang)) . '</option><option value="unknown">' . htmlspecialchars(I18n::t('switch_status_unknown', $lang)) . '</option></select></div>';
-        echo '<div class="col-md-2 mb-2"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</label><select name="oper_status" class="form-control form-control-sm dcmanage-input"><option value="up">' . htmlspecialchars(I18n::t('port_link_connected', $lang)) . '</option><option value="down">' . htmlspecialchars(I18n::t('port_link_not_connected', $lang)) . '</option><option value="absent">' . htmlspecialchars(I18n::t('port_link_absent', $lang)) . '</option><option value="unknown">' . htmlspecialchars(I18n::t('switch_status_unknown', $lang)) . '</option></select></div>';
-        echo '<div class="col-md-12 mb-2 d-flex align-items-end"><button class="btn btn-sm dcmanage-btn-soft-primary" type="submit" name="dcmanage_action_btn" value="switch_port_upsert">' . htmlspecialchars(I18n::t('switch_add_update_port', $lang)) . '</button></div>';
-        echo '</div>';
-        echo '</form>';
         echo '</div>';
         echo '</td></tr>';
     }
