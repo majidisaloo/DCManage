@@ -1,1 +1,73 @@
-# DCManage
+# DCManage (WHMCS Addon)
+
+DCManage is an API-first datacenter management core inside WHMCS.
+
+## Features in this release (v1.1.0)
+- Datacenter domain model foundations:
+  - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
+- Traffic/usage foundations:
+  - `usage_state`, service linking, package/purchase models.
+  - cycle resolver aligned to WHMCS `nextduedate`.
+- Operations foundations:
+  - DB-backed job queue (`mod_dcmanage_jobs`).
+  - DB locks (`mod_dcmanage_locks`) for safe cron concurrency.
+  - Structured logs (`mod_dcmanage_logs`).
+- Graph foundations:
+  - 2-month cache table and API endpoints to store/retrieve graph payloads.
+- Bilingual admin UI:
+  - Persian (`fa`) and English (`en`) labels/messages.
+  - Automatic language detection from WHMCS session (`Language`/`adminlang`).
+- Cron entrypoint with 4 tasks:
+  - `poll_usage` (every 5 min)
+  - `enforce_queue` (every 1 min)
+  - `graph_warm` (every 30 min)
+  - `cleanup` (daily)
+
+## Installation
+1. Copy `modules/addons/dcmanage` into WHMCS root.
+2. Activate addon in WHMCS Admin > System Settings > Addon Modules.
+3. Grant admin role access to `DCManage`.
+4. Add server cron entries:
+
+```bash
+*/5 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php poll_usage
+* * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php enforce_queue
+*/30 * * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php graph_warm
+12 2 * * * php -q /path/to/whmcs/modules/addons/dcmanage/cron.php cleanup
+```
+
+## Upgrade and zero-downtime strategy
+- Versioned migrations run in `dcmanage_upgrade($vars)`.
+- Additive schema-first updates only in normal upgrades.
+- Destructive cleanup only in maintenance release and never in request path.
+- Cron-safe locks prevent overlapping poll/enforce jobs.
+- Queue-based operations keep UI responsive and avoid blocking admin pages.
+
+## API-first internal design
+Admin UI can call internal JSON routes via:
+- `addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint=...`
+
+Example endpoints:
+- `dashboard/health`
+- `datacenters/list`
+- `traffic/list`
+- `graphs/get`
+
+## Security notes
+- `shell_exec` is not used.
+- Sensitive fields are encrypted through WHMCS local API (`EncryptPassword`/`DecryptPassword`) fallback to OpenSSL.
+
+## Bootstrap 4
+The admin shell uses Bootstrap 4-compatible markup and responsive layout.
+
+## Language behavior
+- If the account/session language is Persian, module UI labels load in Persian.
+- If the account/session language is English, module UI labels load in English.
+- Optional override for testing: add `&lang=fa` or `&lang=en` to addon URL.
+
+## Next implementation phases
+1. Full CRUD forms + validations for all tabs.
+2. PRTG sensor picker UI with search by group/device.
+3. Nexus/iLO job workers and enforce/unlock actions.
+4. Auto-buy invoice workflow and credit application.
+5. Client-area widgets and advanced charts.
