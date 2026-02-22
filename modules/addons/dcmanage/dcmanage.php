@@ -3496,25 +3496,65 @@ function dcmanage_render_servers(string $lang): void
     echo '</script>';
 }
 
+/**
+ * @return int[]
+ */
+function dcmanage_parse_csv_ids(string $raw): array
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return [];
+    }
+
+    $raw = str_replace(
+        ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', '٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'],
+        ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+        $raw
+    );
+
+    $out = [];
+    foreach (preg_split('/[\s,;]+/', $raw) ?: [] as $item) {
+        $item = trim((string) $item);
+        if ($item === '' || preg_match('/^\d+$/', $item) !== 1) {
+            continue;
+        }
+        $id = (int) $item;
+        if ($id > 0) {
+            $out[$id] = $id;
+        }
+    }
+
+    return array_values($out);
+}
+
 function dcmanage_render_scope(string $lang): void
 {
-    $scopeType = strtolower(trim((string) ($_GET['scope_type'] ?? 'gid')));
-    if (!in_array($scopeType, ['gid', 'pid'], true)) {
-        $scopeType = 'gid';
-    }
-    $scopeGid = max(0, (int) ($_GET['scope_gid'] ?? 0));
-    $scopePid = max(0, (int) ($_GET['scope_pid'] ?? 0));
+    $scopeGidRaw = trim((string) ($_GET['scope_gid'] ?? ''));
+    $scopePidRaw = trim((string) ($_GET['scope_pid'] ?? ''));
     $scopeQ = trim((string) ($_GET['scope_q'] ?? ''));
+    $scopeGids = dcmanage_parse_csv_ids($scopeGidRaw);
+    $scopePids = dcmanage_parse_csv_ids($scopePidRaw);
+    $hasScopeFilter = $scopeGids !== [] || $scopePids !== [] || $scopeQ !== '';
 
-    $groups = Capsule::table('tblproductgroups')->orderBy('order')->orderBy('name')->get(['id', 'name']);
     $productsQuery = Capsule::table('tblproducts as p')
         ->leftJoin('tblproductgroups as g', 'g.id', '=', 'p.gid')
         ->orderBy('p.id', 'asc');
 
-    if ($scopeType === 'pid' && $scopePid > 0) {
-        $productsQuery->where('p.id', $scopePid);
-    } elseif ($scopeGid > 0) {
-        $productsQuery->where('p.gid', $scopeGid);
+    if ($hasScopeFilter) {
+        if ($scopeGids !== [] || $scopePids !== []) {
+            $productsQuery->where(static function ($w) use ($scopeGids, $scopePids): void {
+                if ($scopeGids !== []) {
+                    $w->whereIn('p.gid', $scopeGids);
+                }
+                if ($scopePids !== []) {
+                    $scopeGids === []
+                        ? $w->whereIn('p.id', $scopePids)
+                        : $w->orWhereIn('p.id', $scopePids);
+                }
+            });
+        }
+    } else {
+        $productsQuery->whereRaw('1=0');
     }
 
     if ($scopeQ !== '') {
@@ -3534,8 +3574,10 @@ function dcmanage_render_scope(string $lang): void
     ]);
 
     $productIds = [];
+    $productGids = [];
     foreach ($products as $product) {
         $productIds[] = (int) $product->id;
+        $productGids[(int) $product->gid] = (int) $product->gid;
     }
 
     $scopeRows = [];
@@ -3549,35 +3591,32 @@ function dcmanage_render_scope(string $lang): void
             });
     }
 
-    $groupScope = null;
-    if ($scopeGid > 0) {
-        $groupScope = Capsule::table('mod_dcmanage_scope')->where('type', 'gid')->where('ref_id', $scopeGid)->first();
+    $groupScopeRows = [];
+    if ($productGids !== []) {
+        $groupScopeRows = Capsule::table('mod_dcmanage_scope')
+            ->where('type', 'gid')
+            ->whereIn('ref_id', array_values($productGids))
+            ->get()
+            ->keyBy(static function ($row) {
+                return (int) $row->ref_id;
+            });
+    }
+
+    $selectedGroups = [];
+    if ($scopeGids !== []) {
+        $selectedGroups = Capsule::table('tblproductgroups')
+            ->whereIn('id', $scopeGids)
+            ->orderBy('id', 'asc')
+            ->get(['id', 'name']);
     }
 
     $baseUrl = 'addonmodules.php?module=dcmanage&tab=scope';
     echo '<form method="get" class="dcmanage-form-card mb-3">';
     echo '<input type="hidden" name="module" value="dcmanage"><input type="hidden" name="tab" value="scope">';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('scope_type', $lang)) . '</label><select class="form-control dcmanage-input" name="scope_type">';
-    echo '<option value="gid"' . ($scopeType === 'gid' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('scope_group', $lang)) . '</option>';
-    echo '<option value="pid"' . ($scopeType === 'pid' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('scope_product', $lang)) . '</option>';
-    echo '</select></div>';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_select_group', $lang)) . '</label><select class="form-control dcmanage-input" name="scope_gid"><option value="0">--</option>';
-    foreach ($groups as $group) {
-        $selected = (int) $group->id === $scopeGid ? ' selected' : '';
-        echo '<option value="' . (int) $group->id . '"' . $selected . '>' . htmlspecialchars((string) $group->name) . ' (#' . (int) $group->id . ')</option>';
-    }
-    echo '</select></div>';
-
-    $allProducts = Capsule::table('tblproducts')->orderBy('name')->get(['id', 'name']);
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_select_product', $lang)) . '</label><select class="form-control dcmanage-input" name="scope_pid"><option value="0">--</option>';
-    foreach ($allProducts as $product) {
-        $selected = (int) $product->id === $scopePid ? ' selected' : '';
-        echo '<option value="' . (int) $product->id . '"' . $selected . '>' . htmlspecialchars((string) $product->name) . ' (#' . (int) $product->id . ')</option>';
-    }
-    echo '</select></div>';
-
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('table_search', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_q" value="' . htmlspecialchars($scopeQ) . '" placeholder="' . htmlspecialchars(I18n::t('scope_search_product', $lang)) . '"></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_gid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_gid" value="' . htmlspecialchars($scopeGidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_gid_csv_placeholder', $lang)) . '"></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_pid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_pid" value="' . htmlspecialchars($scopePidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_pid_csv_placeholder', $lang)) . '"></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('table_search', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_q" value="' . htmlspecialchars($scopeQ) . '" placeholder="' . htmlspecialchars(I18n::t('scope_search_product', $lang)) . '"></div>';
     echo '</div>';
     echo '<div class="dcmanage-form-actions d-flex flex-wrap">';
     echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('logs_apply_filter', $lang)) . '</button>';
@@ -3585,29 +3624,33 @@ function dcmanage_render_scope(string $lang): void
     echo '</div>';
     echo '</form>';
 
-    if ($scopeGid > 0) {
-        $downValue = $groupScope !== null && $groupScope->down_limit_gb !== null ? (string) $groupScope->down_limit_gb : '';
-        $upValue = $groupScope !== null && $groupScope->up_limit_gb !== null ? (string) $groupScope->up_limit_gb : '';
-        $totalValue = $groupScope !== null && $groupScope->total_limit_gb !== null ? (string) $groupScope->total_limit_gb : '';
-        $downUnlimited = $groupScope !== null && (int) ($groupScope->down_unlimited ?? 0) === 1;
-        $upUnlimited = $groupScope !== null && (int) ($groupScope->up_unlimited ?? 0) === 1;
-        $totalUnlimited = $groupScope !== null && (int) ($groupScope->total_unlimited ?? 0) === 1;
+    if (count($selectedGroups) > 0) {
+        foreach ($selectedGroups as $group) {
+            $gid = (int) $group->id;
+            $groupScope = $groupScopeRows[$gid] ?? null;
+            $downValue = $groupScope !== null && $groupScope->down_limit_gb !== null ? (string) $groupScope->down_limit_gb : '';
+            $upValue = $groupScope !== null && $groupScope->up_limit_gb !== null ? (string) $groupScope->up_limit_gb : '';
+            $totalValue = $groupScope !== null && $groupScope->total_limit_gb !== null ? (string) $groupScope->total_limit_gb : '';
+            $downUnlimited = $groupScope !== null && (int) ($groupScope->down_unlimited ?? 0) === 1;
+            $upUnlimited = $groupScope !== null && (int) ($groupScope->up_unlimited ?? 0) === 1;
+            $totalUnlimited = $groupScope !== null && (int) ($groupScope->total_unlimited ?? 0) === 1;
 
-        echo '<form method="post" class="dcmanage-form-card mb-3 dcmanage-scope-group-form">';
-        echo '<input type="hidden" name="dcmanage_action" value="scope_limits_save"><input type="hidden" name="scope_type" value="gid"><input type="hidden" name="scope_ref_id" value="' . $scopeGid . '">';
-        echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('scope_group_defaults', $lang)) . '</h5>';
-        echo '<div class="form-row">';
-        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_download_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="down_limit_gb" value="' . htmlspecialchars($downValue) . '" class="form-control dcmanage-input"' . ($downUnlimited ? ' disabled' : '') . '></div>';
-        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_upload_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="up_limit_gb" value="' . htmlspecialchars($upValue) . '" class="form-control dcmanage-input"' . ($upUnlimited ? ' disabled' : '') . '></div>';
-        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_total_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="total_limit_gb" value="' . htmlspecialchars($totalValue) . '" class="form-control dcmanage-input"' . ($totalUnlimited ? ' disabled' : '') . '></div>';
-        echo '</div>';
-        echo '<div class="form-row">';
-        echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="down_unlimited" value="1"' . ($downUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
-        echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="up_unlimited" value="1"' . ($upUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
-        echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="total_unlimited" value="1"' . ($totalUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
-        echo '</div>';
-        echo '<div class="dcmanage-form-actions"><button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></div>';
-        echo '</form>';
+            echo '<form method="post" class="dcmanage-form-card mb-3 dcmanage-scope-group-form">';
+            echo '<input type="hidden" name="dcmanage_action" value="scope_limits_save"><input type="hidden" name="scope_type" value="gid"><input type="hidden" name="scope_ref_id" value="' . $gid . '">';
+            echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('scope_group_defaults', $lang)) . ' - ' . htmlspecialchars((string) $group->name) . ' (#' . $gid . ')</h5>';
+            echo '<div class="form-row">';
+            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_download_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="down_limit_gb" value="' . htmlspecialchars($downValue) . '" class="form-control dcmanage-input"' . ($downUnlimited ? ' disabled' : '') . '></div>';
+            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_upload_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="up_limit_gb" value="' . htmlspecialchars($upValue) . '" class="form-control dcmanage-input"' . ($upUnlimited ? ' disabled' : '') . '></div>';
+            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_total_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="total_limit_gb" value="' . htmlspecialchars($totalValue) . '" class="form-control dcmanage-input"' . ($totalUnlimited ? ' disabled' : '') . '></div>';
+            echo '</div>';
+            echo '<div class="form-row">';
+            echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="down_unlimited" value="1"' . ($downUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
+            echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="up_unlimited" value="1"' . ($upUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
+            echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="total_unlimited" value="1"' . ($totalUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
+            echo '</div>';
+            echo '<div class="dcmanage-form-actions"><button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></div>';
+            echo '</form>';
+        }
     }
 
     echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped dcmanage-dc-table">';
@@ -3616,7 +3659,7 @@ function dcmanage_render_scope(string $lang): void
     foreach ($products as $product) {
         $pid = (int) $product->id;
         $scopeRow = $scopeRows[$pid] ?? null;
-        $fallbackRow = $scopeGid > 0 ? $groupScope : null;
+        $fallbackRow = $groupScopeRows[(int) $product->gid] ?? null;
         $effective = $scopeRow ?? $fallbackRow;
 
         $downUnlimited = $effective !== null && (int) ($effective->down_unlimited ?? 0) === 1;

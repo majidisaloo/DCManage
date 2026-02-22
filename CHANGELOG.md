@@ -3,6 +3,21 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.71] - 2026-02-22
+### Changed
+- `Services / Group` filtering was redesigned to use two CSV fields:
+  - `GID List`
+  - `PID List`
+- Scope product loading behavior now follows:
+  - GID-only => load all products in selected groups
+  - PID-only => load selected products
+  - GID + PID => load union of both
+- Scope page no longer loads all products when no filter is provided.
+- Group default quota forms now render for each selected GID (multi-group defaults in one screen).
+
+### Fixed
+- GID/PID filter now accepts Persian/Arabic digits in CSV input.
+
 ## [0.1.70] - 2026-02-22
 ### Added
 - Added monitoring group mapping storage table: `mod_dcmanage_monitoring_group_map`.
