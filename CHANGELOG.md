@@ -3,6 +3,26 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.64] - 2026-02-22
+### Added
+- Server create/edit now supports row-based traffic mapping:
+  - Multiple `Switch + Port` rows per server for aggregated traffic links.
+  - Per-row port search (Persian/English-aware) in port selector.
+- Server create/edit now supports row-based monitoring mapping:
+  - Multiple monitoring rows with `Instance + Sensor + Alert Action`.
+  - Alert actions: `None`, `Email`, `SMS`, `Email + SMS`, `Ticket`.
+- Added schema migration `v9` to extend monitoring storage with `alert_action`.
+
+### Changed
+- Server edit flow now starts from datacenter and enforces chain selection order:
+  - `Datacenter -> Rack -> Switch -> Port`.
+- Server edit now persists core fields in one place (`datacenter`, `rack`, `hostname`, `U start/height`, `notes`, `iLO`) together with traffic/monitoring links.
+- Legacy single-link/sensor payloads remain backward-compatible via parser fallbacks.
+
+### Fixed
+- Prevented cross-datacenter link mismatches by validating selected switch ports against selected datacenter during save.
+- Improved server-side validation for rack ownership by datacenter on create/edit.
+
 ## [0.1.63] - 2026-02-22
 ### Changed
 - VLAN visibility is now restricted to VLAN interfaces only (`Vlan*` / `Vlanif*`).

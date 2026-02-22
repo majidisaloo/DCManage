@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 8;
+    private const SCHEMA_VERSION = 9;
 
     public static function migrate(): void
     {
@@ -54,6 +54,11 @@ final class Schema
         if ($current < 8) {
             self::migrationV8();
             self::setCurrentVersion(8);
+        }
+
+        if ($current < 9) {
+            self::migrationV9();
+            self::setCurrentVersion(9);
         }
     }
 
@@ -461,6 +466,15 @@ final class Schema
                 $table->string('sensor_name', 191)->nullable();
                 $table->timestamp('created_at')->nullable();
                 $table->unique(['server_id', 'sensor_id'], 'mod_dcmanage_server_sensor_unique');
+            });
+        }
+    }
+
+    private static function migrationV9(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors') && !Capsule::schema()->hasColumn('mod_dcmanage_server_traffic_sensors', 'alert_action')) {
+            Capsule::schema()->table('mod_dcmanage_server_traffic_sensors', static function (Blueprint $table): void {
+                $table->string('alert_action', 16)->default('none')->after('sensor_name');
             });
         }
     }

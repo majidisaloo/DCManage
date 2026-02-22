@@ -846,8 +846,15 @@ function dcmanage_handle_actions(string $lang): string
                 throw new RuntimeException('Datacenter and hostname are required');
             }
 
-            $switchId = (int) ($_POST['switch_id'] ?? 0);
-            $switchPortId = (int) ($_POST['switch_port_id'] ?? 0);
+            if ($rackId > 0) {
+                $rackExists = Capsule::table('mod_dcmanage_racks')
+                    ->where('id', $rackId)
+                    ->where('dc_id', $dcId)
+                    ->exists();
+                if (!$rackExists) {
+                    throw new RuntimeException('Rack must belong to selected datacenter');
+                }
+            }
 
             $serverId = (int) Capsule::table('mod_dcmanage_servers')->insertGetId([
                 'dc_id' => $dcId,
@@ -874,36 +881,48 @@ function dcmanage_handle_actions(string $lang): string
                 Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->update(['ilo_id' => $iloId]);
             }
 
-            $serverPortId = 0;
-            $switchIf = null;
-            if ($switchPortId > 0) {
-                $switchPort = Capsule::table('mod_dcmanage_switch_ports')
-                    ->where('id', $switchPortId)
-                    ->first(['id', 'switch_id', 'if_name']);
-                if ($switchPort === null) {
-                    throw new RuntimeException('Selected switch port not found');
-                }
-
-                $switchId = $switchId > 0 ? $switchId : (int) $switchPort->switch_id;
-                if ((int) $switchPort->switch_id !== $switchId) {
-                    throw new RuntimeException('Selected switch/port mismatch');
-                }
-                $switchIf = (string) $switchPort->if_name;
-            }
-
-            if ($switchId > 0 || $switchIf !== null) {
-                $serverPortId = (int) Capsule::table('mod_dcmanage_server_ports')->insertGetId([
+            $trafficLinks = dcmanage_resolve_server_traffic_links(
+                dcmanage_extract_server_traffic_links($_POST),
+                $dcId
+            );
+            $portNo = 1;
+            foreach ($trafficLinks as $link) {
+                Capsule::table('mod_dcmanage_server_ports')->insert([
                     'server_id' => $serverId,
-                    'port_no' => 1,
+                    'port_no' => $portNo++,
                     'network_id' => null,
-                    'switch_id' => $switchId > 0 ? $switchId : null,
-                    'switch_if' => $switchIf,
+                    'switch_id' => (int) $link['switch_id'],
+                    'switch_if' => (string) $link['switch_if'],
                     'prtg_sensor_id' => null,
                     'prtg_channel_in' => null,
                     'prtg_channel_out' => null,
                     'enforce_enabled' => 0,
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
+            }
+
+            if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
+                $monitoringRows = dcmanage_extract_server_monitoring_rows($_POST);
+                $hasAlertAction = Capsule::schema()->hasColumn('mod_dcmanage_server_traffic_sensors', 'alert_action');
+                foreach ($monitoringRows as $monitoringRow) {
+                    $payload = [
+                        'server_id' => $serverId,
+                        'prtg_id' => (int) $monitoringRow['prtg_id'],
+                        'sensor_id' => (string) $monitoringRow['sensor_id'],
+                        'sensor_name' => null,
+                        'created_at' => date('Y-m-d H:i:s'),
+                    ];
+                    if ($hasAlertAction) {
+                        $payload['alert_action'] = (string) $monitoringRow['alert_action'];
+                    }
+                    Capsule::table('mod_dcmanage_server_traffic_sensors')->updateOrInsert(
+                        [
+                            'server_id' => $serverId,
+                            'sensor_id' => (string) $monitoringRow['sensor_id'],
+                        ],
+                        $payload
+                    );
+                }
             }
 
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('created', $lang)) . '</div>';
@@ -919,62 +938,49 @@ function dcmanage_handle_actions(string $lang): string
             if ($server === null) {
                 throw new RuntimeException('Server not found');
             }
-
-            $switchId = (int) ($_POST['switch_id'] ?? 0);
-            $switchPortId = (int) ($_POST['switch_port_id'] ?? 0);
-            $prtgId = (int) ($_POST['prtg_id'] ?? 0);
-            $sensorIds = dcmanage_parse_prtg_sensor_ids(
-                $_POST['prtg_sensor_ids'] ?? [],
-                (string) ($_POST['prtg_sensor_ids_manual'] ?? '')
-            );
-
-            if ($switchId > 0) {
-                $switchExists = Capsule::table('mod_dcmanage_switches')
-                    ->where('id', $switchId)
-                    ->where('dc_id', (int) $server->dc_id)
+            $dcId = (int) ($_POST['dc_id'] ?? (int) $server->dc_id);
+            $rackId = (int) ($_POST['rack_id'] ?? 0);
+            $hostname = trim((string) ($_POST['hostname'] ?? ''));
+            if ($dcId <= 0 || $hostname === '') {
+                throw new RuntimeException('Datacenter and hostname are required');
+            }
+            if ($rackId > 0) {
+                $rackExists = Capsule::table('mod_dcmanage_racks')
+                    ->where('id', $rackId)
+                    ->where('dc_id', $dcId)
                     ->exists();
-                if (!$switchExists) {
-                    throw new RuntimeException('Switch must belong to server datacenter');
+                if (!$rackExists) {
+                    throw new RuntimeException('Rack must belong to selected datacenter');
                 }
             }
+            Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->update([
+                'dc_id' => $dcId,
+                'rack_id' => $rackId > 0 ? $rackId : null,
+                'hostname' => $hostname,
+                'u_start' => (int) ($_POST['u_start'] ?? 0) ?: null,
+                'u_height' => max(1, (int) ($_POST['u_height'] ?? 1)),
+                'notes' => trim((string) ($_POST['notes'] ?? '')),
+            ]);
 
-            $switchIf = null;
-            if ($switchPortId > 0) {
-                $switchPort = Capsule::table('mod_dcmanage_switch_ports')
-                    ->where('id', $switchPortId)
-                    ->first(['id', 'switch_id', 'if_name']);
-                if ($switchPort === null) {
-                    throw new RuntimeException('Selected switch port not found');
-                }
-                if ($switchId > 0 && (int) $switchPort->switch_id !== $switchId) {
-                    throw new RuntimeException('Selected switch/port mismatch');
-                }
-                $switchId = (int) $switchPort->switch_id;
-                $switchIf = (string) $switchPort->if_name;
-            }
-
-            if ($switchId > 0 || $switchIf !== null) {
-                Capsule::table('mod_dcmanage_server_ports')->updateOrInsert(
-                    [
-                        'server_id' => $serverId,
-                        'port_no' => 1,
-                    ],
-                    [
-                        'network_id' => null,
-                        'switch_id' => $switchId > 0 ? $switchId : null,
-                        'switch_if' => $switchIf,
-                        'prtg_sensor_id' => isset($sensorIds[0]) ? (string) $sensorIds[0] : null,
-                        'prtg_channel_in' => null,
-                        'prtg_channel_out' => null,
-                        'enforce_enabled' => 0,
-                        'created_at' => date('Y-m-d H:i:s'),
-                    ]
-                );
-            } else {
-                Capsule::table('mod_dcmanage_server_ports')
-                    ->where('server_id', $serverId)
-                    ->where('port_no', 1)
-                    ->delete();
+            Capsule::table('mod_dcmanage_server_ports')->where('server_id', $serverId)->delete();
+            $trafficLinks = dcmanage_resolve_server_traffic_links(
+                dcmanage_extract_server_traffic_links($_POST),
+                $dcId
+            );
+            $portNo = 1;
+            foreach ($trafficLinks as $link) {
+                Capsule::table('mod_dcmanage_server_ports')->insert([
+                    'server_id' => $serverId,
+                    'port_no' => $portNo++,
+                    'network_id' => null,
+                    'switch_id' => (int) $link['switch_id'],
+                    'switch_if' => (string) $link['switch_if'],
+                    'prtg_sensor_id' => null,
+                    'prtg_channel_in' => null,
+                    'prtg_channel_out' => null,
+                    'enforce_enabled' => 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
             }
 
             if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
@@ -982,14 +988,20 @@ function dcmanage_handle_actions(string $lang): string
                     ->where('server_id', $serverId)
                     ->delete();
 
-                foreach ($sensorIds as $sensorId) {
-                    Capsule::table('mod_dcmanage_server_traffic_sensors')->insert([
+                $monitoringRows = dcmanage_extract_server_monitoring_rows($_POST);
+                $hasAlertAction = Capsule::schema()->hasColumn('mod_dcmanage_server_traffic_sensors', 'alert_action');
+                foreach ($monitoringRows as $monitoringRow) {
+                    $payload = [
                         'server_id' => $serverId,
-                        'prtg_id' => $prtgId > 0 ? $prtgId : null,
-                        'sensor_id' => $sensorId,
+                        'prtg_id' => (int) $monitoringRow['prtg_id'],
+                        'sensor_id' => (string) $monitoringRow['sensor_id'],
                         'sensor_name' => null,
                         'created_at' => date('Y-m-d H:i:s'),
-                    ]);
+                    ];
+                    if ($hasAlertAction) {
+                        $payload['alert_action'] = (string) $monitoringRow['alert_action'];
+                    }
+                    Capsule::table('mod_dcmanage_server_traffic_sensors')->insert($payload);
                 }
             }
 
@@ -999,8 +1011,8 @@ function dcmanage_handle_actions(string $lang): string
             $iloType = trim((string) ($_POST['ilo_type'] ?? 'ilo5'));
             $iloId = dcmanage_upsert_server_ilo(
                 $serverId,
-                (int) $server->dc_id,
-                'srv-' . $serverId,
+                $dcId,
+                $hostname,
                 $iloHost,
                 $iloUser,
                 $iloPass,
@@ -1446,6 +1458,151 @@ function dcmanage_parse_prtg_sensor_ids($selected, string $manual): array
     }
 
     return array_values($items);
+}
+
+function dcmanage_extract_server_traffic_links(array $payload): array
+{
+    $switchIds = $payload['traffic_switch_id'] ?? [];
+    $portIds = $payload['traffic_port_id'] ?? [];
+
+    if (!is_array($switchIds) && !is_array($portIds)) {
+        $legacySwitch = (int) ($payload['switch_id'] ?? 0);
+        $legacyPort = (int) ($payload['switch_port_id'] ?? 0);
+        if ($legacySwitch > 0 || $legacyPort > 0) {
+            $switchIds = [$legacySwitch];
+            $portIds = [$legacyPort];
+        } else {
+            $switchIds = [];
+            $portIds = [];
+        }
+    }
+
+    if (!is_array($switchIds)) {
+        $switchIds = [$switchIds];
+    }
+    if (!is_array($portIds)) {
+        $portIds = [$portIds];
+    }
+
+    $max = max(count($switchIds), count($portIds));
+    $rows = [];
+    for ($i = 0; $i < $max; $i++) {
+        $rows[] = [
+            'switch_id' => (int) ($switchIds[$i] ?? 0),
+            'switch_port_id' => (int) ($portIds[$i] ?? 0),
+        ];
+    }
+
+    return $rows;
+}
+
+function dcmanage_resolve_server_traffic_links(array $rows, int $dcId): array
+{
+    $resolved = [];
+    $seen = [];
+
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $switchId = (int) ($row['switch_id'] ?? 0);
+        $portId = (int) ($row['switch_port_id'] ?? 0);
+        if ($portId <= 0) {
+            continue;
+        }
+
+        $switchPort = Capsule::table('mod_dcmanage_switch_ports as p')
+            ->join('mod_dcmanage_switches as s', 's.id', '=', 'p.switch_id')
+            ->where('p.id', $portId)
+            ->where('s.dc_id', $dcId)
+            ->first(['p.id', 'p.if_name', 'p.switch_id']);
+
+        if ($switchPort === null) {
+            throw new RuntimeException('Selected switch port not found in selected datacenter');
+        }
+
+        $switchIdFromPort = (int) ($switchPort->switch_id ?? 0);
+        if ($switchId > 0 && $switchId !== $switchIdFromPort) {
+            throw new RuntimeException('Selected switch/port mismatch');
+        }
+
+        $ifName = trim((string) ($switchPort->if_name ?? ''));
+        if ($ifName === '') {
+            continue;
+        }
+
+        $key = $switchIdFromPort . '|' . strtolower($ifName);
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+
+        $resolved[] = [
+            'switch_id' => $switchIdFromPort,
+            'switch_if' => $ifName,
+        ];
+    }
+
+    return $resolved;
+}
+
+function dcmanage_extract_server_monitoring_rows(array $payload): array
+{
+    $rows = [];
+    $seen = [];
+
+    $push = static function (int $prtgId, string $sensorId, string $action) use (&$rows, &$seen): void {
+        $sensorId = trim($sensorId);
+        if ($prtgId <= 0 || $sensorId === '' || preg_match('/^\d+$/', $sensorId) !== 1) {
+            return;
+        }
+
+        $action = strtolower(trim($action));
+        if (!in_array($action, ['none', 'email', 'sms', 'email_sms', 'ticket'], true)) {
+            $action = 'none';
+        }
+
+        $key = $prtgId . ':' . $sensorId;
+        if (isset($seen[$key])) {
+            return;
+        }
+        $seen[$key] = true;
+
+        $rows[] = [
+            'prtg_id' => $prtgId,
+            'sensor_id' => $sensorId,
+            'alert_action' => $action,
+        ];
+    };
+
+    $prtgIds = $payload['monitor_prtg_id'] ?? [];
+    $sensorIds = $payload['monitor_sensor_id'] ?? [];
+    $actions = $payload['monitor_action'] ?? [];
+    if (!is_array($prtgIds)) {
+        $prtgIds = [$prtgIds];
+    }
+    if (!is_array($sensorIds)) {
+        $sensorIds = [$sensorIds];
+    }
+    if (!is_array($actions)) {
+        $actions = [$actions];
+    }
+    $max = max(count($prtgIds), count($sensorIds), count($actions));
+    for ($i = 0; $i < $max; $i++) {
+        $push((int) ($prtgIds[$i] ?? 0), (string) ($sensorIds[$i] ?? ''), (string) ($actions[$i] ?? 'none'));
+    }
+
+    $legacyPrtgId = (int) ($payload['prtg_id'] ?? 0);
+    $legacySensors = dcmanage_parse_prtg_sensor_ids(
+        $payload['prtg_sensor_ids'] ?? [],
+        (string) ($payload['prtg_sensor_ids_manual'] ?? '')
+    );
+    foreach ($legacySensors as $sensorId) {
+        $push($legacyPrtgId, (string) $sensorId, 'none');
+    }
+
+    return $rows;
 }
 
 function dcmanage_upsert_server_ilo(
@@ -2723,7 +2880,7 @@ function dcmanage_render_servers(string $lang): void
         ->leftJoin('mod_dcmanage_ilos as il', 'il.id', '=', 's.ilo_id')
         ->orderBy('s.id', 'desc')
         ->get([
-            's.id', 's.dc_id', 's.hostname', 's.asset_tag', 's.serial', 's.u_start', 's.u_height', 's.ilo_id',
+            's.id', 's.dc_id', 's.rack_id', 's.hostname', 's.asset_tag', 's.serial', 's.u_start', 's.u_height', 's.notes', 's.ilo_id',
             'd.name as dc_name', 'r.name as rack_name',
             'il.host as ilo_host', 'il.user as ilo_user', 'il.type as ilo_type'
         ]);
@@ -2735,10 +2892,12 @@ function dcmanage_render_servers(string $lang): void
 
     $serverPortMap = [];
     $serverLinkDefaults = [];
+    $serverTrafficDefaults = [];
     $sensorCountMap = [];
     $sensorPreviewMap = [];
     $serverSensorDefaults = [];
     $serverSensorPrtgMap = [];
+    $serverMonitoringRows = [];
 
     if ($serverIds !== []) {
         $linkedPorts = Capsule::table('mod_dcmanage_server_ports as sp')
@@ -2776,13 +2935,21 @@ function dcmanage_render_servers(string $lang): void
                     'switch_port_id' => (int) ($port->switch_port_id ?? 0),
                 ];
             }
+            if (!isset($serverTrafficDefaults[$serverId])) {
+                $serverTrafficDefaults[$serverId] = [];
+            }
+            $serverTrafficDefaults[$serverId][] = [
+                'switch_id' => (int) ($port->switch_id ?? 0),
+                'switch_port_id' => (int) ($port->switch_port_id ?? 0),
+            ];
         }
 
         if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
+            $hasAlertAction = Capsule::schema()->hasColumn('mod_dcmanage_server_traffic_sensors', 'alert_action');
             $sensorRows = Capsule::table('mod_dcmanage_server_traffic_sensors')
                 ->whereIn('server_id', $serverIds)
                 ->orderBy('id')
-                ->get(['server_id', 'prtg_id', 'sensor_id']);
+                ->get($hasAlertAction ? ['server_id', 'prtg_id', 'sensor_id', 'alert_action'] : ['server_id', 'prtg_id', 'sensor_id']);
             foreach ($sensorRows as $sensorRow) {
                 $serverId = (int) $sensorRow->server_id;
                 if (!isset($sensorCountMap[$serverId])) {
@@ -2803,6 +2970,14 @@ function dcmanage_render_servers(string $lang): void
                 if (!isset($serverSensorPrtgMap[$serverId]) && (int) ($sensorRow->prtg_id ?? 0) > 0) {
                     $serverSensorPrtgMap[$serverId] = (int) $sensorRow->prtg_id;
                 }
+                if (!isset($serverMonitoringRows[$serverId])) {
+                    $serverMonitoringRows[$serverId] = [];
+                }
+                $serverMonitoringRows[$serverId][] = [
+                    'prtg_id' => (int) ($sensorRow->prtg_id ?? 0),
+                    'sensor_id' => (string) ($sensorRow->sensor_id ?? ''),
+                    'alert_action' => (string) ($sensorRow->alert_action ?? 'none'),
+                ];
             }
         }
     }
@@ -2833,17 +3008,23 @@ function dcmanage_render_servers(string $lang): void
     }
     echo '</select></div>';
 
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="switch_id" id="dcmanage-server-switch" class="form-control dcmanage-input" disabled>';
+    echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</div>';
+    echo '<div class="dcmanage-traffic-rows" data-role="traffic-rows">';
+    echo '<div class="dcmanage-traffic-row form-row align-items-end">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="traffic_switch_id[]" class="form-control dcmanage-input dcmanage-traffic-switch" disabled>';
     echo '<option value="">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</option>';
     foreach ($switches as $switch) {
         echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '">' . htmlspecialchars((string) $switch->name) . '</option>';
     }
     echo '</select></div>';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</label><select name="switch_port_id" id="dcmanage-server-switch-port" class="form-control dcmanage-input" disabled>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('table_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-port-select-search" placeholder="' . htmlspecialchars(I18n::t('switch_port_search_placeholder', $lang)) . '"></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</label><select name="traffic_port_id[]" class="form-control dcmanage-input dcmanage-traffic-port" disabled>';
     echo '<option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option>';
     echo '</select></div>';
+    echo '<div class="form-group col-md-1"><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-traffic-row">&times;</button></div>';
     echo '</div>';
+    echo '</div>';
+    echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-traffic-row">' . htmlspecialchars(I18n::t('server_add_traffic_row', $lang)) . '</button></div>';
 
     echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</label><input required name="hostname" class="form-control dcmanage-input"></div>';
     echo '<div class="form-row">';
@@ -2857,6 +3038,22 @@ function dcmanage_render_servers(string $lang): void
     echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input"></div>';
     echo '</div>';
     echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="3"></textarea></div>';
+    echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_monitoring_links', $lang)) . '</div>';
+    echo '<div class="dcmanage-monitor-rows">';
+    echo '<div class="dcmanage-monitor-row form-row align-items-end">';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</label><select name="monitor_prtg_id[]" class="form-control dcmanage-input dcmanage-monitor-prtg">';
+    echo '<option value="">' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</option>';
+    foreach ($prtgInstances as $instance) {
+        echo '<option value="' . (int) $instance->id . '">' . htmlspecialchars((string) $instance->name) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_sensor_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-monitor-sensor-search" placeholder="sensor name / id"></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</label><select name="monitor_sensor_id[]" class="form-control dcmanage-input dcmanage-monitor-sensor"><option value="">--</option></select></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_monitor_action', $lang)) . '</label><select name="monitor_action[]" class="form-control dcmanage-input"><option value="none">' . htmlspecialchars(I18n::t('monitor_action_none', $lang)) . '</option><option value="email">' . htmlspecialchars(I18n::t('monitor_action_email', $lang)) . '</option><option value="sms">' . htmlspecialchars(I18n::t('monitor_action_sms', $lang)) . '</option><option value="email_sms">' . htmlspecialchars(I18n::t('monitor_action_email_sms', $lang)) . '</option><option value="ticket">' . htmlspecialchars(I18n::t('monitor_action_ticket', $lang)) . '</option></select></div>';
+    echo '<div class="form-group col-md-1 dcmanage-action-buttons"><button type="button" class="btn btn-sm btn-outline-info dcmanage-monitor-load">' . htmlspecialchars(I18n::t('server_sensors_load', $lang)) . '</button><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-monitor-row">&times;</button></div>';
+    echo '</div>';
+    echo '</div>';
+    echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-monitor-row">' . htmlspecialchars(I18n::t('server_add_monitor_row', $lang)) . '</button></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_server', $lang)) . '</button>';
     echo '</form>';
     echo '</div>';
@@ -2904,6 +3101,8 @@ function dcmanage_render_servers(string $lang): void
         $sensorDefaults = $serverSensorDefaults[$serverId] ?? [];
         $sensorDefaultCsv = implode(',', $sensorDefaults);
         $sensorPrtgId = (int) ($serverSensorPrtgMap[$serverId] ?? 0);
+        $trafficDefaults = $serverTrafficDefaults[$serverId] ?? [];
+        $monitorDefaults = $serverMonitoringRows[$serverId] ?? [];
         $mapFormId = 'dcmanage-server-map-' . $serverId;
 
         $iloLabel = trim((string) ($row->ilo_host ?? '')) !== ''
@@ -2916,38 +3115,81 @@ function dcmanage_render_servers(string $lang): void
         echo '<input type="hidden" name="dcmanage_action" value="server_link_update">';
         echo '<input type="hidden" name="server_id" value="' . $serverId . '">';
         echo '<div class="form-row">';
-        echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="switch_id" class="form-control dcmanage-input dcmanage-map-switch">';
-        echo '<option value="">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</option>';
-        foreach ($switches as $switch) {
-            $selected = (int) $switch->id === (int) $linkDefaults['switch_id'] ? ' selected' : '';
-            echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '"' . $selected . '>' . htmlspecialchars((string) $switch->name) . '</option>';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" class="form-control dcmanage-input dcmanage-map-dc">';
+        echo '<option value="">--</option>';
+        foreach ($dcs as $dc) {
+            $selectedDc = (int) $dc->id === (int) $row->dc_id ? ' selected' : '';
+            echo '<option value="' . (int) $dc->id . '"' . $selectedDc . '>' . htmlspecialchars((string) $dc->name) . '</option>';
         }
         echo '</select></div>';
-        echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</label><select name="switch_port_id" class="form-control dcmanage-input dcmanage-map-port" data-selected="' . (int) $linkDefaults['switch_port_id'] . '"><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" class="form-control dcmanage-input dcmanage-map-rack">';
+        echo '<option value="">--</option>';
+        foreach ($racks as $rack) {
+            $selectedRack = (int) $rack->id === (int) ($row->rack_id ?? 0) ? ' selected' : '';
+            echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '"' . $selectedRack . '>' . htmlspecialchars((string) $rack->name) . '</option>';
+        }
+        echo '</select></div>';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</label><input name="hostname" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->hostname) . '"></div>';
         echo '</div>';
         echo '<div class="form-row">';
-        echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</label><select name="prtg_id" class="form-control dcmanage-input dcmanage-map-prtg">';
-        echo '<option value="">' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</option>';
-        foreach ($prtgInstances as $instance) {
-            $selected = (int) $instance->id === $sensorPrtgId ? ' selected' : '';
-            echo '<option value="' . (int) $instance->id . '"' . $selected . '>' . htmlspecialchars((string) $instance->name) . '</option>';
-        }
-        echo '</select></div>';
-        echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_sensor_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-map-sensor-search" placeholder="sensor name / id"></div>';
+        echo '<div class="form-group col-md-6"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_start ?? '')) . '"></div>';
+        echo '<div class="form-group col-md-6"><label>U Height</label><input type="number" min="1" name="u_height" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_height ?? 1)) . '"></div>';
         echo '</div>';
+        echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="2">' . htmlspecialchars((string) ($row->notes ?? '')) . '</textarea></div>';
+
+        echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</div>';
+        echo '<div class="dcmanage-traffic-rows" data-role="traffic-rows">';
+        $trafficSeed = $trafficDefaults !== [] ? $trafficDefaults : [['switch_id' => 0, 'switch_port_id' => 0]];
+        foreach ($trafficSeed as $trafficRow) {
+            echo '<div class="dcmanage-traffic-row form-row align-items-end">';
+            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="traffic_switch_id[]" class="form-control dcmanage-input dcmanage-traffic-switch">';
+            echo '<option value="">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</option>';
+            foreach ($switches as $switch) {
+                $selectedSwitch = (int) $switch->id === (int) ($trafficRow['switch_id'] ?? 0) ? ' selected' : '';
+                echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '"' . $selectedSwitch . '>' . htmlspecialchars((string) $switch->name) . '</option>';
+            }
+            echo '</select></div>';
+            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('table_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-port-select-search" placeholder="' . htmlspecialchars(I18n::t('switch_port_search_placeholder', $lang)) . '"></div>';
+            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</label><select name="traffic_port_id[]" class="form-control dcmanage-input dcmanage-traffic-port" data-selected="' . (int) ($trafficRow['switch_port_id'] ?? 0) . '"><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
+            echo '<div class="form-group col-md-1"><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-traffic-row">&times;</button></div>';
+            echo '</div>';
+        }
+        echo '</div>';
+        echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-traffic-row">' . htmlspecialchars(I18n::t('server_add_traffic_row', $lang)) . '</button></div>';
+
+        echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_monitoring_links', $lang)) . '</div>';
+        echo '<div class="dcmanage-monitor-rows">';
+        $monitorSeed = $monitorDefaults !== [] ? $monitorDefaults : [['prtg_id' => $sensorPrtgId, 'sensor_id' => '', 'alert_action' => 'none']];
+        foreach ($monitorSeed as $monitorRow) {
+            $monitorSensorId = (string) ($monitorRow['sensor_id'] ?? '');
+            $monitorAction = (string) ($monitorRow['alert_action'] ?? 'none');
+            echo '<div class="dcmanage-monitor-row form-row align-items-end">';
+            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</label><select name="monitor_prtg_id[]" class="form-control dcmanage-input dcmanage-monitor-prtg">';
+            echo '<option value="">' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</option>';
+            foreach ($prtgInstances as $instance) {
+                $selectedPrtg = (int) $instance->id === (int) ($monitorRow['prtg_id'] ?? 0) ? ' selected' : '';
+                echo '<option value="' . (int) $instance->id . '"' . $selectedPrtg . '>' . htmlspecialchars((string) $instance->name) . '</option>';
+            }
+            echo '</select></div>';
+            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_sensor_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-monitor-sensor-search" placeholder="sensor name / id"></div>';
+            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</label><select name="monitor_sensor_id[]" class="form-control dcmanage-input dcmanage-monitor-sensor"><option value="">--</option>';
+            if ($monitorSensorId !== '') {
+                echo '<option selected value="' . htmlspecialchars($monitorSensorId) . '">' . htmlspecialchars($monitorSensorId) . '</option>';
+            }
+            echo '</select></div>';
+            echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_monitor_action', $lang)) . '</label><select name="monitor_action[]" class="form-control dcmanage-input"><option value="none"' . ($monitorAction === 'none' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_none', $lang)) . '</option><option value="email"' . ($monitorAction === 'email' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_email', $lang)) . '</option><option value="sms"' . ($monitorAction === 'sms' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_sms', $lang)) . '</option><option value="email_sms"' . ($monitorAction === 'email_sms' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_email_sms', $lang)) . '</option><option value="ticket"' . ($monitorAction === 'ticket' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_ticket', $lang)) . '</option></select></div>';
+            echo '<div class="form-group col-md-1 dcmanage-action-buttons"><button type="button" class="btn btn-sm btn-outline-info dcmanage-monitor-load">' . htmlspecialchars(I18n::t('server_sensors_load', $lang)) . '</button><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-monitor-row">&times;</button></div>';
+            echo '</div>';
+        }
+        echo '</div>';
+        echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-monitor-row">' . htmlspecialchars(I18n::t('server_add_monitor_row', $lang)) . '</button></div>';
+
         echo '<div class="form-row">';
         echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('server_ilo_host', $lang)) . '</label><input name="ilo_host" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->ilo_host ?? '')) . '"></div>';
         echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_user', $lang)) . '</label><input name="ilo_user" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->ilo_user ?? '')) . '"></div>';
         echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5"' . ((string) ($row->ilo_type ?? 'ilo5') === 'ilo5' ? ' selected' : '') . '>iLO5</option><option value="ilo4"' . ((string) ($row->ilo_type ?? '') === 'ilo4' ? ' selected' : '') . '>iLO4</option></select></div>';
         echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input" placeholder="••••••"></div>';
         echo '</div>';
-        echo '<div class="form-group"><button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-map-load-sensors">' . htmlspecialchars(I18n::t('server_sensors_load', $lang)) . '</button></div>';
-        echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</label><select multiple name="prtg_sensor_ids[]" class="form-control dcmanage-input dcmanage-map-sensor-select" size="6">';
-        foreach ($sensorDefaults as $sensorId) {
-            echo '<option selected value="' . htmlspecialchars($sensorId) . '">' . htmlspecialchars($sensorId) . '</option>';
-        }
-        echo '</select><input type="hidden" class="dcmanage-map-default-sensors" value="' . htmlspecialchars($sensorDefaultCsv) . '"><small class="form-text text-muted dcmanage-map-sensor-status">' . htmlspecialchars(I18n::t('server_sensor_status', $lang)) . '</small></div>';
-        echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('server_sensor_manual', $lang)) . '</label><input name="prtg_sensor_ids_manual" class="form-control dcmanage-input" placeholder="12345,12346" value="' . htmlspecialchars($sensorDefaultCsv) . '"></div>';
         echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
         echo '</form>';
         echo '</td></tr>';
@@ -2963,32 +3205,24 @@ function dcmanage_render_servers(string $lang): void
 
     echo '<script>';
     echo '(function(){';
-    echo 'var dc=document.getElementById("dcmanage-server-dc");var rack=document.getElementById("dcmanage-server-rack");var sw=document.getElementById("dcmanage-server-switch");var swp=document.getElementById("dcmanage-server-switch-port");';
-    echo 'if(!dc||!rack||!sw||!swp){return;}';
-    echo 'function filterByDc(select,v){for(var i=0;i<select.options.length;i++){var o=select.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute("data-dc-id");if(v===""){o.hidden=true;}else{o.hidden=(d!==null&&d!==v);}}if(select.selectedIndex>0&&select.options[select.selectedIndex].hidden){select.selectedIndex=0;}}';
     echo 'function parsePayload(raw){raw=String(raw||"").replace(/^\\uFEFF/,"").trim();try{return JSON.parse(raw);}catch(e){var s=raw.indexOf("DCMANAGE_JSON_START");var t=raw.indexOf("DCMANAGE_JSON_END");if(s!==-1&&t!==-1&&t>s){return JSON.parse(raw.substring(s+"DCMANAGE_JSON_START".length,t).trim());}throw e;}}';
     echo 'function normalizeSearchText(v){var s=String(v||"").toLowerCase();s=s.replace(/[\\u0660-\\u0669]/g,function(ch){return String.fromCharCode(ch.charCodeAt(0)-1632+48);});s=s.replace(/[\\u06f0-\\u06f9]/g,function(ch){return String.fromCharCode(ch.charCodeAt(0)-1776+48);});s=s.replace(/\\u064a/g,"\\u06cc").replace(/\\u0643/g,"\\u06a9").replace(/\\u0629/g,"\\u0647");return s.trim();}';
     echo 'function apiUrl(endpoint,params){var u="addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint="+encodeURIComponent(endpoint);if(params){for(var k in params){if(Object.prototype.hasOwnProperty.call(params,k)){u+="&"+encodeURIComponent(k)+"="+encodeURIComponent(params[k]);}}}return u;}';
+    echo 'function filterByDc(select,v){if(!select){return;}for(var i=0;i<select.options.length;i++){var o=select.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute("data-dc-id");o.hidden=(v===""||(d!==null&&d!==v));}if(select.selectedIndex>0&&select.options[select.selectedIndex].hidden){select.selectedIndex=0;}}';
     echo 'function portOperLabel(status){var s=String(status||"").toLowerCase();if(s==="up"){return "' . addslashes(I18n::t('port_link_connected', $lang)) . '";}if(s==="down"){return "' . addslashes(I18n::t('port_link_not_connected', $lang)) . '";}if(s==="absent"){return "' . addslashes(I18n::t('port_link_absent', $lang)) . '";}return "' . addslashes(I18n::t('switch_status_unknown', $lang)) . '";}';
     echo 'function clearSwitchPorts(selectEl){if(!selectEl){return;}selectEl.innerHTML="";var first=document.createElement("option");first.value="";first.textContent="' . addslashes(I18n::t('select_switch_port', $lang)) . '";selectEl.appendChild(first);selectEl.disabled=true;}';
-    echo 'function loadSwitchPorts(selectEl,switchId,dcId,selectedId){clearSwitchPorts(selectEl);if(!selectEl||!switchId||!dcId){return;}fetch(apiUrl("switch/ports",{switch_id:switchId,dc_id:dcId}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];for(var i=0;i<items.length;i++){var it=items[i]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.if_name||"-");if(String(it.if_desc||"").trim()!==""){label+=" | "+String(it.if_desc);}label+=" | "+portOperLabel(it.oper_status||"");opt.textContent=label;if(String(selectedId||"")!==""&&String(selectedId)===String(opt.value)){opt.selected=true;}selectEl.appendChild(opt);}selectEl.disabled=false;}).catch(function(){clearSwitchPorts(selectEl);});}';
-    echo 'function syncDcState(){var hasDc=dc.value!=="";rack.disabled=!hasDc;sw.disabled=!hasDc;if(!hasDc){rack.value="";sw.value="";}filterByDc(rack,dc.value);filterByDc(sw,dc.value);clearSwitchPorts(swp);if(hasDc&&sw.value!==""){loadSwitchPorts(swp,sw.value,dc.value,"");}}';
-    echo 'dc.addEventListener("change",syncDcState);';
-    echo 'sw.addEventListener("change",function(){loadSwitchPorts(swp,sw.value,dc.value,"");});';
+    echo 'function filterSelectByQuery(selectEl,q){if(!selectEl){return;}for(var i=0;i<selectEl.options.length;i++){var o=selectEl.options[i];if(!o.value){o.hidden=false;continue;}var hay=normalizeSearchText(o.getAttribute("data-search")||o.textContent||"");o.hidden=(q!==""&&hay.indexOf(q)===-1);}if(selectEl.selectedIndex>0&&selectEl.options[selectEl.selectedIndex].hidden){selectEl.selectedIndex=0;}}';
+    echo 'function loadSwitchPorts(selectEl,switchId,dcId,selectedId){clearSwitchPorts(selectEl);if(!selectEl||!switchId||!dcId){return Promise.resolve();}return fetch(apiUrl("switch/ports",{switch_id:switchId,dc_id:dcId}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];for(var i=0;i<items.length;i++){var it=items[i]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.if_name||"-");if(String(it.if_desc||"").trim()!==""){label+=" | "+String(it.if_desc);}label+=" | "+portOperLabel(it.oper_status||"");opt.textContent=label;opt.setAttribute("data-search",label);if(String(selectedId||"")!==""&&String(selectedId)===String(opt.value)){opt.selected=true;}selectEl.appendChild(opt);}selectEl.disabled=false;}).catch(function(){clearSwitchPorts(selectEl);});}';
+    echo 'function loadSensorsForRow(row){var prtgSel=row.querySelector(".dcmanage-monitor-prtg");var sensorSel=row.querySelector(".dcmanage-monitor-sensor");var search=row.querySelector(".dcmanage-monitor-sensor-search");if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML="<option value=\\"\\">--</option>";return;}fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(search?search.value:""),limit:250}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var selected=sensorSel.value;var items=(res.data&&res.data.items)?res.data.items:[];sensorSel.innerHTML="<option value=\\"\\">--</option>";for(var i=0;i<items.length;i++){var it=items[i]||{};var id=String(it.id||"");if(id===""){continue;}var opt=document.createElement("option");opt.value=id;opt.textContent=id+" | "+String(it.name||"");if(selected!==""&&selected===id){opt.selected=true;}sensorSel.appendChild(opt);}}).catch(function(){});}';
+    echo 'function initTrafficRow(row,dcSelect){if(!row){return;}var sw=row.querySelector(".dcmanage-traffic-switch");var port=row.querySelector(".dcmanage-traffic-port");var search=row.querySelector(".dcmanage-port-select-search");if(!sw||!port){return;}function refresh(selectedId){var dcId=dcSelect?String(dcSelect.value||""):"";sw.disabled=(dcId==="");if(dcId===""){sw.value="";clearSwitchPorts(port);return;}filterByDc(sw,dcId);if(String(sw.value||"")===""){clearSwitchPorts(port);return;}loadSwitchPorts(port,sw.value,dcId,selectedId||port.getAttribute("data-selected")||"").then(function(){if(search){filterSelectByQuery(port,normalizeSearchText(search.value||""));}});}sw.addEventListener("change",function(){port.setAttribute("data-selected","");refresh("");});if(search){search.addEventListener("input",function(){filterSelectByQuery(port,normalizeSearchText(this.value||""));});}row._dcRefresh=refresh;refresh();}';
+    echo 'function initMonitorRow(row){if(!row){return;}var load=row.querySelector(".dcmanage-monitor-load");var search=row.querySelector(".dcmanage-monitor-sensor-search");var prtg=row.querySelector(".dcmanage-monitor-prtg");if(load){load.addEventListener("click",function(){loadSensorsForRow(row);});}if(prtg){prtg.addEventListener("change",function(){loadSensorsForRow(row);});}if(search){search.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();loadSensorsForRow(row);}});} }';
+    echo 'function cloneRow(container,rowSelector){var first=container.querySelector(rowSelector);if(!first){return null;}var clone=first.cloneNode(true);var els=clone.querySelectorAll("input,select,textarea");for(var i=0;i<els.length;i++){var el=els[i];if(el.tagName==="SELECT"){el.selectedIndex=0;if(el.classList.contains("dcmanage-traffic-port")){el.innerHTML="<option value=\\"\\">' . addslashes(I18n::t('select_switch_port', $lang)) . '</option>";el.disabled=true;} }else{el.value="";}}return clone;}';
+    echo 'function initServerForm(form){if(!form){return;}var dc=form.querySelector(".dcmanage-map-dc")||form.querySelector("#dcmanage-server-dc");var rack=form.querySelector(".dcmanage-map-rack")||form.querySelector("#dcmanage-server-rack");var trafficWrap=form.querySelector(".dcmanage-traffic-rows");var monitorWrap=form.querySelector(".dcmanage-monitor-rows");var addTraffic=form.querySelector(".dcmanage-add-traffic-row");var addMonitor=form.querySelector(".dcmanage-add-monitor-row");function syncDc(){var dcId=dc?String(dc.value||""):"";if(rack){rack.disabled=(dcId==="");filterByDc(rack,dcId);}if(trafficWrap){var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var i=0;i<rows.length;i++){if(typeof rows[i]._dcRefresh==="function"){rows[i]._dcRefresh();}}}}if(dc){dc.addEventListener("change",syncDc);}if(trafficWrap){var trafficRows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var t=0;t<trafficRows.length;t++){initTrafficRow(trafficRows[t],dc);}trafficWrap.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-traffic-row");if(!rm){return;}var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");if(rows.length<=1){return;}rm.closest(".dcmanage-traffic-row").remove();});}if(addTraffic&&trafficWrap){addTraffic.addEventListener("click",function(){var row=cloneRow(trafficWrap,".dcmanage-traffic-row");if(!row){return;}trafficWrap.appendChild(row);initTrafficRow(row,dc);});}if(monitorWrap){var monitorRows=monitorWrap.querySelectorAll(".dcmanage-monitor-row");for(var m=0;m<monitorRows.length;m++){initMonitorRow(monitorRows[m]);}monitorWrap.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-monitor-row");if(!rm){return;}var rows=monitorWrap.querySelectorAll(".dcmanage-monitor-row");if(rows.length<=1){return;}rm.closest(".dcmanage-monitor-row").remove();});}if(addMonitor&&monitorWrap){addMonitor.addEventListener("click",function(){var row=cloneRow(monitorWrap,".dcmanage-monitor-row");if(!row){return;}monitorWrap.appendChild(row);initMonitorRow(row);});}syncDc();}';
     echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){var row=rows[r];var sid=row.getAttribute("data-server-id")||"";var detail=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid+"\\"]");if(row.dataset&&row.dataset.filtered==="1"){row.style.display="none";if(detail){detail.style.display="none";}}else{row.style.display="";}}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){var mainRow=visible[x];var sid2=mainRow.getAttribute("data-server-id")||"";var detailRow=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid2+"\\"]");var show=(x>=start&&x<end);mainRow.style.display=show?"":"none";if(!show&&detailRow){detailRow.style.display="none";}}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
     echo 'var serverSearch=document.getElementById("dcmanage-server-table-search");if(serverSearch){serverSearch.addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var rows=document.querySelectorAll("#dcmanage-server-table tbody tr.dcmanage-server-item");for(var i=0;i<rows.length;i++){var hay=normalizeSearchText(rows[i].getAttribute("data-search")||"");rows[i].dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.getElementById("dcmanage-server-table-pager");if(pager){pager._page=1;}applyServerPager();});}';
     echo 'var serverPager=document.getElementById("dcmanage-server-table-pager");if(serverPager){var p=serverPager.querySelector(".dcmanage-page-prev");var n=serverPager.querySelector(".dcmanage-page-next");var sz=serverPager.querySelector(".dcmanage-page-size");if(p){p.addEventListener("click",function(){serverPager._page=(serverPager._page||1)-1;applyServerPager();});}if(n){n.addEventListener("click",function(){serverPager._page=(serverPager._page||1)+1;applyServerPager();});}if(sz){sz.addEventListener("change",function(){serverPager._page=1;applyServerPager();});}}';
-    echo 'var mapRows=document.querySelectorAll(".dcmanage-server-map");';
-    echo 'for(var m=0;m<mapRows.length;m++){(function(form){';
-    echo 'var dcId=form.getAttribute("data-dc-id")||"";var swSel=form.querySelector(".dcmanage-map-switch");var portSel=form.querySelector(".dcmanage-map-port");var prtgSel=form.querySelector(".dcmanage-map-prtg");var sensorSearch=form.querySelector(".dcmanage-map-sensor-search");var loadBtn=form.querySelector(".dcmanage-map-load-sensors");var sensorSel=form.querySelector(".dcmanage-map-sensor-select");var sensorStatus=form.querySelector(".dcmanage-map-sensor-status");var sensorDefault=form.querySelector(".dcmanage-map-default-sensors");';
-    echo 'function setStatus(msg){if(sensorStatus){sensorStatus.textContent=msg;}}';
-    echo 'function filterSwitches(){if(!swSel){return;}for(var i=0;i<swSel.options.length;i++){var o=swSel.options[i];if(!o.value){o.hidden=false;continue;}var d=o.getAttribute("data-dc-id");o.hidden=(dcId!==""&&d!==dcId);}if(swSel.selectedIndex>0&&swSel.options[swSel.selectedIndex].hidden){swSel.selectedIndex=0;}}';
-    echo 'function loadSensors(){if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML="";setStatus("' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '");return;}';
-    echo 'setStatus("' . addslashes(I18n::t('loading', $lang)) . '");';
-    echo 'fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(sensorSearch?sensorSearch.value:""),limit:250}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];var defaults=String(sensorDefault?sensorDefault.value:"").split(",").map(function(v){return v.trim();}).filter(function(v){return v!=="";});sensorSel.innerHTML="";for(var x=0;x<items.length;x++){var it=items[x]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.id||"")+" | "+String(it.name||"");if(it.device){label+=" ["+String(it.device)+"]";}opt.textContent=label;if(defaults.indexOf(opt.value)!==-1){opt.selected=true;}sensorSel.appendChild(opt);}setStatus(items.length+" ' . addslashes(I18n::t('server_traffic_sensors', $lang)) . '");}).catch(function(){setStatus("' . addslashes(I18n::t('no_sensors_loaded', $lang)) . '");});}';
-    echo 'filterSwitches();if(portSel){loadSwitchPorts(portSel,swSel?swSel.value:"",dcId,portSel.getAttribute("data-selected")||"");}if(swSel){swSel.addEventListener("change",function(){loadSwitchPorts(portSel,swSel.value,dcId,"");});}if(loadBtn){loadBtn.addEventListener("click",loadSensors);}if(prtgSel){prtgSel.addEventListener("change",loadSensors);}})(mapRows[m]);}';
+    echo 'var createForm=document.querySelector("#dcmanage-server-add form");if(createForm){initServerForm(createForm);}var mapForms=document.querySelectorAll(".dcmanage-server-map");for(var i=0;i<mapForms.length;i++){initServerForm(mapForms[i]);}';
     echo 'var toggles=document.querySelectorAll(".dcmanage-server-map-toggle");for(var t=0;t<toggles.length;t++){toggles[t].addEventListener("click",function(){var target=document.getElementById(this.getAttribute("data-target"));if(!target){return;}var main=target.previousElementSibling;if(main&&main.style.display==="none"){return;}target.style.display=(target.style.display==="none"||target.style.display==="")?"table-row":"none";});}';
-    echo 'syncDcState();';
     echo 'applyServerPager();';
     echo '})();';
     echo '</script>';

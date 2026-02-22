@@ -887,6 +887,25 @@
   min-height: 36px;
 }
 
+.dcmanage-form-subtitle {
+  margin: 14px 0 10px !important;
+  font-weight: 700 !important;
+  color: #1f3b7a !important;
+}
+
+.dcmanage-traffic-row,
+.dcmanage-monitor-row {
+  padding: 8px 10px 0 !important;
+  border: 1px solid #d8e4ff !important;
+  border-radius: 12px !important;
+  background: #f7fbff !important;
+  margin-bottom: 10px !important;
+}
+
+.dcmanage-port-select-search {
+  font-size: 13px !important;
+}
+
 .dcmanage-shell code {
   color: #1a4bb5;
 }
