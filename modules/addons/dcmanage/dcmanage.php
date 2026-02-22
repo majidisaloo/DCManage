@@ -3410,7 +3410,7 @@ function dcmanage_render_logs(string $lang): void
     echo '</div>';
     echo '</form>';
 
-    echo '<div class="dcmanage-form-actions d-flex flex-wrap mb-3">';
+    echo '<div class="dcmanage-inline-actions">';
     echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="system"><button class="btn btn-outline-danger btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_system', $lang)) . '</button></form>';
     echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="purchase"><button class="btn btn-outline-warning btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_purchase', $lang)) . '</button></form>';
     echo '<form method="post" style="display:inline" onsubmit="return confirm(\'Clear all logs?\')"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="all"><button class="btn btn-danger btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_all', $lang)) . '</button></form>';
@@ -3499,7 +3499,9 @@ function dcmanage_render_queue(string $lang): void
     echo '<a class="btn btn-outline-secondary btn-sm" href="addonmodules.php?module=dcmanage&tab=queue">' . htmlspecialchars(I18n::t('logs_reset_filter', $lang)) . '</a>';
     echo '</div>';
     echo '</form>';
-    echo '<form method="post" class="mb-3" onsubmit="return confirm(\'Clear completed/failed/canceled jobs?\')"><input type="hidden" name="dcmanage_action" value="queue_clear_done"><button class="btn btn-outline-danger btn-sm" type="submit" name="dcmanage_action_btn" value="queue_clear_done">Clear Done/Failed</button></form>';
+    echo '<div class="dcmanage-inline-actions">';
+    echo '<form method="post" onsubmit="return confirm(\'Clear completed/failed/canceled jobs?\')"><input type="hidden" name="dcmanage_action" value="queue_clear_done"><button class="btn btn-outline-danger btn-sm" type="submit" name="dcmanage_action_btn" value="queue_clear_done">Clear Done/Failed</button></form>';
+    echo '</div>';
 
     echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Attempts</th><th>Created</th><th>Started</th><th>Finished</th><th>Run After</th><th>Error</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';

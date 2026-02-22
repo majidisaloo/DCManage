@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.66] - 2026-02-22
+### Changed
+- Introduced a global inline action bar style for consistent spacing/alignment of buttons and action links across forms/tables.
+- Normalized secondary action button visual style (`Reset` and similar) to avoid plain-text rendering look.
+
+### Fixed
+- Queue filter action row spacing fixed (`Apply Filter`, `Reset`, `Clear Done/Failed`) so controls no longer collapse into each other.
+- Logs action row switched to the shared inline action style for stable margins and alignment.
+
 ## [0.1.65] - 2026-02-22
 ### Fixed
 - Traffic Packages edit form action button (`Save Settings`) now renders inside a proper action row and no longer overlaps input fields.

@@ -572,6 +572,7 @@
   flex-wrap: wrap;
   align-items: center;
   margin-top: 12px;
+  margin-bottom: 12px;
   padding-top: 10px;
   border-top: 1px solid #e4ebff;
   gap: 12px !important;
@@ -581,8 +582,34 @@
   margin: 0;
 }
 
+.dcmanage-shell .dcmanage-form-actions a.btn,
+.dcmanage-shell .dcmanage-inline-actions a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dcmanage-shell .dcmanage-form-actions .btn-outline-secondary,
+.dcmanage-shell .dcmanage-inline-actions .btn-outline-secondary {
+  background: #eef2f8;
+  border-color: #cfd6e6;
+  color: #3a4b68;
+}
+
 .dcmanage-shell .dcmanage-form-actions .btn + .btn {
   margin-inline-start: 0;
+}
+
+.dcmanage-shell .dcmanage-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.dcmanage-shell .dcmanage-inline-actions form {
+  margin: 0 !important;
 }
 
 .dcmanage-table-pager {
