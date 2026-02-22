@@ -3,6 +3,12 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.54] - 2026-02-22
+### Changed
+- Top navigation tabs now include compact vector icons beside labels for clearer visual scanning.
+- Dashboard KPI area is now more graphical with a vector hero band and decorative per-card watermark icons.
+- Improved tab and KPI visual hierarchy for better balance on both desktop and mobile breakpoints.
+
 ## [0.1.53] - 2026-02-22
 ### Fixed
 - Fixed persistent stale update warning banner (`Canceled before HTTP request`) after successful/no-active update by normalizing idle update runtime state.

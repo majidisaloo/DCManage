@@ -220,7 +220,13 @@
         { key: 'jobs_pending', label: T.queue, tab: 'queue' }
       ];
 
-      var html = '<div class="row dcmanage-kpi">';
+      var html = '<div class="dcmanage-hero-band">' +
+        '<div class="dcmanage-hero-title">' + safeText(isFa ? 'نمای کلی زیرساخت' : 'Infrastructure Snapshot') + '</div>' +
+        '<div class="dcmanage-hero-art" aria-hidden="true">' +
+          '<svg viewBox="0 0 220 70"><rect x="4" y="20" width="64" height="42" rx="8"/><rect x="78" y="10" width="64" height="52" rx="8"/><rect x="152" y="26" width="64" height="36" rx="8"/><circle cx="24" cy="35" r="4"/><circle cx="98" cy="29" r="4"/><circle cx="172" cy="39" r="4"/></svg>' +
+        '</div>' +
+      '</div>';
+      html += '<div class="row dcmanage-kpi">';
       cards.forEach(function (k) {
         var cardValue = c[k.key] || 0;
         var keyClass = 'is-' + String(k.key).replace(/_/g, '-');
@@ -229,6 +235,7 @@
           '<a href="' + moduleLink + '&tab=' + encodeURIComponent(k.tab) + '" class="text-decoration-none">' +
           '<div class="card dcmanage-click-card dcmanage-kpi-card ' + keyClass + '">' +
           '<div class="card-body">' +
+          '<span class="dcmanage-kpi-watermark" aria-hidden="true">' + iconSvg(k.key) + '</span>' +
           '<div class="dcmanage-kpi-head">' +
           '<span class="dcmanage-kpi-icon">' + iconSvg(k.key) + '</span>' +
           '<span class="dcmanage-kpi-label">' + safeText(k.label) + '</span>' +

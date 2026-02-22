@@ -43,11 +43,35 @@
 .dcmanage-shell .dcmanage-tabs .nav-link {
   border: 0;
   border-radius: 12px;
-  padding: 9px 16px;
+  padding: 9px 14px;
   color: #20335f;
   background: #edf1fb;
   font-weight: 700;
   transition: all .2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.dcmanage-tab-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #36558f;
+  opacity: .94;
+}
+
+.dcmanage-tab-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.dcmanage-shell .dcmanage-tabs .nav-link.active .dcmanage-tab-icon {
+  color: #fff;
 }
 
 .dcmanage-shell .dcmanage-tabs .nav-link:hover {
@@ -149,6 +173,56 @@
 .dcmanage-kpi-card .card-body {
   position: relative;
   z-index: 1;
+}
+
+.dcmanage-kpi-watermark {
+  position: absolute;
+  inset-inline-end: 10px;
+  top: 8px;
+  width: 34px;
+  height: 34px;
+  color: #9db2de;
+  opacity: .38;
+  z-index: 0;
+}
+
+.dcmanage-kpi-watermark svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.dcmanage-hero-band {
+  margin-bottom: 12px;
+  border: 1px solid #d7e4ff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(120deg, #f3f8ff 0%, #ebf4ff 60%, #f5fbff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.dcmanage-hero-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #2a467f;
+  letter-spacing: .2px;
+}
+
+.dcmanage-hero-art {
+  width: 240px;
+  max-width: 42%;
+  color: #6f8fcb;
+  opacity: .9;
+}
+
+.dcmanage-hero-art svg {
+  width: 100%;
+  height: auto;
+  fill: currentColor;
 }
 
 .dcmanage-kpi-head {
@@ -961,6 +1035,10 @@
     padding: 8px 12px;
   }
 
+  .dcmanage-tab-label {
+    font-size: 12px;
+  }
+
   .dcmanage-shell .dcmanage-form-card {
     padding: 12px;
   }
@@ -979,6 +1057,16 @@
 
   .dcmanage-version-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .dcmanage-hero-band {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dcmanage-hero-art {
+    max-width: 100%;
+    width: 200px;
   }
 
   .dcmanage-update-actions-row {

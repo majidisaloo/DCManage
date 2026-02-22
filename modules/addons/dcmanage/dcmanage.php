@@ -113,7 +113,10 @@ function dcmanage_output(array $vars): void
     foreach ($tabs as $key => $label) {
         $active = $activeTab === $key ? ' active' : '';
         echo '<li class="nav-item">';
-        echo '<a class="nav-link' . $active . '" href="' . $moduleLink . '&tab=' . urlencode($key) . '">' . htmlspecialchars($label) . '</a>';
+        echo '<a class="nav-link' . $active . '" href="' . $moduleLink . '&tab=' . urlencode($key) . '">';
+        echo '<span class="dcmanage-tab-icon" aria-hidden="true">' . dcmanage_tab_icon_svg($key) . '</span>';
+        echo '<span class="dcmanage-tab-label">' . htmlspecialchars($label) . '</span>';
+        echo '</a>';
         echo '</li>';
     }
     echo '</ul>';
@@ -3022,4 +3025,23 @@ function dcmanage_render_queue(string $lang): void
         $lang,
         'queue_page'
     );
+}
+
+function dcmanage_tab_icon_svg(string $tab): string
+{
+    $icons = [
+        'dashboard' => '<svg viewBox="0 0 24 24"><path d="M3 13h8v8H3v-8zm10-10h8v18h-8V3zM3 3h8v8H3V3z"/></svg>',
+        'datacenters' => '<svg viewBox="0 0 24 24"><path d="M4 5h16v4H4V5zm0 5h16v4H4v-4zm0 5h16v4H4v-4z"/></svg>',
+        'switches' => '<svg viewBox="0 0 24 24"><path d="M3 8h18v8H3V8zm3 2h2v2H6v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2z"/></svg>',
+        'servers' => '<svg viewBox="0 0 24 24"><path d="M4 4h16v6H4V4zm0 10h16v6H4v-6zm2-8h3v2H6V6zm0 10h3v2H6v-2z"/></svg>',
+        'monitoring' => '<svg viewBox="0 0 24 24"><path d="M4 18h16v2H4v-2zM6 16l3-4 3 2 4-6 2 1-5 7-3-2-2 3-2-1z"/></svg>',
+        'packages' => '<svg viewBox="0 0 24 24"><path d="M3 8l9-5 9 5v10l-9 5-9-5V8zm9-2.7L7 8l5 2.7L17 8l-5-2.7z"/></svg>',
+        'scope' => '<svg viewBox="0 0 24 24"><path d="M11 2v2.1a8 8 0 107.9 7.9H21A10 10 0 1111 2zm2 0a10 10 0 018.9 8H13V2z"/></svg>',
+        'traffic' => '<svg viewBox="0 0 24 24"><path d="M4 19h16v2H4v-2zM6 17V9h2v8H6zm5 0V5h2v12h-2zm5 0v-6h2v6h-2z"/></svg>',
+        'queue' => '<svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h16v10H4V10zm3 2h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>',
+        'settings' => '<svg viewBox="0 0 24 24"><path d="M19.4 13a7.8 7.8 0 000-2l2.1-1.6-2-3.5-2.5 1a7.7 7.7 0 00-1.7-1L15 3h-4l-.3 2.9a7.7 7.7 0 00-1.7 1l-2.5-1-2 3.5L6.6 11a7.8 7.8 0 000 2l-2.1 1.6 2 3.5 2.5-1a7.7 7.7 0 001.7 1L11 21h4l.3-2.9a7.7 7.7 0 001.7-1l2.5 1 2-3.5L19.4 13zM13 15h-2v-2h2v2zm0-4h-2V9h2v2z"/></svg>',
+        'logs' => '<svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6V3zm8 1.5V9h4.5L14 4.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>',
+    ];
+
+    return $icons[$tab] ?? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>';
 }
