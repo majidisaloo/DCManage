@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.59] - 2026-02-22
+### Fixed
+- Fixed Servers tab inline JavaScript parse error in Safari/WebKit (`SyntaxError: Invalid escape in identifier`) caused by escaped quotes in pager logic.
+- Server row `Edit` toggle works again after JS parse fix.
+
 ## [0.1.58] - 2026-02-22
 ### Fixed
 - Auto-update package validation now correctly detects module path for both release asset layouts:
