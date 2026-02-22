@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.57] - 2026-02-22
+### Changed
+- Search normalization improved for live tables so Persian/Arabic digits are matched the same as English digits.
+- Server list pagination now follows the same UX as switch ports: controls are below table, default page size is `15`, and page size is selectable (`10/15/25/50/100`).
+
+### Fixed
+- Server add form now enforces datacenter-first dependency: `Rack`, `Switch`, and `Switch Port` are disabled until datacenter is selected.
+- Rack/Switch selection is now properly scoped by selected datacenter before loading switch ports.
+
 ## [0.1.56] - 2026-02-22
 ### Changed
 - Switch Ports table now uses fixed column layout so all rows stay vertically aligned even with long description text.
