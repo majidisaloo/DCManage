@@ -1817,6 +1817,27 @@ function dcmanage_snmp_parse_vlan(string $raw): string
     return '';
 }
 
+function dcmanage_vlan_fallback_for_interface(string $ifName, string $ifDesc = ''): string
+{
+    $ifName = trim($ifName);
+    $ifDesc = trim($ifDesc);
+
+    // Common SVI naming: Vlan10 / vlan10 / Vlanif10
+    if (preg_match('/^(?:vlan|vlanif)\s*[-_\/]?\s*(\d{1,4})$/i', $ifName, $m) === 1) {
+        return (string) ((int) $m[1]);
+    }
+    if (preg_match('/\bvlan\s*[-_\/]?\s*(\d{1,4})\b/i', $ifName, $m) === 1) {
+        return (string) ((int) $m[1]);
+    }
+
+    // Secondary fallback from description if it explicitly includes VLAN id.
+    if (preg_match('/\bvlan\s*[-_\/]?\s*(\d{1,4})\b/i', $ifDesc, $m) === 1) {
+        return (string) ((int) $m[1]);
+    }
+
+    return '';
+}
+
 function dcmanage_snmp_parse_int(string $raw): int
 {
     $value = dcmanage_snmp_parse_typed_value($raw);
@@ -2030,15 +2051,19 @@ function dcmanage_probe_single_switch_port(string $host, string $community, int 
     }
 
     $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value($ifNameRaw));
+    $ifDesc = dcmanage_snmp_parse_typed_value($ifDescRaw);
     if ($ifName === '') {
         return ['ok' => false, 'message' => 'Interface not found'];
+    }
+    if ($vlan === '') {
+        $vlan = dcmanage_vlan_fallback_for_interface($ifName, $ifDesc);
     }
 
     return [
         'ok' => true,
         'message' => 'Port checked',
         'if_name' => $ifName,
-        'if_desc' => dcmanage_snmp_parse_typed_value($ifDescRaw),
+        'if_desc' => $ifDesc,
         'vlan' => $vlan,
         'speed_mbps' => dcmanage_snmp_speed_mbps_from_raw($ifHighSpeedRaw, $ifSpeedRaw),
         'speed_mode' => dcmanage_snmp_autoneg_mode_from_raw($autoNegRaw),
@@ -2163,6 +2188,9 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
             $operRaw = isset($operMap[$index]) ? (string) $operMap[$index] : '';
             $ifDesc = dcmanage_snmp_parse_typed_value((string) ($ifDescMap[$index] ?? ''));
             $vlan = (string) ($pvidByIfIndex[$index] ?? '');
+            if ($vlan === '') {
+                $vlan = dcmanage_vlan_fallback_for_interface($ifName, $ifDesc);
+            }
             $speedMbps = dcmanage_snmp_speed_mbps_from_raw((string) ($ifHighSpeedMap[$index] ?? ''), (string) ($ifSpeedMap[$index] ?? ''));
             $speedMode = dcmanage_snmp_autoneg_mode_from_raw((string) ($autoNegMap[$index] ?? ''));
 
@@ -2232,6 +2260,9 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
             $ifDesc = dcmanage_snmp_parse_typed_value((string) ($ifDescList[$i] ?? ''));
             $ifIndex = $i + 1;
             $vlan = (string) ($pvidByIfIndex[$ifIndex] ?? '');
+            if ($vlan === '') {
+                $vlan = dcmanage_vlan_fallback_for_interface($ifName, $ifDesc);
+            }
             $speedMbps = dcmanage_snmp_speed_mbps_from_raw((string) ($ifHighSpeedList[$i] ?? ''), (string) ($ifSpeedList[$i] ?? ''));
             $speedMode = dcmanage_snmp_autoneg_mode_from_raw((string) ($autoNegList[$i] ?? ''));
             $ports[] = [
@@ -2277,13 +2308,20 @@ function dcmanage_store_discovered_switch_ports(int $switchId, array $ports): in
             'if_index' => isset($port['if_index']) && (int) $port['if_index'] > 0 ? (int) $port['if_index'] : null,
             'if_name' => $ifName,
             'if_desc' => trim((string) ($port['if_desc'] ?? '')) ?: null,
-            'vlan' => trim((string) ($port['vlan'] ?? '')),
+            'vlan' => '',
             'speed_mbps' => isset($port['speed_mbps']) && (int) $port['speed_mbps'] > 0 ? (int) $port['speed_mbps'] : null,
             'speed_mode' => trim((string) ($port['speed_mode'] ?? '')) ?: null,
             'admin_status' => trim((string) ($port['admin_status'] ?? 'unknown')),
             'oper_status' => trim((string) ($port['oper_status'] ?? 'unknown')),
             'last_seen' => date('Y-m-d H:i:s'),
         ];
+        $payload['vlan'] = trim((string) ($port['vlan'] ?? ''));
+        if ($payload['vlan'] === '') {
+            $payload['vlan'] = dcmanage_vlan_fallback_for_interface(
+                $ifName,
+                (string) ($payload['if_desc'] ?? '')
+            );
+        }
 
         $existing = Capsule::table('mod_dcmanage_switch_ports')
             ->where('switch_id', $switchId)

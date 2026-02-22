@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.54)
+## Features in this release (v0.1.55)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -128,6 +128,8 @@ DCManage is an API-first datacenter management core inside WHMCS.
 - Visual enhancements:
   - top menu tabs now have compact vector icons next to each label.
   - dashboard middle section includes a vector hero strip and icon watermarks on KPI cards.
+- Switch VLAN discovery:
+  - VLAN extraction now supports SVI interface patterns like `Vlan10` / `vlanif10` when native PVID SNMP mapping is not provided by device.
 
 ## Installation From GitHub Releases
 1. Download asset: `DCManage-vX.Y.Z.zip` from repository Releases.

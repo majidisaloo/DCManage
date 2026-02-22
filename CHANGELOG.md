@@ -3,6 +3,12 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.55] - 2026-02-22
+### Fixed
+- Fixed VLAN detection for SVI-style interfaces (`VlanX`, `vlanifX`) so VLAN column no longer stays empty when PVID mapping is unavailable.
+- Added fallback VLAN extraction from interface name/description during switch port discovery and single-port check.
+- Added storage-time VLAN fallback to persist VLAN value even when SNMP PVID OIDs are missing on specific devices.
+
 ## [0.1.54] - 2026-02-22
 ### Changed
 - Top navigation tabs now include compact vector icons beside labels for clearer visual scanning.
