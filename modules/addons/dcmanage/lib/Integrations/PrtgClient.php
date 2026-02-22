@@ -144,7 +144,39 @@ final class PrtgClient
             'count' => max(20, min(1000, $limit)),
         ]);
 
-        return $this->normalizeTableRows($json['probes'] ?? [], 'probe');
+        $items = $this->normalizeTableRows($json['probes'] ?? [], 'probe');
+        if ($items === []) {
+            return [];
+        }
+
+        $filtered = [];
+        $seen = [];
+        foreach ($items as $item) {
+            $id = trim((string) ($item['id'] ?? ''));
+            $name = trim((string) ($item['name'] ?? ''));
+            $idInt = (int) $id;
+
+            // Ignore internal/root pseudo rows often returned by some PRTG endpoints.
+            if ($idInt <= 0) {
+                continue;
+            }
+            if ($name === '' || preg_match('/^-?\d+$/', $name) === 1) {
+                continue;
+            }
+
+            $key = $id . '|' . strtolower($name);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $filtered[] = $item;
+        }
+
+        usort($filtered, static function (array $a, array $b): int {
+            return strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+        });
+
+        return $filtered;
     }
 
     public function listGroups(int $parentId, int $limit = 300): array

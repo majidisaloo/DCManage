@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 11;
+    private const SCHEMA_VERSION = 12;
 
     public static function migrate(): void
     {
@@ -69,6 +69,11 @@ final class Schema
         if ($current < 11) {
             self::migrationV11();
             self::setCurrentVersion(11);
+        }
+
+        if ($current < 12) {
+            self::migrationV12();
+            self::setCurrentVersion(12);
         }
     }
 
@@ -529,6 +534,24 @@ final class Schema
                 $table->boolean('down_unlimited')->default(false)->after('total_limit_gb');
                 $table->boolean('up_unlimited')->default(false)->after('down_unlimited');
                 $table->boolean('total_unlimited')->default(false)->after('up_unlimited');
+            });
+        }
+    }
+
+    private static function migrationV12(): void
+    {
+        if (!Capsule::schema()->hasTable('mod_dcmanage_monitoring_group_map')) {
+            Capsule::schema()->create('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
+                $table->bigIncrements('id');
+                $table->unsignedInteger('prtg_id')->index();
+                $table->unsignedInteger('switch_id')->nullable()->index();
+                $table->string('purpose', 32)->default('traffic')->index();
+                $table->string('probe_id', 64)->nullable();
+                $table->string('group_id', 64)->nullable();
+                $table->string('subgroup_id', 64)->nullable();
+                $table->string('device_id', 64)->nullable();
+                $table->text('notes')->nullable();
+                $table->timestamp('created_at')->nullable()->index();
             });
         }
     }

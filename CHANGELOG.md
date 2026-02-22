@@ -3,6 +3,25 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.70] - 2026-02-22
+### Added
+- Added monitoring group mapping storage table: `mod_dcmanage_monitoring_group_map`.
+- Added Monitoring mapping UI with `View` shortcut from instance list and mapping rows for:
+  - traffic
+  - hardware
+  - public monitoring
+  - client discovery
+- Added per-server Discovery widget in Server edit form (target host + port list + run/check result).
+
+### Changed
+- Monitoring top action label changed from `Add PRTG Instance` to `Add Monitoring Instance`.
+- Monitoring now supports mapping to switch context in UI so group strategy can be defined before server assignment.
+- PRTG probe list now filters pseudo/internal numeric rows and keeps only valid probe-style entries.
+- Discovery section moved out of Monitoring tab and into Servers workflow.
+
+### Fixed
+- Reduced wrong probe dropdown results where numeric/internal IDs were shown as probe names.
+
 ## [0.1.69] - 2026-02-22
 ### Added
 - Added `Test Mode` in Settings (`settings.enforcement_test_mode`) to allow safe enforcement testing without executing real suspend/enforce operations.

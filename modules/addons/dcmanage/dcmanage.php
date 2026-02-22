@@ -329,6 +329,56 @@ function dcmanage_handle_actions(string $lang): string
             return '<div class="alert alert-' . ($ok ? 'success' : 'warning') . '">' . htmlspecialchars($ok ? 'PRTG connection OK' : 'PRTG test returned a non-standard payload') . '</div>';
         }
 
+        if ($action === 'monitoring_map_create') {
+            $prtgId = (int) ($_POST['map_prtg_id'] ?? 0);
+            $switchId = (int) ($_POST['map_switch_id'] ?? 0);
+            $purpose = strtolower(trim((string) ($_POST['map_purpose'] ?? 'traffic')));
+            $probeId = trim((string) ($_POST['map_probe_id'] ?? ''));
+            $groupId = trim((string) ($_POST['map_group_id'] ?? ''));
+            $subgroupId = trim((string) ($_POST['map_subgroup_id'] ?? ''));
+            $deviceId = trim((string) ($_POST['map_device_id'] ?? ''));
+            $notes = trim((string) ($_POST['map_notes'] ?? ''));
+            if (!in_array($purpose, ['traffic', 'hardware', 'public', 'client_discovery'], true)) {
+                $purpose = 'traffic';
+            }
+            if ($prtgId <= 0) {
+                throw new RuntimeException('Monitoring instance is required');
+            }
+            $instanceType = strtolower((string) Capsule::table('mod_dcmanage_prtg_instances')->where('id', $prtgId)->value('type'));
+            if ($instanceType !== 'prtg') {
+                throw new RuntimeException('Only PRTG instances support group mapping');
+            }
+            if ($switchId <= 0) {
+                $switchId = null;
+            }
+            if ($groupId === '' && $subgroupId === '' && $deviceId === '') {
+                throw new RuntimeException('Group/Sub Group/Device is required');
+            }
+
+            Capsule::table('mod_dcmanage_monitoring_group_map')->insert([
+                'prtg_id' => $prtgId,
+                'switch_id' => $switchId,
+                'purpose' => $purpose,
+                'probe_id' => $probeId !== '' ? $probeId : null,
+                'group_id' => $groupId !== '' ? $groupId : null,
+                'subgroup_id' => $subgroupId !== '' ? $subgroupId : null,
+                'device_id' => $deviceId !== '' ? $deviceId : null,
+                'notes' => $notes !== '' ? $notes : null,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('created', $lang)) . '</div>';
+        }
+
+        if ($action === 'monitoring_map_delete') {
+            $id = (int) ($_POST['map_id'] ?? 0);
+            if ($id <= 0) {
+                throw new RuntimeException('Invalid mapping');
+            }
+            Capsule::table('mod_dcmanage_monitoring_group_map')->where('id', $id)->delete();
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
         if ($action === 'datacenter_create') {
             $name = trim((string) ($_POST['name'] ?? ''));
             if ($name === '') {
@@ -1440,9 +1490,30 @@ function dcmanage_render_monitoring(string $lang): void
     $instances = Capsule::table('mod_dcmanage_prtg_instances')
         ->orderBy('id', 'desc')
         ->get(['id', 'name', 'type', 'base_url', 'user', 'auth_mode', 'verify_ssl', 'created_at']);
+    $switches = Capsule::table('mod_dcmanage_switches as s')
+        ->leftJoin('mod_dcmanage_datacenters as d', 'd.id', '=', 's.dc_id')
+        ->orderBy('s.name')
+        ->get(['s.id', 's.name', 'd.name as dc_name']);
+    $mappingRows = Capsule::table('mod_dcmanage_monitoring_group_map as m')
+        ->leftJoin('mod_dcmanage_prtg_instances as p', 'p.id', '=', 'm.prtg_id')
+        ->leftJoin('mod_dcmanage_switches as s', 's.id', '=', 'm.switch_id')
+        ->orderBy('m.id', 'desc')
+        ->get([
+            'm.id',
+            'm.prtg_id',
+            'm.switch_id',
+            'm.purpose',
+            'm.probe_id',
+            'm.group_id',
+            'm.subgroup_id',
+            'm.device_id',
+            'm.notes',
+            'p.name as prtg_name',
+            's.name as switch_name',
+        ]);
 
     echo '<div class="d-flex justify-content-end align-items-center mb-3 dcmanage-section-toolbar">';
-    echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-monitoring-add">' . htmlspecialchars(I18n::t('prtg_add_instance', $lang)) . '</button>';
+    echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-monitoring-add">' . htmlspecialchars(I18n::t('monitoring_add_instance', $lang)) . '</button>';
     echo '</div>';
 
     echo '<div class="collapse mb-4" id="dcmanage-monitoring-add">';
@@ -1459,7 +1530,7 @@ function dcmanage_render_monitoring(string $lang): void
     echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('prtg_passhash', $lang)) . '</label><input name="prtg_passhash" class="form-control dcmanage-input" placeholder="passhash / apitoken"></div>';
     echo '<div class="form-group col-md-2"><label class="d-block">&nbsp;</label><div class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input" id="dcmanage-prtg-verify-ssl" name="prtg_verify_ssl" value="1" checked><label class="custom-control-label" for="dcmanage-prtg-verify-ssl">' . htmlspecialchars(I18n::t('prtg_verify_ssl', $lang)) . '</label></div></div>';
     echo '</div>';
-    echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('prtg_create', $lang)) . '</button>';
+    echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('monitoring_create', $lang)) . '</button>';
     echo '</form>';
     echo '</div>';
 
@@ -1477,6 +1548,7 @@ function dcmanage_render_monitoring(string $lang): void
         echo '<td>' . htmlspecialchars((string) ($instance->auth_mode ?: 'passhash')) . '</td>';
         echo '<td>' . ((int) $instance->verify_ssl === 1 ? 'on' : 'off') . '</td>';
         echo '<td class="dcmanage-action-buttons">';
+        echo '<button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-monitoring-view" data-instance-id="' . (int) $instance->id . '">' . htmlspecialchars(I18n::t('action_view', $lang)) . '</button>';
         if (strtolower((string) $instance->type) === 'prtg') {
             echo '<form method="post"><input type="hidden" name="dcmanage_action" value="prtg_instance_test"><input type="hidden" name="prtg_id" value="' . (int) $instance->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-success">' . htmlspecialchars(I18n::t('prtg_test', $lang)) . '</button></form>';
         }
@@ -1497,6 +1569,64 @@ function dcmanage_render_monitoring(string $lang): void
             break;
         }
     }
+
+    echo '<div class="dcmanage-form-card mb-4" id="dcmanage-monitoring-map-card">';
+    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('monitoring_group_map_title', $lang)) . '</h6>';
+    echo '<form method="post" class="dcmanage-centered-form">';
+    echo '<input type="hidden" name="dcmanage_action" value="monitoring_map_create">';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</label><select id="dcmanage-map-prtg" name="map_prtg_id" class="form-control dcmanage-input" required><option value="">--</option>';
+    foreach ($instances as $instance) {
+        if (strtolower((string) ($instance->type ?? 'prtg')) !== 'prtg') {
+            continue;
+        }
+        $selected = (int) $instance->id === $defaultPrtg ? ' selected' : '';
+        echo '<option value="' . (int) $instance->id . '"' . $selected . '>' . htmlspecialchars((string) $instance->name) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="map_switch_id" class="form-control dcmanage-input"><option value="">--</option>';
+    foreach ($switches as $switch) {
+        $swLabel = (string) $switch->name;
+        if (trim((string) ($switch->dc_name ?? '')) !== '') {
+            $swLabel .= ' (' . (string) $switch->dc_name . ')';
+        }
+        echo '<option value="' . (int) $switch->id . '">' . htmlspecialchars($swLabel) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_map_purpose', $lang)) . '</label><select name="map_purpose" class="form-control dcmanage-input"><option value="traffic">' . htmlspecialchars(I18n::t('monitoring_purpose_traffic', $lang)) . '</option><option value="hardware">' . htmlspecialchars(I18n::t('monitoring_purpose_hardware', $lang)) . '</option><option value="public">' . htmlspecialchars(I18n::t('monitoring_purpose_public', $lang)) . '</option><option value="client_discovery">' . htmlspecialchars(I18n::t('monitoring_purpose_client_discovery', $lang)) . '</option></select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</label><select id="dcmanage-map-probe" name="map_probe_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
+    echo '</div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</label><select id="dcmanage-map-group" name="map_group_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</label><select id="dcmanage-map-subgroup" name="map_subgroup_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select id="dcmanage-map-device" name="map_device_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
+    echo '</div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-9"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input class="form-control dcmanage-input" name="map_notes" placeholder="' . htmlspecialchars(I18n::t('monitoring_map_notes_placeholder', $lang)) . '"></div>';
+    echo '<div class="form-group col-md-3 d-flex align-items-end"><button type="submit" class="btn btn-primary btn-sm">' . htmlspecialchars(I18n::t('monitoring_map_add', $lang)) . '</button></div>';
+    echo '</div>';
+    echo '</form>';
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
+    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_map_purpose', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+    foreach ($mappingRows as $mapRow) {
+        $purposeLabel = I18n::t('monitoring_purpose_' . strtolower((string) ($mapRow->purpose ?? 'traffic')), $lang);
+        echo '<tr>';
+        echo '<td>' . (int) $mapRow->id . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($mapRow->prtg_name ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($mapRow->switch_name ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars($purposeLabel) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($mapRow->probe_id ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($mapRow->group_id ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($mapRow->subgroup_id ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($mapRow->device_id ?? '-')) . '</td>';
+        echo '<td class="dcmanage-action-buttons"><form method="post" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('action_delete', $lang), ENT_QUOTES, 'UTF-8') . '?\')"><input type="hidden" name="dcmanage_action" value="monitoring_map_delete"><input type="hidden" name="map_id" value="' . (int) $mapRow->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-danger">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td>';
+        echo '</tr>';
+    }
+    if (count($mappingRows) === 0) {
+        echo '<tr><td colspan="9">-</td></tr>';
+    }
+    echo '</tbody></table></div>';
+    echo '</div>';
 
     echo '<div class="dcmanage-form-card">';
     echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('monitoring_browser', $lang)) . '</h6>';
@@ -1523,23 +1653,13 @@ function dcmanage_render_monitoring(string $lang): void
     echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped"><thead><tr><th>ID</th><th>Sensor</th><th>Device</th><th>Status</th></tr></thead><tbody id="dcmanage-prtg-browser-list"><tr><td colspan="4">-</td></tr></tbody></table></div>';
     echo '</div>';
 
-    echo '<div class="dcmanage-form-card mt-4">';
-    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('monitoring_discovery', $lang)) . '</h6>';
-    echo '<div class="form-row align-items-end">';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_target_host', $lang)) . '</label><input id="dcmanage-monitor-discovery-host" class="form-control dcmanage-input" placeholder="203.0.113.10"></div>';
-    echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('monitoring_ports', $lang)) . '</label><input id="dcmanage-monitor-discovery-ports" class="form-control dcmanage-input" value="22,80,443,3389,8080,8443"></div>';
-    echo '<div class="form-group col-md-3"><button id="dcmanage-monitor-discovery-run" type="button" class="btn btn-outline-primary btn-sm">' . htmlspecialchars(I18n::t('monitoring_run_discovery', $lang)) . '</button></div>';
-    echo '</div>';
-    echo '<div id="dcmanage-monitor-discovery-result" class="small text-muted">-</div>';
-    echo '</div>';
-
     echo '<script>';
     echo '(function(){';
     echo 'function parsePayload(raw){raw=String(raw||"").replace(/^\\uFEFF/,"").trim();try{return JSON.parse(raw);}catch(e){var s=raw.indexOf("DCMANAGE_JSON_START");var t=raw.indexOf("DCMANAGE_JSON_END");if(s!==-1&&t!==-1&&t>s){return JSON.parse(raw.substring(s+"DCMANAGE_JSON_START".length,t).trim());}throw e;}}';
     echo 'function apiUrl(endpoint,params){var u="addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint="+encodeURIComponent(endpoint);if(params){for(var k in params){if(Object.prototype.hasOwnProperty.call(params,k)){u+="&"+encodeURIComponent(k)+"="+encodeURIComponent(params[k]);}}}return u;}';
     echo 'function fillSelect(select,items){if(!select){return;}select.innerHTML="<option value=\\"\\">--</option>";for(var i=0;i<items.length;i++){var it=items[i]||{};var o=document.createElement("option");o.value=String(it.id||"");o.textContent=String(it.name||it.id||"-");select.appendChild(o);}select.disabled=items.length===0;}';
     echo 'function fetchJson(endpoint,params){return fetch(apiUrl(endpoint,params),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var out=parsePayload(raw);if(!out.ok){throw new Error(out.error||"API error");}return out.data||{};});}';
-    echo 'var ins=document.getElementById("dcmanage-prtg-browser-instance");var probe=document.getElementById("dcmanage-prtg-browser-probe");var grp=document.getElementById("dcmanage-prtg-browser-group");var subgrp=document.getElementById("dcmanage-prtg-browser-subgroup");var dev=document.getElementById("dcmanage-prtg-browser-device");var q=document.getElementById("dcmanage-prtg-browser-q");var load=document.getElementById("dcmanage-prtg-browser-load");var list=document.getElementById("dcmanage-prtg-browser-list");';
+    echo 'var ins=document.getElementById("dcmanage-prtg-browser-instance");var probe=document.getElementById("dcmanage-prtg-browser-probe");var grp=document.getElementById("dcmanage-prtg-browser-group");var subgrp=document.getElementById("dcmanage-prtg-browser-subgroup");var dev=document.getElementById("dcmanage-prtg-browser-device");var q=document.getElementById("dcmanage-prtg-browser-q");var load=document.getElementById("dcmanage-prtg-browser-load");var list=document.getElementById("dcmanage-prtg-browser-list");var mapPrtg=document.getElementById("dcmanage-map-prtg");var mapProbe=document.getElementById("dcmanage-map-probe");var mapGroup=document.getElementById("dcmanage-map-group");var mapSub=document.getElementById("dcmanage-map-subgroup");var mapDev=document.getElementById("dcmanage-map-device");';
     echo 'function loadProbes(){if(!ins||!probe){return;}var id=ins.value;if(!id){fillSelect(probe,[]);fillSelect(grp,[]);fillSelect(subgrp,[]);fillSelect(dev,[]);return;}fetchJson("prtg/probes",{prtg_id:id}).then(function(data){fillSelect(probe,(data.items||[]));fillSelect(grp,[]);fillSelect(subgrp,[]);fillSelect(dev,[]);}).catch(function(){fillSelect(probe,[]);fillSelect(grp,[]);fillSelect(subgrp,[]);fillSelect(dev,[]);});}';
     echo 'function loadGroups(parentSel,targetSel){if(!ins||!parentSel||!targetSel||!parentSel.value){fillSelect(targetSel,[]);return Promise.resolve();}return fetchJson("prtg/groups",{prtg_id:ins.value,parent_id:parentSel.value}).then(function(data){fillSelect(targetSel,(data.items||[]));}).catch(function(){fillSelect(targetSel,[]);});}';
     echo 'function loadDevices(){if(!ins||!dev){return;}var parentId="";if(subgrp&&subgrp.value){parentId=subgrp.value;}else if(grp&&grp.value){parentId=grp.value;}else if(probe&&probe.value){parentId=probe.value;}if(parentId===""){fillSelect(dev,[]);return;}fetchJson("prtg/devices",{prtg_id:ins.value,parent_id:parentId}).then(function(data){fillSelect(dev,(data.items||[]));}).catch(function(){fillSelect(dev,[]);});}';
@@ -1547,10 +1667,15 @@ function dcmanage_render_monitoring(string $lang): void
     echo 'if(probe){probe.addEventListener("change",function(){loadGroups(probe,grp).then(function(){fillSelect(subgrp,[]);loadDevices();});});}';
     echo 'if(grp){grp.addEventListener("change",function(){loadGroups(grp,subgrp).then(function(){loadDevices();});});}';
     echo 'if(subgrp){subgrp.addEventListener("change",loadDevices);}';
+    echo 'function mapLoadProbes(){if(!mapPrtg){return;}var id=String(mapPrtg.value||"");if(id===""){fillSelect(mapProbe,[]);fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);return;}fetchJson("prtg/probes",{prtg_id:id}).then(function(data){fillSelect(mapProbe,(data.items||[]));fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);}).catch(function(){fillSelect(mapProbe,[]);fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);});}';
+    echo 'if(mapPrtg){mapPrtg.addEventListener("change",mapLoadProbes);}';
+    echo 'if(mapProbe){mapProbe.addEventListener("change",function(){if(!mapPrtg){return;}if(!mapProbe.value){fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);return;}fetchJson("prtg/groups",{prtg_id:mapPrtg.value,parent_id:mapProbe.value}).then(function(data){fillSelect(mapGroup,(data.items||[]));fillSelect(mapSub,[]);fillSelect(mapDev,[]);}).catch(function(){fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);});});}';
+    echo 'if(mapGroup){mapGroup.addEventListener("change",function(){if(!mapPrtg){return;}if(!mapGroup.value){fillSelect(mapSub,[]);if(mapProbe&&mapProbe.value){fetchJson("prtg/devices",{prtg_id:mapPrtg.value,parent_id:mapProbe.value}).then(function(data){fillSelect(mapDev,(data.items||[]));}).catch(function(){fillSelect(mapDev,[]);});}else{fillSelect(mapDev,[]);}return;}fetchJson("prtg/groups",{prtg_id:mapPrtg.value,parent_id:mapGroup.value}).then(function(data){fillSelect(mapSub,(data.items||[]));return fetchJson("prtg/devices",{prtg_id:mapPrtg.value,parent_id:mapGroup.value});}).then(function(data){fillSelect(mapDev,(data.items||[]));}).catch(function(){fillSelect(mapSub,[]);fillSelect(mapDev,[]);});});}';
+    echo 'if(mapSub){mapSub.addEventListener("change",function(){if(!mapPrtg){return;}var parent=mapSub.value||mapGroup.value||mapProbe.value;if(!parent){fillSelect(mapDev,[]);return;}fetchJson("prtg/devices",{prtg_id:mapPrtg.value,parent_id:parent}).then(function(data){fillSelect(mapDev,(data.items||[]));}).catch(function(){fillSelect(mapDev,[]);});});}';
     echo 'if(load){load.addEventListener("click",function(){if(!ins||!dev||!dev.value){return;}fetchJson("prtg/device-sensors",{prtg_id:ins.value,device_id:dev.value,q:(q?q.value:""),limit:500}).then(function(data){var items=data.items||[];if(!list){return;}if(items.length===0){list.innerHTML="<tr><td colspan=\\"4\\">-</td></tr>";return;}list.innerHTML="";for(var i=0;i<items.length;i++){var it=items[i]||{};var tr=document.createElement("tr");tr.innerHTML="<td>"+String(it.id||"-")+"</td><td>"+String(it.name||"-")+"</td><td>"+String(it.device||"-")+"</td><td>"+String(it.status||"-")+"</td>";list.appendChild(tr);}}).catch(function(err){if(list){list.innerHTML="<tr><td colspan=\\"4\\">"+String(err&&err.message?err.message:"error")+"</td></tr>";}});});}';
     echo 'if(ins&&ins.value){loadProbes();}';
-    echo 'var dHost=document.getElementById("dcmanage-monitor-discovery-host");var dPorts=document.getElementById("dcmanage-monitor-discovery-ports");var dRun=document.getElementById("dcmanage-monitor-discovery-run");var dOut=document.getElementById("dcmanage-monitor-discovery-result");';
-    echo 'if(dRun){dRun.addEventListener("click",function(){var host=dHost?String(dHost.value||"").trim():"";if(host===""){if(dOut){dOut.textContent="Target IP / Host is required";}return;}if(dOut){dOut.textContent="Running...";}fetchJson("monitoring/discover",{host:host,ports:(dPorts?dPorts.value:"")}).then(function(data){if(!dOut){return;}var rows=data.ports||[];if(rows.length===0){dOut.textContent="No results";return;}var txt=[];for(var i=0;i<rows.length;i++){var r=rows[i]||{};txt.push(String(r.port)+": "+(r.open?"open":"closed")+" ("+String(r.latency_ms||0)+"ms)");}dOut.textContent="Resolved IP: "+String(data.resolved_ip||"-")+" | "+txt.join(" | ");}).catch(function(err){if(dOut){dOut.textContent=String(err&&err.message?err.message:"error");}});});}';
+    echo 'if(mapPrtg&&mapPrtg.value){mapLoadProbes();}';
+    echo 'var viewBtns=document.querySelectorAll(".dcmanage-monitoring-view");for(var vb=0;vb<viewBtns.length;vb++){viewBtns[vb].addEventListener("click",function(){var id=this.getAttribute("data-instance-id")||"";if(mapPrtg){mapPrtg.value=id;mapLoadProbes();}var card=document.getElementById("dcmanage-monitoring-map-card");if(card&&typeof card.scrollIntoView==="function"){card.scrollIntoView({behavior:"smooth",block:"start"});}});}';
     echo '})();';
     echo '</script>';
 }
@@ -3324,6 +3449,13 @@ function dcmanage_render_servers(string $lang): void
         echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5"' . ((string) ($row->ilo_type ?? 'ilo5') === 'ilo5' ? ' selected' : '') . '>iLO5</option><option value="ilo4"' . ((string) ($row->ilo_type ?? '') === 'ilo4' ? ' selected' : '') . '>iLO4</option></select></div>';
         echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input" placeholder="••••••"></div>';
         echo '</div>';
+        echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('monitoring_discovery', $lang)) . '</div>';
+        echo '<div class="form-row align-items-end dcmanage-server-discovery-wrap">';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_target_host', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-host" value="' . htmlspecialchars((string) ($row->hostname ?? '')) . '" placeholder="203.0.113.10"></div>';
+        echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('monitoring_ports', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-ports" value="22,80,443,3389,8080,8443"></div>';
+        echo '<div class="form-group col-md-3"><button type="button" class="btn btn-outline-primary btn-sm dcmanage-server-discovery-run">' . htmlspecialchars(I18n::t('monitoring_run_discovery', $lang)) . '</button></div>';
+        echo '<div class="col-12"><div class="small text-muted dcmanage-server-discovery-result">-</div></div>';
+        echo '</div>';
         echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
         echo '</form>';
         echo '</td></tr>';
@@ -3356,7 +3488,8 @@ function dcmanage_render_servers(string $lang): void
     echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){var row=rows[r];var sid=row.getAttribute("data-server-id")||"";var detail=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid+"\\"]");if(row.dataset&&row.dataset.filtered==="1"){row.style.display="none";if(detail){detail.style.display="none";}}else{row.style.display="";}}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){var mainRow=visible[x];var sid2=mainRow.getAttribute("data-server-id")||"";var detailRow=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid2+"\\"]");var show=(x>=start&&x<end);mainRow.style.display=show?"":"none";if(!show&&detailRow){detailRow.style.display="none";}}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
     echo 'var serverSearch=document.getElementById("dcmanage-server-table-search");if(serverSearch){serverSearch.addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var rows=document.querySelectorAll("#dcmanage-server-table tbody tr.dcmanage-server-item");for(var i=0;i<rows.length;i++){var hay=normalizeSearchText(rows[i].getAttribute("data-search")||"");rows[i].dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.getElementById("dcmanage-server-table-pager");if(pager){pager._page=1;}applyServerPager();});}';
     echo 'var serverPager=document.getElementById("dcmanage-server-table-pager");if(serverPager){var p=serverPager.querySelector(".dcmanage-page-prev");var n=serverPager.querySelector(".dcmanage-page-next");var sz=serverPager.querySelector(".dcmanage-page-size");if(p){p.addEventListener("click",function(){serverPager._page=(serverPager._page||1)-1;applyServerPager();});}if(n){n.addEventListener("click",function(){serverPager._page=(serverPager._page||1)+1;applyServerPager();});}if(sz){sz.addEventListener("change",function(){serverPager._page=1;applyServerPager();});}}';
-    echo 'var createForm=document.querySelector("#dcmanage-server-add form");if(createForm){initServerForm(createForm);}var mapForms=document.querySelectorAll(".dcmanage-server-map");for(var i=0;i<mapForms.length;i++){initServerForm(mapForms[i]);}';
+    echo 'function initServerDiscovery(scope){if(!scope){return;}var host=scope.querySelector(".dcmanage-server-discovery-host");var ports=scope.querySelector(".dcmanage-server-discovery-ports");var run=scope.querySelector(".dcmanage-server-discovery-run");var out=scope.querySelector(".dcmanage-server-discovery-result");if(!run){return;}run.addEventListener("click",function(){var target=host?String(host.value||"").trim():"";if(target===""){if(out){out.textContent="Target IP / Host is required";}return;}if(out){out.textContent="Running...";}fetch(apiUrl("monitoring/discover",{host:target,ports:(ports?ports.value:"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var data=res.data||{};var rows=data.ports||[];if(!out){return;}if(rows.length===0){out.textContent="No results";return;}var txt=[];for(var i=0;i<rows.length;i++){var it=rows[i]||{};txt.push(String(it.port)+": "+(it.open?"open":"closed")+" ("+String(it.latency_ms||0)+"ms)");}out.textContent="Resolved IP: "+String(data.resolved_ip||"-")+" | "+txt.join(" | ");}).catch(function(err){if(out){out.textContent=String(err&&err.message?err.message:"error");}});});}';
+    echo 'var createForm=document.querySelector("#dcmanage-server-add form");if(createForm){initServerForm(createForm);}var mapForms=document.querySelectorAll(".dcmanage-server-map");for(var i=0;i<mapForms.length;i++){initServerForm(mapForms[i]);}var discoveryWraps=document.querySelectorAll(".dcmanage-server-discovery-wrap");for(var dw=0;dw<discoveryWraps.length;dw++){initServerDiscovery(discoveryWraps[dw]);}';
     echo 'var toggles=document.querySelectorAll(".dcmanage-server-map-toggle");for(var t=0;t<toggles.length;t++){toggles[t].addEventListener("click",function(){var target=document.getElementById(this.getAttribute("data-target"));if(!target){return;}var main=target.previousElementSibling;if(main&&main.style.display==="none"){return;}target.style.display=(target.style.display==="none"||target.style.display==="")?"table-row":"none";});}';
     echo 'applyServerPager();';
     echo '})();';
