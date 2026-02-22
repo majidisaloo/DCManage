@@ -3,6 +3,25 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.69] - 2026-02-22
+### Added
+- Added `Test Mode` in Settings (`settings.enforcement_test_mode`) to allow safe enforcement testing without executing real suspend/enforce operations.
+
+### Changed
+- Monitoring instance creation now supports non-PRTG providers (`SolarWinds`, `Cacti`) without forcing API secret at create time.
+- Monitoring add form now labels secret field as `passhash / apitoken` for clearer operator input.
+- PRTG client now normalizes base URL (removes `index.htm` / `home` suffixes) to prevent malformed API paths.
+- PRTG auth fallback chain expanded to try:
+  - `username + passhash`
+  - `username + password`
+  - `username + apitoken`
+  - `apitoken`
+- PRTG secret normalization now accepts prefixed values like `apitoken=...` and `passhash=...`.
+
+### Fixed
+- Reduced common `PRTG HTTP 401` causes for self-signed and mixed-auth deployments by improving URL and auth fallback handling.
+- Usage engine now skips real enforce queue actions in Test Mode and logs test-mode breach events instead.
+
 ## [0.1.68] - 2026-02-22
 ### Added
 - New `Services / Group` tab (replacing placeholder `WHMCS Scope`) with real product-scope management:

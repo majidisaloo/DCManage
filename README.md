@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.68)
+## Features in this release (v0.1.69)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -48,6 +48,9 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - `Services / Group` tab now provides real PID/GID product scope management with per-product download/upload/total defaults and unlimited toggles.
   - Datacenter create/edit now includes traffic calculation mode (`Download` / `Upload` / `Total`) used by usage enforcement.
   - Monitoring tab now supports multi-platform instance registry (`PRTG`, `SolarWinds`, `Cacti`) with a unified top add/list workflow.
+  - Monitoring create flow now allows non-PRTG provider records without mandatory PRTG secret.
+  - PRTG auth compatibility improved for `passhash`/`apitoken`/fallback combinations and normalized base URLs.
+  - Added Settings `Test Mode` toggle so enforce/suspend actions can be tested safely before production enforcement.
   - Added PRTG hierarchy browser flow for probe/group/subgroup/device/sensor traversal.
   - Added built-in discovery check (host + common TCP ports) for monitoring pre-validation without shell functions.
   - PRTG auth now supports both `Username + Passhash` and `API Token` modes with 401 fallback strategy.

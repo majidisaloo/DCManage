@@ -17,9 +17,9 @@ final class PrtgClient
 
     public function __construct(string $baseUrl, string $user, string $passhash, bool $verifySsl = true, string $authMode = 'passhash')
     {
-        $this->baseUrl = rtrim($baseUrl, '/');
+        $this->baseUrl = $this->normalizeBaseUrl($baseUrl);
         $this->user = $user;
-        $this->passhash = $passhash;
+        $this->passhash = $this->normalizeSecret($passhash);
         $this->verifySsl = $verifySsl;
         $this->authMode = in_array($authMode, ['passhash', 'api_token'], true) ? $authMode : 'passhash';
     }
@@ -276,15 +276,49 @@ final class PrtgClient
         if ($this->authMode === 'api_token') {
             return [
                 array_filter(['apitoken' => $secret, 'username' => $user], static fn($v) => $v !== ''),
+                array_filter(['username' => $user, 'passhash' => $secret], static fn($v) => $v !== ''),
+                array_filter(['username' => $user, 'password' => $secret], static fn($v) => $v !== ''),
                 ['apitoken' => $secret],
             ];
         }
 
         return [
             array_filter(['username' => $user, 'passhash' => $secret], static fn($v) => $v !== ''),
+            array_filter(['username' => $user, 'password' => $secret], static fn($v) => $v !== ''),
             array_filter(['username' => $user, 'apitoken' => $secret], static fn($v) => $v !== ''),
             ['apitoken' => $secret],
         ];
+    }
+
+    private function normalizeBaseUrl(string $baseUrl): string
+    {
+        $baseUrl = trim($baseUrl);
+        if ($baseUrl === '') {
+            return '';
+        }
+
+        $baseUrl = preg_replace('#/index\.htm(l)?$#i', '', $baseUrl) ?? $baseUrl;
+        $baseUrl = preg_replace('#/home$#i', '', $baseUrl) ?? $baseUrl;
+        $baseUrl = rtrim($baseUrl, '/');
+
+        return $baseUrl;
+    }
+
+    private function normalizeSecret(string $secret): string
+    {
+        $secret = trim($secret);
+        if ($secret === '') {
+            return '';
+        }
+
+        if (stripos($secret, 'apitoken=') === 0) {
+            return trim(substr($secret, strlen('apitoken=')));
+        }
+        if (stripos($secret, 'passhash=') === 0) {
+            return trim(substr($secret, strlen('passhash=')));
+        }
+
+        return $secret;
     }
 
     /**

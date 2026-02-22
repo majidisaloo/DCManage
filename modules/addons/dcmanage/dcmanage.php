@@ -285,8 +285,11 @@ function dcmanage_handle_actions(string $lang): string
                 $authMode = 'passhash';
             }
 
-            if ($name === '' || $baseUrl === '' || $passhash === '') {
-                throw new RuntimeException('Monitoring name, URL and API key/passhash are required');
+            if ($name === '' || $baseUrl === '') {
+                throw new RuntimeException('Monitoring name and URL are required');
+            }
+            if ($type === 'prtg' && $passhash === '') {
+                throw new RuntimeException('PRTG API key/passhash is required');
             }
 
             Capsule::table('mod_dcmanage_prtg_instances')->insert([
@@ -1120,6 +1123,7 @@ function dcmanage_system_defaults(): array
     return [
         'timezone' => 'Asia/Tehran',
         'locale' => 'default',
+        'enforcement_test_mode' => '0',
         'traffic_poll_minutes' => '5',
         'switch_discovery_minutes' => '30',
         'graph_cache_ttl_minutes' => '30',
@@ -1151,7 +1155,11 @@ function dcmanage_handle_settings_save(): void
 {
     $defaults = dcmanage_system_defaults();
     foreach (array_keys($defaults) as $key) {
-        $value = isset($_POST[$key]) ? trim((string) $_POST[$key]) : '';
+        if ($key === 'enforcement_test_mode') {
+            $value = (int) ($_POST['enforcement_test_mode'] ?? 0) === 1 ? '1' : '0';
+        } else {
+            $value = isset($_POST[$key]) ? trim((string) $_POST[$key]) : '';
+        }
         if ($value === '') {
             $value = $defaults[$key];
         }
@@ -1375,6 +1383,8 @@ function dcmanage_render_settings_form(string $lang): void
     echo '</select></div>';
 
     echo '<div class="col-md-4 mb-3"><label>Traffic Poll Minutes</label><input class="form-control dcmanage-input" name="traffic_poll_minutes" value="' . htmlspecialchars($settings['traffic_poll_minutes']) . '"></div>';
+    $testModeChecked = (string) ($settings['enforcement_test_mode'] ?? '0') === '1' ? ' checked' : '';
+    echo '<div class="col-md-4 mb-3"><label class="d-block">&nbsp;</label><label class="dcmanage-check-label"><input type="checkbox" name="enforcement_test_mode" value="1"' . $testModeChecked . '> ' . htmlspecialchars(I18n::t('settings_test_mode', $lang)) . '</label></div>';
     echo '<div class="col-md-4 mb-3"><label>' . htmlspecialchars(I18n::t('settings_discovery_minutes', $lang)) . '</label><input class="form-control dcmanage-input" name="switch_discovery_minutes" value="' . htmlspecialchars($settings['switch_discovery_minutes']) . '"></div>';
     echo '<div class="col-md-4 mb-3"><label>Graph Cache TTL (Minutes)</label><input class="form-control dcmanage-input" name="graph_cache_ttl_minutes" value="' . htmlspecialchars($settings['graph_cache_ttl_minutes']) . '"></div>';
     echo '<div class="col-md-4 mb-3"><label>Log Retention (Days)</label><input class="form-control dcmanage-input" name="log_retention_days" value="' . htmlspecialchars($settings['log_retention_days']) . '"></div>';
@@ -1446,7 +1456,7 @@ function dcmanage_render_monitoring(string $lang): void
     echo '<div class="form-row">';
     echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('prtg_user', $lang)) . '</label><input name="prtg_user" class="form-control dcmanage-input" placeholder="prtgadmin"></div>';
     echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_auth_mode', $lang)) . '</label><select name="prtg_auth_mode" class="form-control dcmanage-input"><option value="passhash">' . htmlspecialchars(I18n::t('monitoring_auth_passhash', $lang)) . '</option><option value="api_token">' . htmlspecialchars(I18n::t('monitoring_auth_apitoken', $lang)) . '</option></select></div>';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('prtg_passhash', $lang)) . '</label><input name="prtg_passhash" class="form-control dcmanage-input" required></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('prtg_passhash', $lang)) . '</label><input name="prtg_passhash" class="form-control dcmanage-input" placeholder="passhash / apitoken"></div>';
     echo '<div class="form-group col-md-2"><label class="d-block">&nbsp;</label><div class="custom-control custom-checkbox"><input type="checkbox" class="custom-control-input" id="dcmanage-prtg-verify-ssl" name="prtg_verify_ssl" value="1" checked><label class="custom-control-label" for="dcmanage-prtg-verify-ssl">' . htmlspecialchars(I18n::t('prtg_verify_ssl', $lang)) . '</label></div></div>';
     echo '</div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('prtg_create', $lang)) . '</button>';

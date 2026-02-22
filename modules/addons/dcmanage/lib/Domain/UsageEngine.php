@@ -136,7 +136,12 @@ final class UsageEngine
         ]);
 
         if ($status === 'blocked') {
-            JobQueue::enqueue('enforce', ['service_id' => $serviceId, 'reason' => 'quota_breach']);
+            $testMode = (string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.enforcement_test_mode')->value('meta_value') === '1';
+            if ($testMode) {
+                Logger::warning('usage', 'Quota breach detected in TEST MODE; enforce skipped', ['service_id' => $serviceId]);
+            } else {
+                JobQueue::enqueue('enforce', ['service_id' => $serviceId, 'reason' => 'quota_breach']);
+            }
         }
     }
 
