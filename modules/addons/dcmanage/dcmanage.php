@@ -140,6 +140,8 @@ function dcmanage_output(array $vars): void
         dcmanage_render_switches($lang);
     } elseif ($activeTab === 'servers') {
         dcmanage_render_servers($lang);
+    } elseif ($activeTab === 'packages') {
+        dcmanage_render_packages($lang);
     } elseif ($activeTab === 'logs') {
         dcmanage_render_logs($lang);
     } elseif ($activeTab === 'monitoring') {
@@ -690,6 +692,89 @@ function dcmanage_handle_actions(string $lang): string
             Capsule::table('mod_dcmanage_switch_ports')->where('id', $id)->update($payload);
 
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('switch_port_checked', $lang)) . '</div>';
+        }
+
+        if ($action === 'package_create') {
+            $dcId = (int) ($_POST['dc_id'] ?? 0);
+            $name = trim((string) ($_POST['name'] ?? ''));
+            $sizeGb = (float) ($_POST['size_gb'] ?? 0);
+            $price = (float) ($_POST['price'] ?? 0);
+            $taxed = (int) ($_POST['taxed'] ?? 0) === 1 ? 1 : 0;
+            $active = (int) ($_POST['active'] ?? 1) === 1 ? 1 : 0;
+
+            if ($dcId <= 0) {
+                throw new RuntimeException('Datacenter is required');
+            }
+            if ($name === '') {
+                throw new RuntimeException('Package name is required');
+            }
+            if ($sizeGb <= 0) {
+                throw new RuntimeException('Package size must be greater than zero');
+            }
+            if ($price < 0) {
+                throw new RuntimeException('Price cannot be negative');
+            }
+
+            Capsule::table('mod_dcmanage_packages')->insert([
+                'dc_id' => $dcId,
+                'name' => $name,
+                'size_gb' => $sizeGb,
+                'price' => $price,
+                'taxed' => $taxed,
+                'active' => $active,
+            ]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('created', $lang)) . '</div>';
+        }
+
+        if ($action === 'package_update') {
+            $packageId = (int) ($_POST['package_id'] ?? 0);
+            if ($packageId <= 0) {
+                throw new RuntimeException('Invalid package');
+            }
+
+            $dcId = (int) ($_POST['dc_id'] ?? 0);
+            $name = trim((string) ($_POST['name'] ?? ''));
+            $sizeGb = (float) ($_POST['size_gb'] ?? 0);
+            $price = (float) ($_POST['price'] ?? 0);
+            $taxed = (int) ($_POST['taxed'] ?? 0) === 1 ? 1 : 0;
+            $active = (int) ($_POST['active'] ?? 1) === 1 ? 1 : 0;
+
+            if ($dcId <= 0) {
+                throw new RuntimeException('Datacenter is required');
+            }
+            if ($name === '') {
+                throw new RuntimeException('Package name is required');
+            }
+            if ($sizeGb <= 0) {
+                throw new RuntimeException('Package size must be greater than zero');
+            }
+            if ($price < 0) {
+                throw new RuntimeException('Price cannot be negative');
+            }
+
+            Capsule::table('mod_dcmanage_packages')
+                ->where('id', $packageId)
+                ->update([
+                    'dc_id' => $dcId,
+                    'name' => $name,
+                    'size_gb' => $sizeGb,
+                    'price' => $price,
+                    'taxed' => $taxed,
+                    'active' => $active,
+                ]);
+
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
+        }
+
+        if ($action === 'package_delete') {
+            $packageId = (int) ($_POST['package_id'] ?? 0);
+            if ($packageId <= 0) {
+                throw new RuntimeException('Invalid package');
+            }
+
+            Capsule::table('mod_dcmanage_packages')->where('id', $packageId)->delete();
+            return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
 
         if ($action === 'server_create_bulk') {
@@ -2890,6 +2975,89 @@ function dcmanage_render_servers(string $lang): void
     echo 'applyServerPager();';
     echo '})();';
     echo '</script>';
+}
+
+function dcmanage_render_packages(string $lang): void
+{
+    $dcs = Capsule::table('mod_dcmanage_datacenters')->orderBy('name')->get(['id', 'name']);
+    $rows = Capsule::table('mod_dcmanage_packages as p')
+        ->leftJoin('mod_dcmanage_datacenters as d', 'd.id', '=', 'p.dc_id')
+        ->orderBy('p.id', 'desc')
+        ->get(['p.id', 'p.dc_id', 'p.name', 'p.size_gb', 'p.price', 'p.taxed', 'p.active', 'd.name as dc_name']);
+
+    echo '<div class="d-flex justify-content-end align-items-center mb-3 dcmanage-section-toolbar">';
+    echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-package-add">' . htmlspecialchars(I18n::t('package_add', $lang)) . '</button>';
+    echo '</div>';
+
+    echo '<div class="collapse mb-4" id="dcmanage-package-add">';
+    echo '<form method="post" action="" class="dcmanage-form-card dcmanage-centered-form">';
+    echo '<input type="hidden" name="dcmanage_action" value="package_create">';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" required class="form-control dcmanage-input"><option value="">--</option>';
+    foreach ($dcs as $dc) {
+        echo '<option value="' . (int) $dc->id . '">' . htmlspecialchars((string) $dc->name) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('package_name', $lang)) . '</label><input name="name" required class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_size_gb', $lang)) . '</label><input type="number" step="0.001" min="0.001" name="size_gb" value="10" required class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_price', $lang)) . '</label><input type="number" step="0.01" min="0" name="price" value="0" required class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</label><select name="taxed" class="form-control dcmanage-input"><option value="1">' . htmlspecialchars(I18n::t('yes', $lang)) . '</option><option value="0">' . htmlspecialchars(I18n::t('no', $lang)) . '</option></select></div>';
+    echo '</div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</label><select name="active" class="form-control dcmanage-input"><option value="1">' . htmlspecialchars(I18n::t('status_active', $lang)) . '</option><option value="0">' . htmlspecialchars(I18n::t('status_inactive', $lang)) . '</option></select></div>';
+    echo '</div>';
+    echo '<button class="btn btn-primary" type="submit" name="dcmanage_action_btn" value="package_create">' . htmlspecialchars(I18n::t('package_create', $lang)) . '</button>';
+    echo '</form>';
+    echo '</div>';
+
+    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped dcmanage-dc-table">';
+    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_size_gb', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_price', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+
+    foreach ($rows as $row) {
+        $taxed = (int) ($row->taxed ?? 0) === 1 ? I18n::t('yes', $lang) : I18n::t('no', $lang);
+        $activeLabel = (int) ($row->active ?? 0) === 1 ? I18n::t('status_active', $lang) : I18n::t('status_inactive', $lang);
+        echo '<tr>';
+        echo '<td>' . (int) $row->id . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->dc_name ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->name) . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->size_gb) . '</td>';
+        echo '<td>' . htmlspecialchars((string) $row->price) . '</td>';
+        echo '<td>' . htmlspecialchars($taxed) . '</td>';
+        echo '<td>' . htmlspecialchars($activeLabel) . '</td>';
+        echo '<td><div class="dcmanage-action-buttons">';
+        echo '<button class="btn btn-sm dcmanage-btn-soft-warning" type="button" data-toggle="collapse" data-target="#pkg-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
+        echo '<form method="post" style="display:inline" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('delete_confirm_package', $lang), ENT_QUOTES, 'UTF-8') . '\')">';
+        echo '<input type="hidden" name="dcmanage_action" value="package_delete"><input type="hidden" name="package_id" value="' . (int) $row->id . '">';
+        echo '<button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="package_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button>';
+        echo '</form>';
+        echo '</div></td>';
+        echo '</tr>';
+
+        echo '<tr class="collapse" id="pkg-edit-' . (int) $row->id . '"><td colspan="8">';
+        echo '<form method="post" class="dcmanage-form-card dcmanage-centered-form">';
+        echo '<input type="hidden" name="dcmanage_action" value="package_update"><input type="hidden" name="package_id" value="' . (int) $row->id . '">';
+        echo '<div class="form-row">';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" required class="form-control dcmanage-input">';
+        foreach ($dcs as $dc) {
+            $selected = (int) $dc->id === (int) ($row->dc_id ?? 0) ? ' selected' : '';
+            echo '<option value="' . (int) $dc->id . '"' . $selected . '>' . htmlspecialchars((string) $dc->name) . '</option>';
+        }
+        echo '</select></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('package_name', $lang)) . '</label><input name="name" required class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
+        echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_size_gb', $lang)) . '</label><input type="number" step="0.001" min="0.001" name="size_gb" required class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->size_gb) . '"></div>';
+        echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_price', $lang)) . '</label><input type="number" step="0.01" min="0" name="price" required class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->price) . '"></div>';
+        echo '<div class="form-group col-md-1"><label>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</label><select name="taxed" class="form-control dcmanage-input"><option value="1"' . ((int) $row->taxed === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('yes', $lang)) . '</option><option value="0"' . ((int) $row->taxed === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('no', $lang)) . '</option></select></div>';
+        echo '<div class="form-group col-md-1"><label>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</label><select name="active" class="form-control dcmanage-input"><option value="1"' . ((int) $row->active === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_active', $lang)) . '</option><option value="0"' . ((int) $row->active === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_inactive', $lang)) . '</option></select></div>';
+        echo '</div>';
+        echo '<button class="btn btn-primary btn-sm" type="submit" name="dcmanage_action_btn" value="package_update">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+        echo '</form>';
+        echo '</td></tr>';
+    }
+
+    if (count($rows) === 0) {
+        echo '<tr><td colspan="8">-</td></tr>';
+    }
+    echo '</tbody></table></div>';
 }
 
 function dcmanage_render_simple_pagination(string $baseUrl, int $page, int $perPage, int $total, string $lang, string $pageParam): string

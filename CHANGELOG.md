@@ -3,6 +3,18 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.62] - 2026-02-22
+### Added
+- Implemented full `Traffic Packages` admin CRUD UI in addon:
+  - Add package by Datacenter (required), Package Name, Traffic Unit (GB), Price, Taxed, Status.
+  - Edit package with same fields.
+  - Delete package with confirmation.
+- Added bilingual labels/messages for package fields and actions in English/Persian.
+
+### Changed
+- `Traffic Packages` tab now renders real management UI instead of placeholder message.
+- Package model is now explicitly Datacenter-scoped in UI for different pricing per datacenter.
+
 ## [0.1.61] - 2026-02-22
 ### Changed
 - Servers tab now provides two top action buttons (`Add Server`, `Bulk Create Servers`) and each form is opened in its own collapsible section for cleaner workflow.
