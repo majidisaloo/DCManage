@@ -3,6 +3,29 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.67] - 2026-02-22
+### Added
+- Monitoring API now exposes PRTG hierarchy endpoints for structured browsing:
+  - `prtg/probes`
+  - `prtg/groups`
+  - `prtg/devices`
+  - `prtg/device-sensors`
+- Added monitoring discovery endpoint (`monitoring/discover`) to test target host common TCP ports without `shell_exec`.
+- Monitoring tab now includes:
+  - unified list of monitoring instances (PRTG / SolarWinds / Cacti),
+  - top add button and add form,
+  - PRTG Browser (instance -> probe -> group -> subgroup -> device -> sensors),
+  - discovery card for host/port checks.
+
+### Changed
+- PRTG credentials now support auth mode selection (`passhash` or `api_token`) and keep `Verify SSL` behavior for self-signed environments.
+- Server traffic and monitoring mapping UX updated so search is embedded in the same selector block (no separate detached search column).
+- Switch-port option labels in server mapping now include VLAN context when available.
+
+### Fixed
+- Improved PRTG HTTP 401 handling by adding resilient auth fallback attempts (`username+passhash`, `username+apitoken`, `apitoken`).
+- Datacenter-dependent select filtering now rebuilds option lists by selected datacenter to prevent cross-DC rack/switch selection leakage.
+
 ## [0.1.66] - 2026-02-22
 ### Changed
 - Introduced a global inline action bar style for consistent spacing/alignment of buttons and action links across forms/tables.

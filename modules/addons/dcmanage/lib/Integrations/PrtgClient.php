@@ -13,13 +13,15 @@ final class PrtgClient
     private string $user;
     private string $passhash;
     private bool $verifySsl;
+    private string $authMode;
 
-    public function __construct(string $baseUrl, string $user, string $passhash, bool $verifySsl = true)
+    public function __construct(string $baseUrl, string $user, string $passhash, bool $verifySsl = true, string $authMode = 'passhash')
     {
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->user = $user;
         $this->passhash = $passhash;
         $this->verifySsl = $verifySsl;
+        $this->authMode = in_array($authMode, ['passhash', 'api_token'], true) ? $authMode : 'passhash';
     }
 
     public static function fromDb(int $prtgId): self
@@ -33,13 +35,25 @@ final class PrtgClient
             (string) $row->base_url,
             (string) $row->user,
             Crypto::decrypt((string) $row->passhash_enc),
-            (bool) $row->verify_ssl
+            (bool) $row->verify_ssl,
+            (string) ($row->auth_mode ?? 'passhash')
         );
     }
 
     public function testConnection(): array
     {
-        return $this->get('/api/getstatus.json', []);
+        $json = $this->get('/api/table.json', [
+            'content' => 'probes',
+            'output' => 'json',
+            'columns' => 'objid,probe',
+            'count' => 1,
+        ]);
+
+        return [
+            'ok' => true,
+            'probes_count' => isset($json['probes']) && is_array($json['probes']) ? count($json['probes']) : 0,
+            'raw' => $json,
+        ];
     }
 
     public function getTrafficCounters(string $sensorId): array
@@ -121,40 +135,185 @@ final class PrtgClient
         return $items;
     }
 
-    private function get(string $path, array $query): array
+    public function listProbes(int $limit = 200): array
     {
-        $query = array_merge($query, [
-            'username' => $this->user,
-            'passhash' => $this->passhash,
+        $json = $this->get('/api/table.json', [
+            'content' => 'probes',
+            'output' => 'json',
+            'columns' => 'objid,probe,status',
+            'count' => max(20, min(1000, $limit)),
         ]);
 
-        $url = $this->baseUrl . $path . '?' . http_build_query($query);
+        return $this->normalizeTableRows($json['probes'] ?? [], 'probe');
+    }
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->verifySsl);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->verifySsl ? 2 : 0);
+    public function listGroups(int $parentId, int $limit = 300): array
+    {
+        $json = $this->get('/api/table.json', [
+            'content' => 'groups',
+            'output' => 'json',
+            'columns' => 'objid,group,parentid,status',
+            'count' => max(20, min(1000, $limit)),
+            'filter_parentid' => $parentId,
+        ]);
 
-        $body = curl_exec($ch);
-        if ($body === false) {
-            $error = curl_error($ch);
+        return $this->normalizeTableRows($json['groups'] ?? [], 'group');
+    }
+
+    public function listDevices(int $parentId, int $limit = 300): array
+    {
+        $json = $this->get('/api/table.json', [
+            'content' => 'devices',
+            'output' => 'json',
+            'columns' => 'objid,device,group,parentid,status,host',
+            'count' => max(20, min(1000, $limit)),
+            'filter_parentid' => $parentId,
+        ]);
+
+        return $this->normalizeTableRows($json['devices'] ?? [], 'device', 'host');
+    }
+
+    public function listDeviceSensors(int $deviceId, int $limit = 400, string $query = ''): array
+    {
+        $limit = max(20, min(1000, $limit));
+        $json = $this->get('/api/table.json', [
+            'content' => 'sensors',
+            'output' => 'json',
+            'columns' => 'objid,sensor,device,group,status,lastvalue,parentid',
+            'count' => $limit,
+            'filter_parentid' => $deviceId,
+        ]);
+
+        $rows = $json['sensors'] ?? [];
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $q = strtolower(trim($query));
+        $items = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $id = trim((string) ($row['objid'] ?? $row['id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+
+            $name = trim((string) ($row['sensor'] ?? $row['name'] ?? $id));
+            $device = trim((string) ($row['device'] ?? ''));
+            $group = trim((string) ($row['group'] ?? ''));
+            $status = trim((string) ($row['status'] ?? ''));
+            $lastValue = trim((string) ($row['lastvalue'] ?? ''));
+
+            if ($q !== '') {
+                $haystack = strtolower($id . ' ' . $name . ' ' . $device . ' ' . $group . ' ' . $status);
+                if (strpos($haystack, $q) === false) {
+                    continue;
+                }
+            }
+
+            $items[] = [
+                'id' => $id,
+                'name' => $name,
+                'device' => $device,
+                'group' => $group,
+                'status' => $status,
+                'lastvalue' => $lastValue,
+            ];
+        }
+
+        return $items;
+    }
+
+    private function get(string $path, array $query): array
+    {
+        $errors = [];
+        foreach ($this->authCandidates() as $auth) {
+            $fullQuery = array_merge($query, $auth);
+            $url = $this->baseUrl . $path . '?' . http_build_query($fullQuery);
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 45);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->verifySsl);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->verifySsl ? 2 : 0);
+
+            $body = curl_exec($ch);
+            if ($body === false) {
+                $errors[] = 'PRTG request failed: ' . curl_error($ch);
+                curl_close($ch);
+                continue;
+            }
+
+            $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            throw new \RuntimeException('PRTG request failed: ' . $error);
+
+            if ($statusCode >= 400) {
+                $errors[] = 'PRTG HTTP ' . $statusCode;
+                continue;
+            }
+
+            $json = json_decode($body, true);
+            if (!is_array($json)) {
+                $errors[] = 'PRTG returned invalid JSON';
+                continue;
+            }
+
+            return $json;
         }
 
-        $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        throw new \RuntimeException($errors !== [] ? (string) end($errors) : 'PRTG request failed');
+    }
 
-        if ($statusCode >= 400) {
-            throw new \RuntimeException('PRTG HTTP ' . $statusCode);
+    private function authCandidates(): array
+    {
+        $secret = trim($this->passhash);
+        $user = trim($this->user);
+
+        if ($this->authMode === 'api_token') {
+            return [
+                array_filter(['apitoken' => $secret, 'username' => $user], static fn($v) => $v !== ''),
+                ['apitoken' => $secret],
+            ];
         }
 
-        $json = json_decode($body, true);
-        if (!is_array($json)) {
-            throw new \RuntimeException('PRTG returned invalid JSON');
+        return [
+            array_filter(['username' => $user, 'passhash' => $secret], static fn($v) => $v !== ''),
+            array_filter(['username' => $user, 'apitoken' => $secret], static fn($v) => $v !== ''),
+            ['apitoken' => $secret],
+        ];
+    }
+
+    /**
+     * @param mixed $rows
+     */
+    private function normalizeTableRows($rows, string $nameKey, ?string $extraKey = null): array
+    {
+        if (!is_array($rows)) {
+            return [];
         }
 
-        return $json;
+        $items = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = trim((string) ($row['objid'] ?? $row['id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+            $items[] = [
+                'id' => $id,
+                'name' => trim((string) ($row[$nameKey] ?? $row['name'] ?? $id)),
+                'status' => trim((string) ($row['status'] ?? '')),
+                'parent_id' => (int) ($row['parentid'] ?? 0),
+                'extra' => $extraKey !== null ? trim((string) ($row[$extraKey] ?? '')) : '',
+            ];
+        }
+
+        return $items;
     }
 }

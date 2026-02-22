@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 9;
+    private const SCHEMA_VERSION = 10;
 
     public static function migrate(): void
     {
@@ -59,6 +59,11 @@ final class Schema
         if ($current < 9) {
             self::migrationV9();
             self::setCurrentVersion(9);
+        }
+
+        if ($current < 10) {
+            self::migrationV10();
+            self::setCurrentVersion(10);
         }
     }
 
@@ -215,8 +220,10 @@ final class Schema
             Capsule::schema()->create('mod_dcmanage_prtg_instances', static function (Blueprint $table): void {
                 $table->increments('id');
                 $table->string('name', 191);
+                $table->string('type', 32)->default('prtg')->index();
                 $table->string('base_url', 255);
                 $table->string('user', 191);
+                $table->string('auth_mode', 32)->default('passhash');
                 $table->text('passhash_enc');
                 $table->string('timezone', 64)->nullable();
                 $table->boolean('verify_ssl')->default(true);
@@ -475,6 +482,21 @@ final class Schema
         if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors') && !Capsule::schema()->hasColumn('mod_dcmanage_server_traffic_sensors', 'alert_action')) {
             Capsule::schema()->table('mod_dcmanage_server_traffic_sensors', static function (Blueprint $table): void {
                 $table->string('alert_action', 16)->default('none')->after('sensor_name');
+            });
+        }
+    }
+
+    private static function migrationV10(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_prtg_instances') && !Capsule::schema()->hasColumn('mod_dcmanage_prtg_instances', 'type')) {
+            Capsule::schema()->table('mod_dcmanage_prtg_instances', static function (Blueprint $table): void {
+                $table->string('type', 32)->default('prtg')->after('name')->index();
+            });
+        }
+
+        if (Capsule::schema()->hasTable('mod_dcmanage_prtg_instances') && !Capsule::schema()->hasColumn('mod_dcmanage_prtg_instances', 'auth_mode')) {
+            Capsule::schema()->table('mod_dcmanage_prtg_instances', static function (Blueprint $table): void {
+                $table->string('auth_mode', 32)->default('passhash')->after('user');
             });
         }
     }

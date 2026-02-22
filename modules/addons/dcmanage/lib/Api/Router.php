@@ -58,6 +58,21 @@ final class Router
                 case 'prtg/sensors':
                     $data = self::prtgSensors();
                     break;
+                case 'prtg/probes':
+                    $data = self::prtgProbes();
+                    break;
+                case 'prtg/groups':
+                    $data = self::prtgGroups();
+                    break;
+                case 'prtg/devices':
+                    $data = self::prtgDevices();
+                    break;
+                case 'prtg/device-sensors':
+                    $data = self::prtgDeviceSensors();
+                    break;
+                case 'monitoring/discover':
+                    $data = self::monitoringDiscover();
+                    break;
                 case 'switch/ports':
                     $data = self::switchPorts();
                     break;
@@ -266,6 +281,110 @@ final class Router
         return [
             'items' => $items,
             'count' => count($items),
+        ];
+    }
+
+    private static function prtgProbes(): array
+    {
+        $prtgId = (int) ($_GET['prtg_id'] ?? 0);
+        if ($prtgId <= 0) {
+            throw new \InvalidArgumentException('prtg_id is required');
+        }
+
+        $client = PrtgClient::fromDb($prtgId);
+        $items = $client->listProbes();
+
+        return ['items' => $items, 'count' => count($items)];
+    }
+
+    private static function prtgGroups(): array
+    {
+        $prtgId = (int) ($_GET['prtg_id'] ?? 0);
+        $parentId = (int) ($_GET['parent_id'] ?? 0);
+        if ($prtgId <= 0 || $parentId <= 0) {
+            throw new \InvalidArgumentException('prtg_id and parent_id are required');
+        }
+
+        $client = PrtgClient::fromDb($prtgId);
+        $items = $client->listGroups($parentId);
+
+        return ['items' => $items, 'count' => count($items)];
+    }
+
+    private static function prtgDevices(): array
+    {
+        $prtgId = (int) ($_GET['prtg_id'] ?? 0);
+        $parentId = (int) ($_GET['parent_id'] ?? 0);
+        if ($prtgId <= 0 || $parentId <= 0) {
+            throw new \InvalidArgumentException('prtg_id and parent_id are required');
+        }
+
+        $client = PrtgClient::fromDb($prtgId);
+        $items = $client->listDevices($parentId);
+
+        return ['items' => $items, 'count' => count($items)];
+    }
+
+    private static function prtgDeviceSensors(): array
+    {
+        $prtgId = (int) ($_GET['prtg_id'] ?? 0);
+        $deviceId = (int) ($_GET['device_id'] ?? 0);
+        $query = trim((string) ($_GET['q'] ?? ''));
+        $limit = max(20, min(500, (int) ($_GET['limit'] ?? 250)));
+
+        if ($prtgId <= 0 || $deviceId <= 0) {
+            throw new \InvalidArgumentException('prtg_id and device_id are required');
+        }
+
+        $client = PrtgClient::fromDb($prtgId);
+        $items = $client->listDeviceSensors($deviceId, $limit, $query);
+
+        return ['items' => $items, 'count' => count($items)];
+    }
+
+    private static function monitoringDiscover(): array
+    {
+        $host = trim((string) ($_GET['host'] ?? ''));
+        if ($host === '') {
+            throw new \InvalidArgumentException('host is required');
+        }
+
+        $portsInput = trim((string) ($_GET['ports'] ?? '22,80,443,3389,8080,8443'));
+        $ports = [];
+        foreach (preg_split('/[\s,;]+/', $portsInput) ?: [] as $port) {
+            $value = (int) $port;
+            if ($value > 0 && $value <= 65535) {
+                $ports[$value] = $value;
+            }
+        }
+        if ($ports === []) {
+            $ports = [22 => 22, 80 => 80, 443 => 443];
+        }
+
+        $resolved = gethostbyname($host);
+        $resolvedIp = $resolved !== $host ? $resolved : '';
+        $results = [];
+        foreach ($ports as $port) {
+            $start = microtime(true);
+            $conn = @fsockopen($host, $port, $errno, $errstr, 2.0);
+            $latency = (int) round((microtime(true) - $start) * 1000);
+            $open = is_resource($conn);
+            if ($open) {
+                fclose($conn);
+            }
+            $results[] = [
+                'port' => $port,
+                'open' => $open,
+                'latency_ms' => $latency,
+                'error' => $open ? '' : ($errstr !== '' ? $errstr : ('errno:' . $errno)),
+            ];
+        }
+
+        return [
+            'host' => $host,
+            'resolved_ip' => $resolvedIp,
+            'checked_ports' => count($results),
+            'ports' => $results,
         ];
     }
 
