@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.63] - 2026-02-22
+### Changed
+- VLAN visibility is now restricted to VLAN interfaces only (`Vlan*` / `Vlanif*`).
+- Physical interfaces (e.g. `Ethernet`, `mgmt`, `10G/40G` ports) now keep VLAN field empty in switch ports view and persisted data.
+
+### Fixed
+- Prevented SNMP PVID-derived VLAN values from being shown on non-VLAN interfaces.
+
 ## [0.1.62] - 2026-02-22
 ### Added
 - Implemented full `Traffic Packages` admin CRUD UI in addon:

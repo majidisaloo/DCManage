@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.62)
+## Features in this release (v0.1.63)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -63,6 +63,9 @@ DCManage is an API-first datacenter management core inside WHMCS.
     - Price
     - Taxed (for invoice tax behavior)
     - Active/Inactive status
+- Switch VLAN display logic:
+  - VLAN value is now shown only for VLAN interfaces (`Vlan*` / `Vlanif*`).
+  - Physical interfaces (`Ethernet`, `mgmt`, uplinks, 10G/40G ports) keep VLAN column empty.
   - Server `Edit` row toggle is restored and works correctly again.
   - Live table search now normalizes Persian/Arabic digits and common Arabic/Persian letter variants for reliable matching in mixed-language input.
   - Servers table pagination moved to bottom and now defaults to 15 items with user-selectable page size (10/15/25/50/100).
