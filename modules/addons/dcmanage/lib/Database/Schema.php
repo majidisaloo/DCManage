@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 13;
+    private const SCHEMA_VERSION = 14;
 
     public static function migrate(): void
     {
@@ -79,6 +79,11 @@ final class Schema
         if ($current < 13) {
             self::migrationV13();
             self::setCurrentVersion(13);
+        }
+
+        if ($current < 14) {
+            self::migrationV14();
+            self::setCurrentVersion(14);
         }
     }
 
@@ -583,6 +588,15 @@ final class Schema
         if (Capsule::schema()->hasTable('mod_dcmanage_servers') && !Capsule::schema()->hasColumn('mod_dcmanage_servers', 'action_port_id')) {
             Capsule::schema()->table('mod_dcmanage_servers', static function (Blueprint $table): void {
                 $table->unsignedInteger('action_port_id')->nullable()->after('action_switch_id')->index();
+            });
+        }
+    }
+
+    private static function migrationV14(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors') && !Capsule::schema()->hasColumn('mod_dcmanage_server_traffic_sensors', 'sensor_type')) {
+            Capsule::schema()->table('mod_dcmanage_server_traffic_sensors', static function (Blueprint $table): void {
+                $table->string('sensor_type', 32)->default('traffic')->after('sensor_id')->index();
             });
         }
     }

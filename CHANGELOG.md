@@ -3,6 +3,29 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.73] - 2026-02-22
+### Changed
+- Servers table no longer renders inline row edit forms; server actions are now compact and include dedicated `View`, `Edit`, and `Delete`.
+- Server details now use a single details workspace below the table with mode switching:
+  - `View` (read-only)
+  - `Edit` (editable with Save/Cancel flow)
+- Server details UI sections were reorganized to be cleaner and easier to scan:
+  - Overview
+  - Network Control (single SNMP control port mapping)
+  - Traffic links and aggregated counters (Download / Upload / Total)
+  - Hardware/Traffic monitoring sensor sections
+  - Public IP discovery/check block
+  - WHMCS discovery status/logs visibility
+  - iLO block in the same server workflow
+
+### Added
+- Added schema migration `v14` to extend `mod_dcmanage_server_traffic_sensors` with `sensor_type` for separating `traffic` and `hardware` sensor mappings.
+- Server create/update now persists explicit control-port mapping (`action_switch_id` + `action_port_id`) and keeps compatibility fallback to first traffic link when no explicit control port is chosen.
+
+### Fixed
+- Improved server details spacing/alignment/button consistency with new dedicated server-details card styles.
+- Monitoring row parser now supports `monitor_sensor_type[]` safely with validation and deduping by `(prtg_id, sensor_id, alert_action, sensor_type)`.
+
 ## [0.1.72] - 2026-02-22
 ### Fixed
 - Fixed Safari/WebKit JS selector escaping in Rack/Switch/Servers scripts that caused `SyntaxError: Invalid escape in identifier` and blocked server edit interactions.
