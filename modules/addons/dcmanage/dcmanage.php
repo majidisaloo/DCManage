@@ -124,7 +124,6 @@ function dcmanage_output(array $vars): void
     echo '<div class="card mt-3 border-0 shadow-sm dcmanage-page-card"><div class="card-body dcmanage-page-body">';
 
     if ($activeTab === 'dashboard') {
-        echo '<div class="dcmanage-header mb-3"><h2 class="mb-1">' . htmlspecialchars(I18n::t('title', $lang)) . '</h2><p class="text-muted mb-0">' . htmlspecialchars(I18n::t('subtitle', $lang)) . ' - v' . htmlspecialchars(DCManage\Version::CURRENT) . '</p></div>';
         echo '<div id="dcmanage-dashboard" data-module-link="' . $moduleLink . '" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
         echo '<div id="dcmanage-version" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
         echo '<div id="dcmanage-cron" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
@@ -1208,22 +1207,22 @@ function dcmanage_render_settings_form(string $lang): void
     echo '</div>';
     echo '</form>';
 
-    $overallClass = $cron['overall'] === 'ok' ? 'success' : ($cron['overall'] === 'fail' ? 'danger' : 'warning');
+    $overallClass = $cron['overall'] === 'ok' ? 'is-up' : ($cron['overall'] === 'fail' ? 'is-down' : 'is-unknown');
     echo '<hr class="my-4">';
     if (!empty($cron['items'][0]['cron'])) {
         echo '<div class="alert alert-info text-break mb-3"><strong>' . htmlspecialchars(I18n::t('cron_single_entry', $lang)) . ':</strong> <code>' . htmlspecialchars((string) $cron['items'][0]['cron']) . '</code></div>';
     }
-    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('cron_monitor', $lang)) . ' <span class="badge badge-' . $overallClass . '">' . htmlspecialchars(I18n::t('cron_overall', $lang)) . '</span></h5>';
+    echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('cron_monitor', $lang)) . ' <span class="dcmanage-status-pill ' . $overallClass . '">' . htmlspecialchars(I18n::t('cron_overall', $lang)) . '</span></h5>';
     echo '<div class="table-responsive dcmanage-table-wrap">';
     echo '<table class="table table-sm table-bordered">';
     echo '<thead><tr><th>' . htmlspecialchars(I18n::t('cron_task', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_last_run', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('cron_next_run', $lang)) . '</th></tr></thead><tbody>';
 
     foreach ($cron['items'] as $item) {
-        $cls = $item['status'] === 'ok' ? 'success' : ($item['status'] === 'fail' ? 'danger' : 'warning');
+        $cls = $item['status'] === 'ok' ? 'is-up' : ($item['status'] === 'fail' ? 'is-down' : 'is-unknown');
         $label = $item['status'] === 'ok' ? I18n::t('status_ok', $lang) : ($item['status'] === 'fail' ? I18n::t('status_fail', $lang) : I18n::t('status_warning', $lang));
         echo '<tr>';
         echo '<td>' . htmlspecialchars($item['task']) . '</td>';
-        echo '<td><span class="badge badge-' . $cls . '">' . htmlspecialchars($label) . '</span></td>';
+        echo '<td><span class="dcmanage-status-pill ' . $cls . '">' . htmlspecialchars($label) . '</span></td>';
         echo '<td>' . htmlspecialchars($item['last']) . '</td>';
         echo '<td>' . htmlspecialchars($item['next']) . '</td>';
         echo '</tr>';

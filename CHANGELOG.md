@@ -3,6 +3,18 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.58] - 2026-02-22
+### Fixed
+- Auto-update package validation now correctly detects module path for both release asset layouts:
+  - archive root contains `modules/addons/dcmanage`
+  - archive contains a top-level folder that then contains `modules/addons/dcmanage`
+- Resolved false update failure: `Update archive missing modules/addons/dcmanage`.
+- Dashboard Cron Health `OK` state now renders with green status pill (instead of gray badge).
+- Settings Cron Monitor status pills now use consistent green/yellow/red semantic colors.
+
+### Changed
+- Removed extra dashboard header text line (`DCManage / API-first Datacenter Core - vX.Y.Z`) as requested.
+
 ## [0.1.57] - 2026-02-22
 ### Changed
 - Search normalization improved for live tables so Persian/Arabic digits are matched the same as English digits.

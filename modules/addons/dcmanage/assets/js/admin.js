@@ -323,19 +323,17 @@
       }
 
       var d = res.data || {};
-      var cls = d.overall === 'ok' ? 'success' : (d.overall === 'fail' ? 'danger' : 'warning');
       var label = d.overall === 'ok' ? T.ok : (d.overall === 'fail' ? T.fail : T.warn);
       var rows = d.items || [];
       var html = '<div class="p-3 dcmanage-version-card">';
       html += '<div class="dcmanage-cron-head">';
       html += '<h5 class="mb-0">' + safeText(T.cronHealth) + '</h5>';
-      html += '<span class="badge badge-' + cls + '">' + safeText(label) + '</span>';
+      html += '<span class="dcmanage-status-pill ' + (d.overall === 'ok' ? 'is-up' : (d.overall === 'fail' ? 'is-down' : 'is-unknown')) + '">' + safeText(label) + '</span>';
       html += '</div>';
       html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Task</th><th>Status</th><th>Last Run</th><th>Next Run</th></tr></thead><tbody>';
       rows.forEach(function (r) {
-        var scls = r.status === 'ok' ? 'success' : (r.status === 'fail' ? 'danger' : 'warning');
         var slbl = r.status === 'ok' ? T.ok : (r.status === 'fail' ? T.fail : T.warn);
-        html += '<tr><td>' + safeText(r.task) + '</td><td><span class="badge badge-' + scls + '">' + safeText(slbl) + '</span></td><td>' + safeText(r.last_run || '-') + '</td><td>' + safeText(r.next_run || '-') + '</td></tr>';
+        html += '<tr><td>' + safeText(r.task) + '</td><td><span class="dcmanage-status-pill ' + (r.status === 'ok' ? 'is-up' : (r.status === 'fail' ? 'is-down' : 'is-unknown')) + '">' + safeText(slbl) + '</span></td><td>' + safeText(r.last_run || '-') + '</td><td>' + safeText(r.next_run || '-') + '</td></tr>';
       });
       html += '</tbody></table></div>';
       html += '<div class="mt-2"><a class="btn btn-sm btn-outline-secondary" href="' + moduleLink + '&tab=settings">' + safeText(T.openCron) + '</a></div>';

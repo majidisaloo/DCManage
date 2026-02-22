@@ -420,8 +420,7 @@ final class UpdateManager
         $zip->close();
         self::checkCanceled('Canceled after extraction');
 
-        $repoRoot = self::findRepoRoot($extractDir);
-        $sourceModule = $repoRoot . DIRECTORY_SEPARATOR . 'modules' . DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR . 'dcmanage';
+        $sourceModule = self::findExtractedModulePath($extractDir);
         if (!is_dir($sourceModule)) {
             self::cleanupTemp($zipFile, $extractDir);
             throw new \RuntimeException('Update archive missing modules/addons/dcmanage');
@@ -438,25 +437,56 @@ final class UpdateManager
         self::cleanupTemp($zipFile, $extractDir);
     }
 
-    private static function findRepoRoot(string $extractDir): string
+    private static function findExtractedModulePath(string $extractDir): string
     {
+        $candidates = [
+            $extractDir . DIRECTORY_SEPARATOR . 'modules' . DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR . 'dcmanage',
+            $extractDir . DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR . 'dcmanage',
+            $extractDir . DIRECTORY_SEPARATOR . 'dcmanage',
+        ];
+
         $entries = scandir($extractDir);
-        if (!is_array($entries)) {
-            throw new \RuntimeException('Cannot read extracted update directory');
+        if (is_array($entries)) {
+            foreach ($entries as $entry) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+                $base = $extractDir . DIRECTORY_SEPARATOR . $entry;
+                if (!is_dir($base)) {
+                    continue;
+                }
+                $candidates[] = $base . DIRECTORY_SEPARATOR . 'modules' . DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR . 'dcmanage';
+                $candidates[] = $base . DIRECTORY_SEPARATOR . 'addons' . DIRECTORY_SEPARATOR . 'dcmanage';
+                $candidates[] = $base . DIRECTORY_SEPARATOR . 'dcmanage';
+            }
         }
 
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
+        foreach ($candidates as $candidate) {
+            if (is_dir($candidate) && is_file($candidate . DIRECTORY_SEPARATOR . 'dcmanage.php')) {
+                return $candidate;
+            }
+        }
+
+        if (!class_exists(\RecursiveDirectoryIterator::class)) {
+            throw new \RuntimeException('Update archive missing modules/addons/dcmanage');
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($extractDir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $item) {
+            if (!$item->isDir()) {
                 continue;
             }
-
-            $path = $extractDir . DIRECTORY_SEPARATOR . $entry;
-            if (is_dir($path)) {
+            $path = $item->getPathname();
+            $normalized = str_replace('\\', '/', $path);
+            if (substr($normalized, -23) === '/modules/addons/dcmanage' && is_file($path . DIRECTORY_SEPARATOR . 'dcmanage.php')) {
                 return $path;
             }
         }
 
-        throw new \RuntimeException('Repository root not found in extracted update');
+        throw new \RuntimeException('Update archive missing modules/addons/dcmanage');
     }
 
     private static function copyRecursive(string $src, string $dst, bool $root = false): void
