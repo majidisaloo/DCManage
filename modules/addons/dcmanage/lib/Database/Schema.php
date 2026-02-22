@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 10;
+    private const SCHEMA_VERSION = 11;
 
     public static function migrate(): void
     {
@@ -65,6 +65,11 @@ final class Schema
             self::migrationV10();
             self::setCurrentVersion(10);
         }
+
+        if ($current < 11) {
+            self::migrationV11();
+            self::setCurrentVersion(11);
+        }
     }
 
     private static function ensureMeta(): void
@@ -115,6 +120,7 @@ final class Schema
                 $table->string('name', 191);
                 $table->string('code', 64)->nullable();
                 $table->string('location', 191)->nullable();
+                $table->string('traffic_calc_mode', 16)->default('TOTAL');
                 $table->text('notes')->nullable();
                 $table->timestamp('created_at')->nullable();
             });
@@ -256,6 +262,12 @@ final class Schema
                 $table->decimal('default_quota_gb', 12, 3)->default(0);
                 $table->string('default_mode', 16)->default('TOTAL');
                 $table->string('default_action', 16)->default('BLOCK');
+                $table->decimal('down_limit_gb', 12, 3)->nullable();
+                $table->decimal('up_limit_gb', 12, 3)->nullable();
+                $table->decimal('total_limit_gb', 12, 3)->nullable();
+                $table->boolean('down_unlimited')->default(false);
+                $table->boolean('up_unlimited')->default(false);
+                $table->boolean('total_unlimited')->default(false);
                 $table->unsignedInteger('dc_id')->nullable()->index();
                 $table->decimal('autobuy_threshold_gb', 12, 3)->nullable();
                 $table->unsignedInteger('autobuy_package_id')->nullable();
@@ -497,6 +509,26 @@ final class Schema
         if (Capsule::schema()->hasTable('mod_dcmanage_prtg_instances') && !Capsule::schema()->hasColumn('mod_dcmanage_prtg_instances', 'auth_mode')) {
             Capsule::schema()->table('mod_dcmanage_prtg_instances', static function (Blueprint $table): void {
                 $table->string('auth_mode', 32)->default('passhash')->after('user');
+            });
+        }
+    }
+
+    private static function migrationV11(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_datacenters') && !Capsule::schema()->hasColumn('mod_dcmanage_datacenters', 'traffic_calc_mode')) {
+            Capsule::schema()->table('mod_dcmanage_datacenters', static function (Blueprint $table): void {
+                $table->string('traffic_calc_mode', 16)->default('TOTAL')->after('location');
+            });
+        }
+
+        if (Capsule::schema()->hasTable('mod_dcmanage_scope') && !Capsule::schema()->hasColumn('mod_dcmanage_scope', 'down_limit_gb')) {
+            Capsule::schema()->table('mod_dcmanage_scope', static function (Blueprint $table): void {
+                $table->decimal('down_limit_gb', 12, 3)->nullable()->after('default_action');
+                $table->decimal('up_limit_gb', 12, 3)->nullable()->after('down_limit_gb');
+                $table->decimal('total_limit_gb', 12, 3)->nullable()->after('up_limit_gb');
+                $table->boolean('down_unlimited')->default(false)->after('total_limit_gb');
+                $table->boolean('up_unlimited')->default(false)->after('down_unlimited');
+                $table->boolean('total_unlimited')->default(false)->after('up_unlimited');
             });
         }
     }

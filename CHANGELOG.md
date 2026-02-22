@@ -3,6 +3,30 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.68] - 2026-02-22
+### Added
+- New `Services / Group` tab (replacing placeholder `WHMCS Scope`) with real product-scope management:
+  - Filter by `GID` / `PID`.
+  - Product list loaded from WHMCS products/groups.
+  - Per-product default traffic limits for `Download`, `Upload`, `Total`.
+  - Per-limit `Unlimited` toggles that disable numeric inputs in UI.
+- Added group-level default scope form (`type=gid`) for quick defaulting across products in a group.
+- Added Datacenter traffic calculation mode field in create/edit UI:
+  - `Download`
+  - `Upload`
+  - `Total`
+
+### Changed
+- Usage engine now applies Datacenter traffic calculation mode during polling (`IN`/`OUT`/`TOTAL`) so quota enforcement follows selected datacenter policy.
+- Usage engine now resolves base limits from scope hierarchy:
+  - Product-level (`PID`) first,
+  - then Group-level (`GID`) fallback.
+- Scope/product labels updated in bilingual dictionary to match new naming (`Services / Group`).
+
+### Fixed
+- Datacenter listing query now includes `traffic_calc_mode` safely in grouped selection.
+- Scope edit row UX now includes consistent checkbox/input spacing and inline action alignment.
+
 ## [0.1.67] - 2026-02-22
 ### Added
 - Monitoring API now exposes PRTG hierarchy endpoints for structured browsing:

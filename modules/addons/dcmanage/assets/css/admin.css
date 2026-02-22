@@ -530,6 +530,20 @@
   font-weight: 700;
 }
 
+.dcmanage-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #2a3f69;
+}
+
+.dcmanage-check-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
 .dcmanage-shell .form-group {
   margin-bottom: 1rem;
 }
@@ -686,6 +700,19 @@
   font-weight: 600;
   margin: 0 !important;
   vertical-align: middle;
+}
+
+.dcmanage-scope-row-form .form-row {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.dcmanage-scope-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .dcmanage-dc-table .dcmanage-action-buttons {
