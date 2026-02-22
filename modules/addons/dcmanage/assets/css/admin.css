@@ -489,14 +489,21 @@
 }
 
 .dcmanage-shell .dcmanage-form-actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid #e4ebff;
-  gap: 10px;
+  gap: 12px !important;
 }
 
 .dcmanage-shell .dcmanage-form-actions .btn {
   margin: 0;
+}
+
+.dcmanage-shell .dcmanage-form-actions .btn + .btn {
+  margin-inline-start: 0;
 }
 
 .dcmanage-table-pager {

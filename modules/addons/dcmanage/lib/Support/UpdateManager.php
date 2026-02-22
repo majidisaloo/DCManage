@@ -192,8 +192,20 @@ final class UpdateManager
             ->orderBy('id', 'desc')
             ->first(['id', 'status', 'attempts', 'created_at', 'started_at', 'finished_at', 'last_error']);
 
-        if ($active === null && self::isCancelRequested()) {
-            self::clearCancelRequest();
+        if ($active === null) {
+            if (self::isCancelRequested()) {
+                self::clearCancelRequest();
+            }
+
+            $state = self::getUpdateState();
+            $stateStatus = strtolower(trim((string) ($state['status'] ?? '')));
+            if ($stateStatus === 'canceled' || $stateStatus === 'cancel-requested') {
+                self::setUpdateState([
+                    'status' => 'idle',
+                    'message' => '',
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
         }
 
         return [

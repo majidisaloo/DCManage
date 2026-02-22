@@ -376,7 +376,9 @@
             } else if (status === 'cancel-requested' || status === 'canceled') {
               kind = 'warning';
             }
-            setUpdateMsg(msg, message, kind);
+            if (active || status === 'running' || status === 'failed') {
+              setUpdateMsg(msg, message, kind);
+            }
           }
 
           if (!active && (status === 'updated' || status === 'up-to-date' || status === 'failed' || status === 'canceled')) {
@@ -486,11 +488,15 @@
         } else if (status === 'cancel-requested' || status === 'canceled') {
           kind = 'warning';
         }
-        setUpdateMsg(msg, message, kind);
+        if (active || status === 'running' || status === 'failed') {
+          setUpdateMsg(msg, message, kind);
+        }
       }
       if (active) {
         setUpdateMsg(msg, message || T.applying, 'warning');
         startStatusPoll();
+      } else if (status === 'idle' || status === 'updated' || status === 'up-to-date' || status === 'canceled') {
+        setUpdateMsg(msg, '', 'info');
       }
     }).catch(function () {
     });

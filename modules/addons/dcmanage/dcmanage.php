@@ -1102,7 +1102,7 @@ function dcmanage_cron_status(): array
             if ($ts !== null) {
                 $nextAt = date('Y-m-d H:i:s', $ts + (int) $def['interval']);
                 $age = time() - $ts;
-                if (strpos((string) $last->message, 'completed') !== false && $age <= ((int) $def['interval'] * 2)) {
+                if ($age <= ((int) $def['interval'] * 2)) {
                     $status = 'ok';
                 } else {
                     $status = 'warning';

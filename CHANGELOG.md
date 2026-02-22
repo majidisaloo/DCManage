@@ -3,6 +3,13 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.53] - 2026-02-22
+### Fixed
+- Fixed persistent stale update warning banner (`Canceled before HTTP request`) after successful/no-active update by normalizing idle update runtime state.
+- Fixed Cron Health status logic to mark tasks `OK` based on successful task run age, not only strict `completed` message text.
+- Fixed mismatch between Dashboard and Settings cron status output for legacy `... executed/processed` log messages.
+- Fixed Settings action button spacing in iLO proxy block (`Save Settings` / `Test iLO Proxy`) with consistent form action layout.
+
 ## [0.1.52] - 2026-02-22
 ### Fixed
 - Fixed Cron Health false-fail state in both Dashboard and Settings monitor by accepting both dispatcher-style and legacy task success log messages.

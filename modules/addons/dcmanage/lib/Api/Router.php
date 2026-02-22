@@ -341,7 +341,7 @@ final class Router
                 if ($lastTs !== null) {
                     $nextAt = date('Y-m-d H:i:s', $lastTs + $interval);
                     $age = time() - $lastTs;
-                    if (strpos((string) $last->message, 'completed') !== false && $age <= ($interval * 2)) {
+                    if ($age <= ($interval * 2)) {
                         $status = 'ok';
                     } else {
                         $status = 'warning';
