@@ -643,13 +643,26 @@
 .dcmanage-action-buttons {
   display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+}
+
+.dcmanage-action-buttons form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 !important;
 }
 
 .dcmanage-action-buttons .btn {
   border-radius: 10px;
   padding: 4px 10px;
   font-weight: 600;
+  margin: 0 !important;
+  vertical-align: middle;
+}
+
+.dcmanage-dc-table .dcmanage-action-buttons {
+  flex-wrap: nowrap;
 }
 
 .dcmanage-dc-topbar {

@@ -3,6 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.65] - 2026-02-22
+### Fixed
+- Traffic Packages edit form action button (`Save Settings`) now renders inside a proper action row and no longer overlaps input fields.
+- Package row action buttons (`Edit` / `Delete`) are now vertically aligned and kept on one line for cleaner table layout.
+
+### Changed
+- Improved action button container styling by normalizing inline form/button alignment and margin behavior.
+
 ## [0.1.64] - 2026-02-22
 ### Added
 - Server create/edit now supports row-based traffic mapping:

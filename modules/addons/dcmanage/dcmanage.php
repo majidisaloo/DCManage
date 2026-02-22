@@ -3300,7 +3300,9 @@ function dcmanage_render_packages(string $lang): void
         echo '<div class="form-group col-md-1"><label>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</label><select name="taxed" class="form-control dcmanage-input"><option value="1"' . ((int) $row->taxed === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('yes', $lang)) . '</option><option value="0"' . ((int) $row->taxed === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('no', $lang)) . '</option></select></div>';
         echo '<div class="form-group col-md-1"><label>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</label><select name="active" class="form-control dcmanage-input"><option value="1"' . ((int) $row->active === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_active', $lang)) . '</option><option value="0"' . ((int) $row->active === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_inactive', $lang)) . '</option></select></div>';
         echo '</div>';
+        echo '<div class="dcmanage-form-actions">';
         echo '<button class="btn btn-primary btn-sm" type="submit" name="dcmanage_action_btn" value="package_update">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+        echo '</div>';
         echo '</form>';
         echo '</td></tr>';
     }
