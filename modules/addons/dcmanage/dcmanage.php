@@ -1012,6 +1012,7 @@ function dcmanage_handle_actions(string $lang): string
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
             }
+            dcmanage_set_server_action_port($serverId, $trafficLinks);
 
             if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
                 $monitoringRows = dcmanage_extract_server_monitoring_rows($_POST);
@@ -1094,6 +1095,7 @@ function dcmanage_handle_actions(string $lang): string
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
             }
+            dcmanage_set_server_action_port($serverId, $trafficLinks);
 
             if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
                 Capsule::table('mod_dcmanage_server_traffic_sensors')
@@ -1148,6 +1150,9 @@ function dcmanage_handle_actions(string $lang): string
             Capsule::table('mod_dcmanage_server_ports')->where('server_id', $serverId)->delete();
             if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
                 Capsule::table('mod_dcmanage_server_traffic_sensors')->where('server_id', $serverId)->delete();
+            }
+            if (Capsule::schema()->hasTable('mod_dcmanage_server_monitoring_links')) {
+                Capsule::table('mod_dcmanage_server_monitoring_links')->where('server_id', $serverId)->delete();
             }
             Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->delete();
 
@@ -1485,6 +1490,7 @@ function dcmanage_render_settings_form(string $lang): void
 
 function dcmanage_render_monitoring(string $lang): void
 {
+    $moduleLink = 'addonmodules.php?module=dcmanage';
     $provider = Capsule::table('mod_dcmanage_meta')->where('meta_key', 'monitoring.provider')->value('meta_value');
     $provider = strtolower(trim((string) ($provider ?: 'prtg')));
     $instances = Capsule::table('mod_dcmanage_prtg_instances')
@@ -1494,23 +1500,15 @@ function dcmanage_render_monitoring(string $lang): void
         ->leftJoin('mod_dcmanage_datacenters as d', 'd.id', '=', 's.dc_id')
         ->orderBy('s.name')
         ->get(['s.id', 's.name', 'd.name as dc_name']);
-    $mappingRows = Capsule::table('mod_dcmanage_monitoring_group_map as m')
-        ->leftJoin('mod_dcmanage_prtg_instances as p', 'p.id', '=', 'm.prtg_id')
-        ->leftJoin('mod_dcmanage_switches as s', 's.id', '=', 'm.switch_id')
-        ->orderBy('m.id', 'desc')
-        ->get([
-            'm.id',
-            'm.prtg_id',
-            'm.switch_id',
-            'm.purpose',
-            'm.probe_id',
-            'm.group_id',
-            'm.subgroup_id',
-            'm.device_id',
-            'm.notes',
-            'p.name as prtg_name',
-            's.name as switch_name',
-        ]);
+
+    $viewInstanceId = (int) ($_GET['monitoring_view'] ?? 0);
+    $viewInstance = null;
+    foreach ($instances as $instance) {
+        if ((int) $instance->id === $viewInstanceId) {
+            $viewInstance = $instance;
+            break;
+        }
+    }
 
     echo '<div class="d-flex justify-content-end align-items-center mb-3 dcmanage-section-toolbar">';
     echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-monitoring-add">' . htmlspecialchars(I18n::t('monitoring_add_instance', $lang)) . '</button>';
@@ -1539,6 +1537,9 @@ function dcmanage_render_monitoring(string $lang): void
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('prtg_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('prtg_base_url', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('prtg_user', $lang)) . '</th><th>Auth</th><th>SSL</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($instances as $instance) {
         $kind = strtoupper((string) ($instance->type ?: 'prtg'));
+        $isActive = (int) $instance->id === $viewInstanceId;
+        $viewClass = $isActive ? 'btn-info' : 'dcmanage-btn-soft-primary';
+        $viewUrl = $moduleLink . '&tab=monitoring&monitoring_view=' . (int) $instance->id;
         echo '<tr>';
         echo '<td>' . (int) $instance->id . '</td>';
         echo '<td>' . htmlspecialchars($kind) . '</td>';
@@ -1548,7 +1549,7 @@ function dcmanage_render_monitoring(string $lang): void
         echo '<td>' . htmlspecialchars((string) ($instance->auth_mode ?: 'passhash')) . '</td>';
         echo '<td>' . ((int) $instance->verify_ssl === 1 ? 'on' : 'off') . '</td>';
         echo '<td class="dcmanage-action-buttons">';
-        echo '<button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-monitoring-view" data-instance-id="' . (int) $instance->id . '">' . htmlspecialchars(I18n::t('action_view', $lang)) . '</button>';
+        echo '<a class="btn btn-sm ' . $viewClass . '" href="' . htmlspecialchars($viewUrl) . '">' . htmlspecialchars(I18n::t('action_view', $lang)) . '</a>';
         if (strtolower((string) $instance->type) === 'prtg') {
             echo '<form method="post"><input type="hidden" name="dcmanage_action" value="prtg_instance_test"><input type="hidden" name="prtg_id" value="' . (int) $instance->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-success">' . htmlspecialchars(I18n::t('prtg_test', $lang)) . '</button></form>';
         }
@@ -1562,122 +1563,275 @@ function dcmanage_render_monitoring(string $lang): void
     echo '</tbody></table></div>';
     echo '</div>';
 
-    $defaultPrtg = 0;
-    foreach ($instances as $instance) {
-        if (strtolower((string) ($instance->type ?? 'prtg')) === 'prtg') {
-            $defaultPrtg = (int) $instance->id;
-            break;
-        }
+    if ($viewInstance === null) {
+        return;
+    }
+    if (strtolower((string) ($viewInstance->type ?? 'prtg')) !== 'prtg') {
+        echo '<div class="alert alert-info">' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . ': ' . htmlspecialchars(strtoupper((string) ($viewInstance->type ?? ''))) . '</div>';
+        return;
     }
 
-    echo '<div class="dcmanage-form-card mb-4" id="dcmanage-monitoring-map-card">';
-    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('monitoring_group_map_title', $lang)) . '</h6>';
-    echo '<form method="post" class="dcmanage-centered-form">';
-    echo '<input type="hidden" name="dcmanage_action" value="monitoring_map_create">';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</label><select id="dcmanage-map-prtg" name="map_prtg_id" class="form-control dcmanage-input" required><option value="">--</option>';
-    foreach ($instances as $instance) {
-        if (strtolower((string) ($instance->type ?? 'prtg')) !== 'prtg') {
-            continue;
-        }
-        $selected = (int) $instance->id === $defaultPrtg ? ' selected' : '';
-        echo '<option value="' . (int) $instance->id . '"' . $selected . '>' . htmlspecialchars((string) $instance->name) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="map_switch_id" class="form-control dcmanage-input"><option value="">--</option>';
-    foreach ($switches as $switch) {
-        $swLabel = (string) $switch->name;
-        if (trim((string) ($switch->dc_name ?? '')) !== '') {
-            $swLabel .= ' (' . (string) $switch->dc_name . ')';
-        }
-        echo '<option value="' . (int) $switch->id . '">' . htmlspecialchars($swLabel) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_map_purpose', $lang)) . '</label><select name="map_purpose" class="form-control dcmanage-input"><option value="traffic">' . htmlspecialchars(I18n::t('monitoring_purpose_traffic', $lang)) . '</option><option value="hardware">' . htmlspecialchars(I18n::t('monitoring_purpose_hardware', $lang)) . '</option><option value="public">' . htmlspecialchars(I18n::t('monitoring_purpose_public', $lang)) . '</option><option value="client_discovery">' . htmlspecialchars(I18n::t('monitoring_purpose_client_discovery', $lang)) . '</option></select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</label><select id="dcmanage-map-probe" name="map_probe_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
-    echo '</div>';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</label><select id="dcmanage-map-group" name="map_group_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</label><select id="dcmanage-map-subgroup" name="map_subgroup_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select id="dcmanage-map-device" name="map_device_id" class="form-control dcmanage-input"><option value="">--</option></select></div>';
-    echo '</div>';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-9"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input class="form-control dcmanage-input" name="map_notes" placeholder="' . htmlspecialchars(I18n::t('monitoring_map_notes_placeholder', $lang)) . '"></div>';
-    echo '<div class="form-group col-md-3 d-flex align-items-end"><button type="submit" class="btn btn-primary btn-sm">' . htmlspecialchars(I18n::t('monitoring_map_add', $lang)) . '</button></div>';
-    echo '</div>';
-    echo '</form>';
-    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_map_purpose', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+    $mappingRows = Capsule::table('mod_dcmanage_monitoring_group_map as m')
+        ->leftJoin('mod_dcmanage_switches as s', 's.id', '=', 'm.switch_id')
+        ->where('m.prtg_id', (int) $viewInstance->id)
+        ->orderBy('m.id', 'desc')
+        ->get([
+            'm.id',
+            'm.prtg_id',
+            'm.switch_id',
+            'm.purpose',
+            'm.probe_id',
+            'm.group_id',
+            'm.subgroup_id',
+            'm.device_id',
+            'm.notes',
+            's.name as switch_name',
+        ]);
+
+    $purposeOrder = ['traffic', 'hardware', 'public', 'client_discovery'];
+    $mapsByPurpose = [
+        'traffic' => [],
+        'hardware' => [],
+        'public' => [],
+        'client_discovery' => [],
+    ];
     foreach ($mappingRows as $mapRow) {
-        $purposeLabel = I18n::t('monitoring_purpose_' . strtolower((string) ($mapRow->purpose ?? 'traffic')), $lang);
-        echo '<tr>';
-        echo '<td>' . (int) $mapRow->id . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($mapRow->prtg_name ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($mapRow->switch_name ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars($purposeLabel) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($mapRow->probe_id ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($mapRow->group_id ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($mapRow->subgroup_id ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($mapRow->device_id ?? '-')) . '</td>';
-        echo '<td class="dcmanage-action-buttons"><form method="post" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('action_delete', $lang), ENT_QUOTES, 'UTF-8') . '?\')"><input type="hidden" name="dcmanage_action" value="monitoring_map_delete"><input type="hidden" name="map_id" value="' . (int) $mapRow->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-danger">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td>';
-        echo '</tr>';
-    }
-    if (count($mappingRows) === 0) {
-        echo '<tr><td colspan="9">-</td></tr>';
-    }
-    echo '</tbody></table></div>';
-    echo '</div>';
-
-    echo '<div class="dcmanage-form-card">';
-    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('monitoring_browser', $lang)) . '</h6>';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</label><select id="dcmanage-prtg-browser-instance" class="form-control dcmanage-input">';
-    echo '<option value="">--</option>';
-    foreach ($instances as $instance) {
-        if (strtolower((string) ($instance->type ?? 'prtg')) !== 'prtg') {
-            continue;
+        $purposeKey = strtolower((string) ($mapRow->purpose ?? 'traffic'));
+        if (!isset($mapsByPurpose[$purposeKey])) {
+            $purposeKey = 'traffic';
         }
-        $selected = (int) $instance->id === $defaultPrtg ? ' selected' : '';
-        echo '<option value="' . (int) $instance->id . '"' . $selected . '>' . htmlspecialchars((string) $instance->name) . '</option>';
+        $mapsByPurpose[$purposeKey][] = $mapRow;
     }
-    echo '</select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</label><select id="dcmanage-prtg-browser-probe" class="form-control dcmanage-input" disabled><option value="">--</option></select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</label><select id="dcmanage-prtg-browser-group" class="form-control dcmanage-input" disabled><option value="">--</option></select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_sensor_search', $lang)) . '</label><input id="dcmanage-prtg-browser-q" class="form-control dcmanage-input" placeholder="sensor name / id"></div>';
-    echo '</div>';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</label><select id="dcmanage-prtg-browser-subgroup" class="form-control dcmanage-input" disabled><option value="">--</option></select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select id="dcmanage-prtg-browser-device" class="form-control dcmanage-input" disabled><option value="">--</option></select></div>';
-    echo '<div class="form-group col-md-6 d-flex align-items-end"><button id="dcmanage-prtg-browser-load" type="button" class="btn btn-outline-primary btn-sm">' . htmlspecialchars(I18n::t('monitoring_load_sensors', $lang)) . '</button></div>';
-    echo '</div>';
-    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped"><thead><tr><th>ID</th><th>Sensor</th><th>Device</th><th>Status</th></tr></thead><tbody id="dcmanage-prtg-browser-list"><tr><td colspan="4">-</td></tr></tbody></table></div>';
+
+    echo '<div class="dcmanage-form-card dcmanage-monitoring-view-card">';
+    echo '<div class="d-flex justify-content-between align-items-center mb-3">';
+    echo '<h6 class="mb-0">' . htmlspecialchars(I18n::t('action_view', $lang)) . ': ' . htmlspecialchars((string) $viewInstance->name) . '</h6>';
+    echo '<a class="btn btn-sm btn-outline-secondary" href="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '">Back</a>';
     echo '</div>';
 
-    echo '<script>';
-    echo '(function(){';
-    echo 'function parsePayload(raw){raw=String(raw||"").replace(/^\\uFEFF/,"").trim();try{return JSON.parse(raw);}catch(e){var s=raw.indexOf("DCMANAGE_JSON_START");var t=raw.indexOf("DCMANAGE_JSON_END");if(s!==-1&&t!==-1&&t>s){return JSON.parse(raw.substring(s+"DCMANAGE_JSON_START".length,t).trim());}throw e;}}';
-    echo 'function apiUrl(endpoint,params){var u="addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint="+encodeURIComponent(endpoint);if(params){for(var k in params){if(Object.prototype.hasOwnProperty.call(params,k)){u+="&"+encodeURIComponent(k)+"="+encodeURIComponent(params[k]);}}}return u;}';
-    echo 'function fillSelect(select,items){if(!select){return;}select.innerHTML="<option value=\\"\\">--</option>";for(var i=0;i<items.length;i++){var it=items[i]||{};var o=document.createElement("option");o.value=String(it.id||"");o.textContent=String(it.name||it.id||"-");select.appendChild(o);}select.disabled=items.length===0;}';
-    echo 'function fetchJson(endpoint,params){return fetch(apiUrl(endpoint,params),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var out=parsePayload(raw);if(!out.ok){throw new Error(out.error||"API error");}return out.data||{};});}';
-    echo 'var ins=document.getElementById("dcmanage-prtg-browser-instance");var probe=document.getElementById("dcmanage-prtg-browser-probe");var grp=document.getElementById("dcmanage-prtg-browser-group");var subgrp=document.getElementById("dcmanage-prtg-browser-subgroup");var dev=document.getElementById("dcmanage-prtg-browser-device");var q=document.getElementById("dcmanage-prtg-browser-q");var load=document.getElementById("dcmanage-prtg-browser-load");var list=document.getElementById("dcmanage-prtg-browser-list");var mapPrtg=document.getElementById("dcmanage-map-prtg");var mapProbe=document.getElementById("dcmanage-map-probe");var mapGroup=document.getElementById("dcmanage-map-group");var mapSub=document.getElementById("dcmanage-map-subgroup");var mapDev=document.getElementById("dcmanage-map-device");';
-    echo 'function loadProbes(){if(!ins||!probe){return;}var id=ins.value;if(!id){fillSelect(probe,[]);fillSelect(grp,[]);fillSelect(subgrp,[]);fillSelect(dev,[]);return;}fetchJson("prtg/probes",{prtg_id:id}).then(function(data){fillSelect(probe,(data.items||[]));fillSelect(grp,[]);fillSelect(subgrp,[]);fillSelect(dev,[]);}).catch(function(){fillSelect(probe,[]);fillSelect(grp,[]);fillSelect(subgrp,[]);fillSelect(dev,[]);});}';
-    echo 'function loadGroups(parentSel,targetSel){if(!ins||!parentSel||!targetSel||!parentSel.value){fillSelect(targetSel,[]);return Promise.resolve();}return fetchJson("prtg/groups",{prtg_id:ins.value,parent_id:parentSel.value}).then(function(data){fillSelect(targetSel,(data.items||[]));}).catch(function(){fillSelect(targetSel,[]);});}';
-    echo 'function loadDevices(){if(!ins||!dev){return;}var parentId="";if(subgrp&&subgrp.value){parentId=subgrp.value;}else if(grp&&grp.value){parentId=grp.value;}else if(probe&&probe.value){parentId=probe.value;}if(parentId===""){fillSelect(dev,[]);return;}fetchJson("prtg/devices",{prtg_id:ins.value,parent_id:parentId}).then(function(data){fillSelect(dev,(data.items||[]));}).catch(function(){fillSelect(dev,[]);});}';
-    echo 'if(ins){ins.addEventListener("change",loadProbes);}';
-    echo 'if(probe){probe.addEventListener("change",function(){loadGroups(probe,grp).then(function(){fillSelect(subgrp,[]);loadDevices();});});}';
-    echo 'if(grp){grp.addEventListener("change",function(){loadGroups(grp,subgrp).then(function(){loadDevices();});});}';
-    echo 'if(subgrp){subgrp.addEventListener("change",loadDevices);}';
-    echo 'function mapLoadProbes(){if(!mapPrtg){return;}var id=String(mapPrtg.value||"");if(id===""){fillSelect(mapProbe,[]);fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);return;}fetchJson("prtg/probes",{prtg_id:id}).then(function(data){fillSelect(mapProbe,(data.items||[]));fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);}).catch(function(){fillSelect(mapProbe,[]);fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);});}';
-    echo 'if(mapPrtg){mapPrtg.addEventListener("change",mapLoadProbes);}';
-    echo 'if(mapProbe){mapProbe.addEventListener("change",function(){if(!mapPrtg){return;}if(!mapProbe.value){fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);return;}fetchJson("prtg/groups",{prtg_id:mapPrtg.value,parent_id:mapProbe.value}).then(function(data){fillSelect(mapGroup,(data.items||[]));fillSelect(mapSub,[]);fillSelect(mapDev,[]);}).catch(function(){fillSelect(mapGroup,[]);fillSelect(mapSub,[]);fillSelect(mapDev,[]);});});}';
-    echo 'if(mapGroup){mapGroup.addEventListener("change",function(){if(!mapPrtg){return;}if(!mapGroup.value){fillSelect(mapSub,[]);if(mapProbe&&mapProbe.value){fetchJson("prtg/devices",{prtg_id:mapPrtg.value,parent_id:mapProbe.value}).then(function(data){fillSelect(mapDev,(data.items||[]));}).catch(function(){fillSelect(mapDev,[]);});}else{fillSelect(mapDev,[]);}return;}fetchJson("prtg/groups",{prtg_id:mapPrtg.value,parent_id:mapGroup.value}).then(function(data){fillSelect(mapSub,(data.items||[]));return fetchJson("prtg/devices",{prtg_id:mapPrtg.value,parent_id:mapGroup.value});}).then(function(data){fillSelect(mapDev,(data.items||[]));}).catch(function(){fillSelect(mapSub,[]);fillSelect(mapDev,[]);});});}';
-    echo 'if(mapSub){mapSub.addEventListener("change",function(){if(!mapPrtg){return;}var parent=mapSub.value||mapGroup.value||mapProbe.value;if(!parent){fillSelect(mapDev,[]);return;}fetchJson("prtg/devices",{prtg_id:mapPrtg.value,parent_id:parent}).then(function(data){fillSelect(mapDev,(data.items||[]));}).catch(function(){fillSelect(mapDev,[]);});});}';
-    echo 'if(load){load.addEventListener("click",function(){if(!ins||!dev||!dev.value){return;}fetchJson("prtg/device-sensors",{prtg_id:ins.value,device_id:dev.value,q:(q?q.value:""),limit:500}).then(function(data){var items=data.items||[];if(!list){return;}if(items.length===0){list.innerHTML="<tr><td colspan=\\"4\\">-</td></tr>";return;}list.innerHTML="";for(var i=0;i<items.length;i++){var it=items[i]||{};var tr=document.createElement("tr");tr.innerHTML="<td>"+String(it.id||"-")+"</td><td>"+String(it.name||"-")+"</td><td>"+String(it.device||"-")+"</td><td>"+String(it.status||"-")+"</td>";list.appendChild(tr);}}).catch(function(err){if(list){list.innerHTML="<tr><td colspan=\\"4\\">"+String(err&&err.message?err.message:"error")+"</td></tr>";}});});}';
-    echo 'if(ins&&ins.value){loadProbes();}';
-    echo 'if(mapPrtg&&mapPrtg.value){mapLoadProbes();}';
-    echo 'var viewBtns=document.querySelectorAll(".dcmanage-monitoring-view");for(var vb=0;vb<viewBtns.length;vb++){viewBtns[vb].addEventListener("click",function(){var id=this.getAttribute("data-instance-id")||"";if(mapPrtg){mapPrtg.value=id;mapLoadProbes();}var card=document.getElementById("dcmanage-monitoring-map-card");if(card&&typeof card.scrollIntoView==="function"){card.scrollIntoView({behavior:"smooth",block:"start"});}});}';
-    echo '})();';
-    echo '</script>';
+    foreach ($purposeOrder as $purpose) {
+        $purposeLabel = I18n::t('monitoring_purpose_' . $purpose, $lang);
+        $rows = $mapsByPurpose[$purpose] ?? [];
+        echo '<div class="dcmanage-form-card mb-3">';
+        echo '<h6 class="mb-3">' . htmlspecialchars($purposeLabel) . '</h6>';
+        echo '<form method="post" class="dcmanage-map-form dcmanage-centered-form" data-prtg-id="' . (int) $viewInstance->id . '">';
+        echo '<input type="hidden" name="dcmanage_action" value="monitoring_map_create">';
+        echo '<input type="hidden" name="map_prtg_id" value="' . (int) $viewInstance->id . '">';
+        echo '<input type="hidden" name="map_purpose" value="' . htmlspecialchars($purpose) . '">';
+        echo '<div class="form-row">';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="map_switch_id" class="form-control dcmanage-input"><option value="">--</option>';
+        foreach ($switches as $switch) {
+            $swLabel = (string) $switch->name;
+            if (trim((string) ($switch->dc_name ?? '')) !== '') {
+                $swLabel .= ' (' . (string) $switch->dc_name . ')';
+            }
+            echo '<option value="' . (int) $switch->id . '">' . htmlspecialchars($swLabel) . '</option>';
+        }
+        echo '</select></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</label><select name="map_probe_id" class="form-control dcmanage-input dcmanage-map-probe"><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</label><select name="map_group_id" class="form-control dcmanage-input dcmanage-map-group"><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</label><select name="map_subgroup_id" class="form-control dcmanage-input dcmanage-map-subgroup"><option value="">--</option></select></div>';
+        echo '</div>';
+        echo '<div class="form-row align-items-end">';
+        echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select name="map_device_id" class="form-control dcmanage-input dcmanage-map-device"><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input class="form-control dcmanage-input" name="map_notes" placeholder="' . htmlspecialchars(I18n::t('monitoring_map_notes_placeholder', $lang)) . '"></div>';
+        echo '<div class="form-group col-md-2"><button type="submit" class="btn btn-primary btn-sm btn-block">' . htmlspecialchars(I18n::t('monitoring_map_add', $lang)) . '</button></div>';
+        echo '</div>';
+        echo '<div class="small text-muted dcmanage-map-loading">-</div>';
+        echo '</form>';
+
+        echo '<div class="table-responsive dcmanage-table-wrap mt-2"><table class="table table-sm table-striped">';
+        echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+        foreach ($rows as $mapRow) {
+            echo '<tr>';
+            echo '<td>' . (int) $mapRow->id . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->switch_name ?? '-')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->probe_id ?? '-')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->group_id ?? '-')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->subgroup_id ?? '-')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->device_id ?? '-')) . '</td>';
+            echo '<td class="dcmanage-action-buttons"><form method="post" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('action_delete', $lang), ENT_QUOTES, 'UTF-8') . '?\')"><input type="hidden" name="dcmanage_action" value="monitoring_map_delete"><input type="hidden" name="map_id" value="' . (int) $mapRow->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-danger">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td>';
+            echo '</tr>';
+        }
+        if (count($rows) === 0) {
+            echo '<tr><td colspan="7">-</td></tr>';
+        }
+        echo '</tbody></table></div>';
+        echo '</div>';
+    }
+    echo '</div>';
+
+    $loadingText = addslashes(I18n::t('loading', $lang));
+    $script = <<<'JS'
+(function(){
+  function parsePayload(raw){
+    raw=String(raw||"").replace(/^\uFEFF/,"").trim();
+    try{return JSON.parse(raw);}catch(e){
+      var s=raw.indexOf("DCMANAGE_JSON_START");
+      var t=raw.indexOf("DCMANAGE_JSON_END");
+      if(s!==-1&&t!==-1&&t>s){return JSON.parse(raw.substring(s+"DCMANAGE_JSON_START".length,t).trim());}
+      throw e;
+    }
+  }
+  function apiUrl(endpoint,params){
+    var u="addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint="+encodeURIComponent(endpoint);
+    if(params){
+      for(var k in params){
+        if(Object.prototype.hasOwnProperty.call(params,k)){
+          u+="&"+encodeURIComponent(k)+"="+encodeURIComponent(params[k]);
+        }
+      }
+    }
+    return u;
+  }
+  function fetchJson(endpoint,params){
+    return fetch(apiUrl(endpoint,params),{credentials:"same-origin"})
+      .then(function(r){return r.text();})
+      .then(function(raw){
+        var out=parsePayload(raw);
+        if(!out.ok){throw new Error(out.error||"API error");}
+        return out.data||{};
+      });
+  }
+  function fillSelect(select,items){
+    if(!select){return;}
+    var selected=String(select.value||"");
+    select.innerHTML='<option value="">--</option>';
+    for(var i=0;i<items.length;i++){
+      var it=items[i]||{};
+      var id=String(it.id||"");
+      if(id===""){continue;}
+      var o=document.createElement("option");
+      o.value=id;
+      o.textContent=String(it.name||id);
+      if(selected!==""&&selected===id){o.selected=true;}
+      select.appendChild(o);
+    }
+    select.disabled=items.length===0;
+  }
+  function bindMapForm(form){
+    if(!form){return;}
+    var prtgId=String(form.getAttribute("data-prtg-id")||"");
+    var probe=form.querySelector(".dcmanage-map-probe");
+    var group=form.querySelector(".dcmanage-map-group");
+    var subgroup=form.querySelector(".dcmanage-map-subgroup");
+    var device=form.querySelector(".dcmanage-map-device");
+    var loading=form.querySelector(".dcmanage-map-loading");
+    var requestId=0;
+    function setLoading(flag,msg){
+      if(loading){loading.textContent=flag?msg:(msg||"-");}
+      if(flag){
+        if(probe){probe.disabled=true;}
+        if(group){group.disabled=true;}
+        if(subgroup){subgroup.disabled=true;}
+        if(device){device.disabled=true;}
+      }
+    }
+    function safeDone(id,fn){
+      if(id!==requestId){return;}
+      fn();
+    }
+    function loadProbes(){
+      if(prtgId===""){return;}
+      requestId++;
+      var id=requestId;
+      setLoading(true,"__LOADING__");
+      fetchJson("prtg/probes",{prtg_id:prtgId}).then(function(data){
+        safeDone(id,function(){
+          fillSelect(probe,(data.items||[]));
+          fillSelect(group,[]);
+          fillSelect(subgroup,[]);
+          fillSelect(device,[]);
+          setLoading(false,"");
+        });
+      }).catch(function(err){
+        safeDone(id,function(){
+          fillSelect(probe,[]);
+          fillSelect(group,[]);
+          fillSelect(subgroup,[]);
+          fillSelect(device,[]);
+          setLoading(false,String(err&&err.message?err.message:"error"));
+        });
+      });
+    }
+    function loadGroups(parentId,target){
+      if(prtgId===""||!parentId||!target){
+        fillSelect(target,[]);
+        return Promise.resolve();
+      }
+      requestId++;
+      var id=requestId;
+      setLoading(true,"__LOADING__");
+      return fetchJson("prtg/groups",{prtg_id:prtgId,parent_id:parentId}).then(function(data){
+        safeDone(id,function(){
+          fillSelect(target,(data.items||[]));
+          setLoading(false,"");
+        });
+      }).catch(function(err){
+        safeDone(id,function(){
+          fillSelect(target,[]);
+          setLoading(false,String(err&&err.message?err.message:"error"));
+        });
+      });
+    }
+    function loadDevices(parentId){
+      if(prtgId===""||!parentId){
+        fillSelect(device,[]);
+        return;
+      }
+      requestId++;
+      var id=requestId;
+      setLoading(true,"__LOADING__");
+      fetchJson("prtg/devices",{prtg_id:prtgId,parent_id:parentId}).then(function(data){
+        safeDone(id,function(){
+          fillSelect(device,(data.items||[]));
+          setLoading(false,"");
+        });
+      }).catch(function(err){
+        safeDone(id,function(){
+          fillSelect(device,[]);
+          setLoading(false,String(err&&err.message?err.message:"error"));
+        });
+      });
+    }
+    if(probe){
+      probe.addEventListener("change",function(){
+        var pid=String(probe.value||"");
+        fillSelect(group,[]);
+        fillSelect(subgroup,[]);
+        fillSelect(device,[]);
+        if(pid===""){return;}
+        loadGroups(pid,group).then(function(){loadDevices(pid);});
+      });
+    }
+    if(group){
+      group.addEventListener("change",function(){
+        var gid=String(group.value||"");
+        fillSelect(subgroup,[]);
+        if(gid===""){
+          var pid=probe?String(probe.value||""):"";
+          if(pid!==""){loadDevices(pid);} else {fillSelect(device,[]);}
+          return;
+        }
+        loadGroups(gid,subgroup).then(function(){loadDevices(gid);});
+      });
+    }
+    if(subgroup){
+      subgroup.addEventListener("change",function(){
+        var sid=String(subgroup.value||"");
+        var parent=sid!==""?sid:(group?String(group.value||""):"");
+        if(parent===""){parent=probe?String(probe.value||""):"";}
+        loadDevices(parent);
+      });
+    }
+    loadProbes();
+  }
+  var forms=document.querySelectorAll(".dcmanage-map-form");
+  for(var i=0;i<forms.length;i++){bindMapForm(forms[i]);}
+})();
+JS;
+    $script = str_replace('__LOADING__', $loadingText, $script);
+    echo '<script>' . $script . '</script>';
 }
 
 function dcmanage_parse_prtg_sensor_ids($selected, string $manual): array
@@ -1796,6 +1950,39 @@ function dcmanage_resolve_server_traffic_links(array $rows, int $dcId): array
     }
 
     return $resolved;
+}
+
+function dcmanage_set_server_action_port(int $serverId, array $trafficLinks): void
+{
+    $actionSwitchId = null;
+    $actionPortId = null;
+
+    if ($trafficLinks !== []) {
+        $first = $trafficLinks[0];
+        $switchId = (int) ($first['switch_id'] ?? 0);
+        $switchIf = trim((string) ($first['switch_if'] ?? ''));
+        if ($switchId > 0 && $switchIf !== '') {
+            $portId = (int) Capsule::table('mod_dcmanage_switch_ports')
+                ->where('switch_id', $switchId)
+                ->where('if_name', $switchIf)
+                ->value('id');
+            if ($portId > 0) {
+                $actionSwitchId = $switchId;
+                $actionPortId = $portId;
+            }
+        }
+    }
+
+    $payload = [];
+    if (Capsule::schema()->hasColumn('mod_dcmanage_servers', 'action_switch_id')) {
+        $payload['action_switch_id'] = $actionSwitchId;
+    }
+    if (Capsule::schema()->hasColumn('mod_dcmanage_servers', 'action_port_id')) {
+        $payload['action_port_id'] = $actionPortId;
+    }
+    if ($payload !== []) {
+        Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->update($payload);
+    }
 }
 
 function dcmanage_extract_server_monitoring_rows(array $payload): array
@@ -2168,7 +2355,7 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
         echo '</div></div></div>';
     }
     echo '</div>';
-    echo '<script>(function(){var units=document.querySelectorAll(".dcmanage-rack-u[data-rack-id]");for(var i=0;i<units.length;i++){units[i].addEventListener("click",function(){var rid=this.getAttribute("data-rack-id");var u=this.getAttribute("data-u");var input=document.getElementById("dcmanage-u-no-"+rid);if(input){input.value=u;}var list=document.querySelectorAll(".dcmanage-rack-u[data-rack-id=\\""+rid+"\\"]");for(var j=0;j<list.length;j++){list[j].classList.remove("selected");}this.classList.add("selected");});}})();</script>';
+    echo '<script>(function(){var units=document.querySelectorAll(".dcmanage-rack-u[data-rack-id]");for(var i=0;i<units.length;i++){units[i].addEventListener("click",function(){var rid=this.getAttribute("data-rack-id");var u=this.getAttribute("data-u");var input=document.getElementById("dcmanage-u-no-"+rid);if(input){input.value=u;}var list=document.querySelectorAll(\'.dcmanage-rack-u[data-rack-id="\'+rid+\'"]\');for(var j=0;j<list.length;j++){list[j].classList.remove("selected");}this.classList.add("selected");});}})();</script>';
 }
 
 function dcmanage_rack_usage(int $rackId, int $totalU): array
@@ -3118,9 +3305,9 @@ function dcmanage_render_switches(string $lang): void
     echo 'if(dc&&rack){function filter(){var v=dc.value;for(var i=0;i<rack.options.length;i++){var o=rack.options[i];if(!o.value){o.hidden=false;continue;}o.hidden=(v!==""&&o.getAttribute("data-dc-id")!==v);}if(rack.selectedIndex>0&&rack.options[rack.selectedIndex].hidden){rack.selectedIndex=0;}}dc.addEventListener("change",filter);filter();}';
     echo 'var editForms=document.querySelectorAll(".dcmanage-switch-edit-form");for(var ef=0;ef<editForms.length;ef++){(function(form){var edc=form.querySelector(".dcmanage-switch-edit-dc");var erack=form.querySelector(".dcmanage-switch-edit-rack");if(!edc||!erack){return;}function filterEdit(){var v=edc.value;for(var i=0;i<erack.options.length;i++){var o=erack.options[i];if(!o.value){o.hidden=false;continue;}o.hidden=(v!==""&&o.getAttribute("data-dc-id")!==v);}if(erack.selectedIndex>0&&erack.options[erack.selectedIndex].hidden){erack.selectedIndex=0;}}edc.addEventListener("change",filterEdit);filterEdit();})(editForms[ef]);}';
     echo 'function normalizeSearchText(v){var s=String(v||"").toLowerCase();s=s.replace(/[\\u0660-\\u0669]/g,function(ch){return String.fromCharCode(ch.charCodeAt(0)-1632+48);});s=s.replace(/[\\u06f0-\\u06f9]/g,function(ch){return String.fromCharCode(ch.charCodeAt(0)-1776+48);});s=s.replace(/\\u064a/g,"\\u06cc").replace(/\\u0643/g,"\\u06a9").replace(/\\u0629/g,"\\u0647");return s.trim();}';
-    echo 'function applyPager(tableId){var table=document.getElementById(tableId);if(!table){return;}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\\""+tableId+"\\"]");if(!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset && rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var x=0;x<rows.length;x++){rows[x].style.display=(rows[x].dataset&&rows[x].dataset.filtered==="1")?"none":"";}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var y=0;y<visible.length;y++){visible[y].style.display=(y>=start&&y<end)?"":"none";}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
+    echo 'function applyPager(tableId){var table=document.getElementById(tableId);if(!table){return;}var pager=document.querySelector(\'.dcmanage-table-pager[data-target-table="\'+tableId+\'"]\');if(!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset && rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var x=0;x<rows.length;x++){rows[x].style.display=(rows[x].dataset&&rows[x].dataset.filtered==="1")?"none":"";}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var y=0;y<visible.length;y++){visible[y].style.display=(y>=start&&y<end)?"":"none";}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
     echo 'var pagers=document.querySelectorAll(".dcmanage-table-pager");for(var p=0;p<pagers.length;p++){(function(pg){var t=pg.getAttribute("data-target-table")||"";var prev=pg.querySelector(".dcmanage-page-prev");var next=pg.querySelector(".dcmanage-page-next");var sizeSel=pg.querySelector(".dcmanage-page-size");if(prev){prev.addEventListener("click",function(){pg._page=(pg._page||1)-1;applyPager(t);});}if(next){next.addEventListener("click",function(){pg._page=(pg._page||1)+1;applyPager(t);});}if(sizeSel){sizeSel.addEventListener("change",function(){pg._page=1;applyPager(t);});}applyPager(t);})(pagers[p]);}';
-    echo 'var inputs=document.querySelectorAll(".dcmanage-port-search");for(var s=0;s<inputs.length;s++){inputs[s].addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var tableId=this.getAttribute("data-target-table")||"";if(!tableId){return;}var table=document.getElementById(tableId);if(!table){return;}var rows=table.querySelectorAll("tbody tr");for(var r=0;r<rows.length;r++){var row=rows[r];var hay=normalizeSearchText(row.getAttribute("data-search")||"");row.dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\\""+tableId+"\\"]");if(pager){pager._page=1;}applyPager(tableId);});}';
+    echo 'var inputs=document.querySelectorAll(".dcmanage-port-search");for(var s=0;s<inputs.length;s++){inputs[s].addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var tableId=this.getAttribute("data-target-table")||"";if(!tableId){return;}var table=document.getElementById(tableId);if(!table){return;}var rows=table.querySelectorAll("tbody tr");for(var r=0;r<rows.length;r++){var row=rows[r];var hay=normalizeSearchText(row.getAttribute("data-search")||"");row.dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.querySelector(\'.dcmanage-table-pager[data-target-table="\'+tableId+\'"]\');if(pager){pager._page=1;}applyPager(tableId);});}';
     echo '})();';
     echo '</script>';
 }
@@ -3485,7 +3672,7 @@ function dcmanage_render_servers(string $lang): void
     echo 'function initMonitorRow(row){if(!row){return;}var load=row.querySelector(".dcmanage-monitor-load");var search=row.querySelector(".dcmanage-monitor-sensor-search");var prtg=row.querySelector(".dcmanage-monitor-prtg");if(load){load.addEventListener("click",function(){loadSensorsForRow(row);});}if(prtg){prtg.addEventListener("change",function(){loadSensorsForRow(row);});}if(search){search.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();loadSensorsForRow(row);}});} }';
     echo 'function cloneRow(container,rowSelector){var first=container.querySelector(rowSelector);if(!first){return null;}var clone=first.cloneNode(true);var els=clone.querySelectorAll("input,select,textarea");for(var i=0;i<els.length;i++){var el=els[i];if(el.tagName==="SELECT"){el.selectedIndex=0;if(el.classList.contains("dcmanage-traffic-port")){el.innerHTML="<option value=\\"\\">' . addslashes(I18n::t('select_switch_port', $lang)) . '</option>";el.disabled=true;} }else{el.value="";}}return clone;}';
     echo 'function initServerForm(form){if(!form){return;}var dc=form.querySelector(".dcmanage-map-dc")||form.querySelector("#dcmanage-server-dc");var rack=form.querySelector(".dcmanage-map-rack")||form.querySelector("#dcmanage-server-rack");var trafficWrap=form.querySelector(".dcmanage-traffic-rows");var monitorWrap=form.querySelector(".dcmanage-monitor-rows");var addTraffic=form.querySelector(".dcmanage-add-traffic-row");var addMonitor=form.querySelector(".dcmanage-add-monitor-row");function syncDc(){var dcId=dc?String(dc.value||""):"";if(rack){rack.disabled=(dcId==="");filterByDc(rack,dcId);}if(trafficWrap){var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var i=0;i<rows.length;i++){if(typeof rows[i]._dcRefresh==="function"){rows[i]._dcRefresh();}}}}if(dc){dc.addEventListener("change",syncDc);}if(trafficWrap){var trafficRows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var t=0;t<trafficRows.length;t++){initTrafficRow(trafficRows[t],dc);}trafficWrap.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-traffic-row");if(!rm){return;}var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");if(rows.length<=1){return;}rm.closest(".dcmanage-traffic-row").remove();});}if(addTraffic&&trafficWrap){addTraffic.addEventListener("click",function(){var row=cloneRow(trafficWrap,".dcmanage-traffic-row");if(!row){return;}trafficWrap.appendChild(row);initTrafficRow(row,dc);});}if(monitorWrap){var monitorRows=monitorWrap.querySelectorAll(".dcmanage-monitor-row");for(var m=0;m<monitorRows.length;m++){initMonitorRow(monitorRows[m]);}monitorWrap.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-monitor-row");if(!rm){return;}var rows=monitorWrap.querySelectorAll(".dcmanage-monitor-row");if(rows.length<=1){return;}rm.closest(".dcmanage-monitor-row").remove();});}if(addMonitor&&monitorWrap){addMonitor.addEventListener("click",function(){var row=cloneRow(monitorWrap,".dcmanage-monitor-row");if(!row){return;}monitorWrap.appendChild(row);initMonitorRow(row);});}syncDc();}';
-    echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){var row=rows[r];var sid=row.getAttribute("data-server-id")||"";var detail=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid+"\\"]");if(row.dataset&&row.dataset.filtered==="1"){row.style.display="none";if(detail){detail.style.display="none";}}else{row.style.display="";}}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){var mainRow=visible[x];var sid2=mainRow.getAttribute("data-server-id")||"";var detailRow=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid2+"\\"]");var show=(x>=start&&x<end);mainRow.style.display=show?"":"none";if(!show&&detailRow){detailRow.style.display="none";}}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
+    echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){var row=rows[r];var sid=row.getAttribute("data-server-id")||"";var detail=document.querySelector(\'tr.dcmanage-server-map-row[data-server-id="\'+sid+\'"]\');if(row.dataset&&row.dataset.filtered==="1"){row.style.display="none";if(detail){detail.style.display="none";}}else{row.style.display="";}}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){var mainRow=visible[x];var sid2=mainRow.getAttribute("data-server-id")||"";var detailRow=document.querySelector(\'tr.dcmanage-server-map-row[data-server-id="\'+sid2+\'"]\');var show=(x>=start&&x<end);mainRow.style.display=show?"":"none";if(!show&&detailRow){detailRow.style.display="none";}}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
     echo 'var serverSearch=document.getElementById("dcmanage-server-table-search");if(serverSearch){serverSearch.addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var rows=document.querySelectorAll("#dcmanage-server-table tbody tr.dcmanage-server-item");for(var i=0;i<rows.length;i++){var hay=normalizeSearchText(rows[i].getAttribute("data-search")||"");rows[i].dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.getElementById("dcmanage-server-table-pager");if(pager){pager._page=1;}applyServerPager();});}';
     echo 'var serverPager=document.getElementById("dcmanage-server-table-pager");if(serverPager){var p=serverPager.querySelector(".dcmanage-page-prev");var n=serverPager.querySelector(".dcmanage-page-next");var sz=serverPager.querySelector(".dcmanage-page-size");if(p){p.addEventListener("click",function(){serverPager._page=(serverPager._page||1)-1;applyServerPager();});}if(n){n.addEventListener("click",function(){serverPager._page=(serverPager._page||1)+1;applyServerPager();});}if(sz){sz.addEventListener("change",function(){serverPager._page=1;applyServerPager();});}}';
     echo 'function initServerDiscovery(scope){if(!scope){return;}var host=scope.querySelector(".dcmanage-server-discovery-host");var ports=scope.querySelector(".dcmanage-server-discovery-ports");var run=scope.querySelector(".dcmanage-server-discovery-run");var out=scope.querySelector(".dcmanage-server-discovery-result");if(!run){return;}run.addEventListener("click",function(){var target=host?String(host.value||"").trim():"";if(target===""){if(out){out.textContent="Target IP / Host is required";}return;}if(out){out.textContent="Running...";}fetch(apiUrl("monitoring/discover",{host:target,ports:(ports?ports.value:"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var data=res.data||{};var rows=data.ports||[];if(!out){return;}if(rows.length===0){out.textContent="No results";return;}var txt=[];for(var i=0;i<rows.length;i++){var it=rows[i]||{};txt.push(String(it.port)+": "+(it.open?"open":"closed")+" ("+String(it.latency_ms||0)+"ms)");}out.textContent="Resolved IP: "+String(data.resolved_ip||"-")+" | "+txt.join(" | ");}).catch(function(err){if(out){out.textContent=String(err&&err.message?err.message:"error");}});});}';
@@ -3531,10 +3718,9 @@ function dcmanage_render_scope(string $lang): void
 {
     $scopeGidRaw = trim((string) ($_GET['scope_gid'] ?? ''));
     $scopePidRaw = trim((string) ($_GET['scope_pid'] ?? ''));
-    $scopeQ = trim((string) ($_GET['scope_q'] ?? ''));
     $scopeGids = dcmanage_parse_csv_ids($scopeGidRaw);
     $scopePids = dcmanage_parse_csv_ids($scopePidRaw);
-    $hasScopeFilter = $scopeGids !== [] || $scopePids !== [] || $scopeQ !== '';
+    $hasScopeFilter = $scopeGids !== [] || $scopePids !== [];
 
     $productsQuery = Capsule::table('tblproducts as p')
         ->leftJoin('tblproductgroups as g', 'g.id', '=', 'p.gid')
@@ -3555,14 +3741,6 @@ function dcmanage_render_scope(string $lang): void
         }
     } else {
         $productsQuery->whereRaw('1=0');
-    }
-
-    if ($scopeQ !== '') {
-        $productsQuery->where(static function ($w) use ($scopeQ): void {
-            $w->where('p.name', 'like', '%' . $scopeQ . '%')
-                ->orWhere('g.name', 'like', '%' . $scopeQ . '%')
-                ->orWhere('p.id', '=', (int) $scopeQ);
-        });
     }
 
     $products = $productsQuery->get([
@@ -3614,9 +3792,8 @@ function dcmanage_render_scope(string $lang): void
     echo '<form method="get" class="dcmanage-form-card mb-3">';
     echo '<input type="hidden" name="module" value="dcmanage"><input type="hidden" name="tab" value="scope">';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_gid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_gid" value="' . htmlspecialchars($scopeGidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_gid_csv_placeholder', $lang)) . '"></div>';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_pid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_pid" value="' . htmlspecialchars($scopePidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_pid_csv_placeholder', $lang)) . '"></div>';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('table_search', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_q" value="' . htmlspecialchars($scopeQ) . '" placeholder="' . htmlspecialchars(I18n::t('scope_search_product', $lang)) . '"></div>';
+    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('scope_gid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_gid" value="' . htmlspecialchars($scopeGidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_gid_csv_placeholder', $lang)) . '"></div>';
+    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('scope_pid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_pid" value="' . htmlspecialchars($scopePidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_pid_csv_placeholder', $lang)) . '"></div>';
     echo '</div>';
     echo '<div class="dcmanage-form-actions d-flex flex-wrap">';
     echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('logs_apply_filter', $lang)) . '</button>';

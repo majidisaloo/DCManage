@@ -78,6 +78,22 @@ final class UpdateManager
             'remote_ok' => $remoteError === '',
         ];
 
+        if ($result['has_update'] === false) {
+            $state = self::getUpdateState();
+            $stateStatus = strtolower(trim((string) ($state['status'] ?? '')));
+            $stateMessage = strtolower(trim((string) ($state['message'] ?? '')));
+            if (in_array($stateStatus, ['failed', 'warning', 'cancel-requested', 'canceled'], true)
+                || strpos($stateMessage, 'update archive missing') !== false
+                || strpos($stateMessage, 'canceled before http request') !== false) {
+                self::setUpdateState([
+                    'status' => 'updated',
+                    'message' => '',
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                $result['update_state'] = self::getUpdateState();
+            }
+        }
+
         if ($remoteError !== '') {
             $result['remote_error'] = $remoteError;
         }

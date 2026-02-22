@@ -140,7 +140,8 @@ final class PrtgClient
         $json = $this->get('/api/table.json', [
             'content' => 'probes',
             'output' => 'json',
-            'columns' => 'objid,probe,status',
+            'columns' => 'objid,probe,parentid,status,tags',
+            'filter_parentid' => 0,
             'count' => max(20, min(1000, $limit)),
         ]);
 
@@ -150,7 +151,8 @@ final class PrtgClient
         }
 
         $filtered = [];
-        $seen = [];
+        $seenById = [];
+        $seenByName = [];
         foreach ($items as $item) {
             $id = trim((string) ($item['id'] ?? ''));
             $name = trim((string) ($item['name'] ?? ''));
@@ -163,12 +165,16 @@ final class PrtgClient
             if ($name === '' || preg_match('/^-?\d+$/', $name) === 1) {
                 continue;
             }
-
-            $key = $id . '|' . strtolower($name);
-            if (isset($seen[$key])) {
+            if (isset($seenById[$idInt])) {
                 continue;
             }
-            $seen[$key] = true;
+            $seenById[$idInt] = true;
+
+            $nameKey = strtolower($name);
+            if (isset($seenByName[$nameKey])) {
+                continue;
+            }
+            $seenByName[$nameKey] = true;
             $filtered[] = $item;
         }
 
@@ -189,7 +195,31 @@ final class PrtgClient
             'filter_parentid' => $parentId,
         ]);
 
-        return $this->normalizeTableRows($json['groups'] ?? [], 'group');
+        $items = $this->normalizeTableRows($json['groups'] ?? [], 'group');
+        $filtered = [];
+        $seen = [];
+        foreach ($items as $item) {
+            $id = (int) ($item['id'] ?? 0);
+            $name = trim((string) ($item['name'] ?? ''));
+            if ($id <= 0) {
+                continue;
+            }
+            if ($name === '' || preg_match('/^-?\d+$/', $name) === 1) {
+                continue;
+            }
+            $key = $id . '|' . strtolower($name);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $filtered[] = $item;
+        }
+
+        usort($filtered, static function (array $a, array $b): int {
+            return strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+        });
+
+        return $filtered;
     }
 
     public function listDevices(int $parentId, int $limit = 300): array
@@ -202,7 +232,28 @@ final class PrtgClient
             'filter_parentid' => $parentId,
         ]);
 
-        return $this->normalizeTableRows($json['devices'] ?? [], 'device', 'host');
+        $items = $this->normalizeTableRows($json['devices'] ?? [], 'device', 'host');
+        $filtered = [];
+        $seen = [];
+        foreach ($items as $item) {
+            $id = (int) ($item['id'] ?? 0);
+            $name = trim((string) ($item['name'] ?? ''));
+            if ($id <= 0 || $name === '' || preg_match('/^-?\d+$/', $name) === 1) {
+                continue;
+            }
+            $key = $id . '|' . strtolower($name);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $filtered[] = $item;
+        }
+
+        usort($filtered, static function (array $a, array $b): int {
+            return strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+        });
+
+        return $filtered;
     }
 
     public function listDeviceSensors(int $deviceId, int $limit = 400, string $query = ''): array

@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 12;
+    private const SCHEMA_VERSION = 13;
 
     public static function migrate(): void
     {
@@ -74,6 +74,11 @@ final class Schema
         if ($current < 12) {
             self::migrationV12();
             self::setCurrentVersion(12);
+        }
+
+        if ($current < 13) {
+            self::migrationV13();
+            self::setCurrentVersion(13);
         }
     }
 
@@ -552,6 +557,32 @@ final class Schema
                 $table->string('device_id', 64)->nullable();
                 $table->text('notes')->nullable();
                 $table->timestamp('created_at')->nullable()->index();
+            });
+        }
+    }
+
+    private static function migrationV13(): void
+    {
+        if (!Capsule::schema()->hasTable('mod_dcmanage_server_monitoring_links')) {
+            Capsule::schema()->create('mod_dcmanage_server_monitoring_links', static function (Blueprint $table): void {
+                $table->bigIncrements('id');
+                $table->unsignedInteger('server_id')->index();
+                $table->unsignedBigInteger('map_id')->index();
+                $table->string('purpose', 32)->index();
+                $table->timestamp('created_at')->nullable()->index();
+                $table->unique(['server_id', 'map_id'], 'mod_dcmanage_server_map_unique');
+            });
+        }
+
+        if (Capsule::schema()->hasTable('mod_dcmanage_servers') && !Capsule::schema()->hasColumn('mod_dcmanage_servers', 'action_switch_id')) {
+            Capsule::schema()->table('mod_dcmanage_servers', static function (Blueprint $table): void {
+                $table->unsignedInteger('action_switch_id')->nullable()->after('rack_id')->index();
+            });
+        }
+
+        if (Capsule::schema()->hasTable('mod_dcmanage_servers') && !Capsule::schema()->hasColumn('mod_dcmanage_servers', 'action_port_id')) {
+            Capsule::schema()->table('mod_dcmanage_servers', static function (Blueprint $table): void {
+                $table->unsignedInteger('action_port_id')->nullable()->after('action_switch_id')->index();
             });
         }
     }

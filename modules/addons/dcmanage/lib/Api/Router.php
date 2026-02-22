@@ -6,6 +6,7 @@ namespace DCManage\Api;
 
 use DCManage\Integrations\PrtgClient;
 use DCManage\Jobs\JobQueue;
+use DCManage\Support\Crypto;
 use DCManage\Support\UpdateManager;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
@@ -72,6 +73,9 @@ final class Router
                     break;
                 case 'monitoring/discover':
                     $data = self::monitoringDiscover();
+                    break;
+                case 'ilo/test':
+                    $data = self::iloTest();
                     break;
                 case 'switch/ports':
                     $data = self::switchPorts();
@@ -222,21 +226,6 @@ final class Router
         $to = (string) ($_GET['to'] ?? 'now');
         $avg = (string) ($_GET['avg'] ?? '300');
 
-        $cacheKey = hash('sha256', $serviceId . '|' . $from . '|' . $to . '|' . $avg);
-        $cached = Capsule::table('mod_dcmanage_graph_cache')
-            ->where('whmcs_serviceid', $serviceId)
-            ->where('payload_hash', $cacheKey)
-            ->where('expires_at', '>=', date('Y-m-d H:i:s'))
-            ->orderBy('id', 'desc')
-            ->first();
-
-        if ($cached !== null) {
-            return [
-                'cached' => true,
-                'payload' => json_decode((string) $cached->json_data, true),
-            ];
-        }
-
         $link = Capsule::table('mod_dcmanage_service_link')->where('whmcs_serviceid', $serviceId)->first();
         if ($link === null || empty($link->prtg_id) || empty($link->prtg_sensor_id)) {
             throw new \RuntimeException('Service has no PRTG mapping');
@@ -244,20 +233,6 @@ final class Router
 
         $client = PrtgClient::fromDb((int) $link->prtg_id);
         $payload = $client->getHistoricData((string) $link->prtg_sensor_id, $avg, $from, $to);
-
-        $now = date('Y-m-d H:i:s');
-        $expires = date('Y-m-d H:i:s', time() + 1800);
-
-        Capsule::table('mod_dcmanage_graph_cache')->insert([
-            'whmcs_serviceid' => $serviceId,
-            'range_start' => date('Y-m-d H:i:s', strtotime($from, time())),
-            'range_end' => date('Y-m-d H:i:s', strtotime($to, time())),
-            'source' => 'prtg',
-            'payload_hash' => $cacheKey,
-            'json_data' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-            'cached_at' => $now,
-            'expires_at' => $expires,
-        ]);
 
         return [
             'cached' => false,
@@ -414,6 +389,114 @@ final class Router
         return [
             'items' => $rows,
             'count' => count($rows),
+        ];
+    }
+
+    private static function iloTest(): array
+    {
+        $serverId = (int) ($_GET['server_id'] ?? 0);
+        $host = trim((string) ($_GET['host'] ?? ''));
+        $user = trim((string) ($_GET['user'] ?? ''));
+        $pass = (string) ($_GET['pass'] ?? '');
+        $verify = (int) ($_GET['verify_ssl'] ?? 0) === 1;
+
+        if ($serverId > 0 && ($host === '' || $user === '' || $pass === '')) {
+            $server = Capsule::table('mod_dcmanage_servers as s')
+                ->leftJoin('mod_dcmanage_ilos as il', 'il.id', '=', 's.ilo_id')
+                ->where('s.id', $serverId)
+                ->first(['il.host as ilo_host', 'il.user as ilo_user', 'il.pass_enc as ilo_pass_enc']);
+            if ($server !== null) {
+                if ($host === '') {
+                    $host = trim((string) ($server->ilo_host ?? ''));
+                }
+                if ($user === '') {
+                    $user = trim((string) ($server->ilo_user ?? ''));
+                }
+                if ($pass === '' && trim((string) ($server->ilo_pass_enc ?? '')) !== '') {
+                    $pass = Crypto::decrypt((string) $server->ilo_pass_enc);
+                }
+            }
+        }
+
+        if ($host === '' || $user === '' || $pass === '') {
+            throw new \RuntimeException('iLO host, user and password are required');
+        }
+
+        $base = preg_match('#^https?://#i', $host) === 1 ? rtrim($host, '/') : ('https://' . rtrim($host, '/'));
+        $root = self::iloCurlJson($base . '/redfish/v1/', $user, $pass, $verify);
+
+        $members = [];
+        if (isset($root['data']['Systems']['@odata.id'])) {
+            $systems = self::iloCurlJson($base . (string) $root['data']['Systems']['@odata.id'], $user, $pass, $verify);
+            $members = $systems['data']['Members'] ?? [];
+        }
+
+        $power = '';
+        if (is_array($members) && isset($members[0]['@odata.id'])) {
+            $systemInfo = self::iloCurlJson($base . (string) $members[0]['@odata.id'], $user, $pass, $verify);
+            $power = trim((string) ($systemInfo['data']['PowerState'] ?? ''));
+        }
+
+        return [
+            'ok' => true,
+            'status_code' => (int) $root['status_code'],
+            'name' => (string) ($root['data']['Name'] ?? ''),
+            'redfish' => (string) ($root['data']['RedfishVersion'] ?? ''),
+            'power_state' => $power,
+        ];
+    }
+
+    private static function iloCurlJson(string $url, string $user, string $pass, bool $verifySsl): array
+    {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $verifySsl);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verifySsl ? 2 : 0);
+        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+        curl_setopt($ch, CURLOPT_USERPWD, $user . ':' . $pass);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+
+        $proxyHost = trim((string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_host')->value('meta_value'));
+        $proxyPort = (int) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_port')->value('meta_value');
+        $proxyType = strtolower(trim((string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_type')->value('meta_value')));
+        $proxyUser = trim((string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_user')->value('meta_value'));
+        $proxyPassEnc = trim((string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_pass_enc')->value('meta_value'));
+        $proxyPass = $proxyPassEnc !== '' ? Crypto::decrypt($proxyPassEnc) : '';
+
+        if ($proxyHost !== '' && $proxyPort > 0) {
+            curl_setopt($ch, CURLOPT_PROXY, $proxyHost . ':' . $proxyPort);
+            if ($proxyType === 'socks5') {
+                curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5_HOSTNAME);
+            } else {
+                curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+            }
+            if ($proxyUser !== '') {
+                curl_setopt($ch, CURLOPT_PROXYUSERPWD, $proxyUser . ':' . $proxyPass);
+            }
+        }
+
+        $body = curl_exec($ch);
+        if ($body === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            throw new \RuntimeException('iLO request failed: ' . $err);
+        }
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($status >= 400) {
+            throw new \RuntimeException('iLO HTTP ' . $status);
+        }
+        $data = json_decode((string) $body, true);
+        if (!is_array($data)) {
+            throw new \RuntimeException('iLO returned invalid JSON');
+        }
+
+        return [
+            'status_code' => $status,
+            'data' => $data,
         ];
     }
 

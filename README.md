@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.71)
+## Features in this release (v0.1.72)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -45,6 +45,10 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - compatible with hardened PHP setups where shell-related functions are disabled.
   - resilient shell-quote fallback keeps settings/cron pages stable even when `escapeshellarg` is blocked by host policy.
 - Inventory workflows:
+  - Fixed Safari/WebKit JS parsing/selector escapes that were breaking server edit actions.
+  - `Services / Group` scope now stays strictly PID/GID CSV based.
+  - Server action port target now syncs from selected traffic link for enforce operations.
+  - Stale update warning banner is auto-cleared when installed version already matches latest release.
   - `Services / Group` filter now uses CSV inputs for both `GID` and `PID`.
   - Supports combined scope loading:
     - only GIDs => all products of those groups

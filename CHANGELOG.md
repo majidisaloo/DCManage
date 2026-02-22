@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.72] - 2026-02-22
+### Fixed
+- Fixed Safari/WebKit JS selector escaping in Rack/Switch/Servers scripts that caused `SyntaxError: Invalid escape in identifier` and blocked server edit interactions.
+- Fixed `Services / Group` filter behavior to be strictly PID/GID CSV-driven (removed extra search dependency).
+- Server create/update now updates action target (`action_switch_id` / `action_port_id`) from selected traffic links for consistent suspend/unsuspend targeting.
+- Server delete now also cleans `mod_dcmanage_server_monitoring_links` when present.
+- Auto-update status now auto-clears stale warning/error banners when installed version is already equal to latest release.
+- PRTG probe listing now filters internal/non-root pseudo entries more strictly to reduce duplicated/invalid probe rows.
+
 ## [0.1.71] - 2026-02-22
 ### Changed
 - `Services / Group` filtering was redesigned to use two CSV fields:
