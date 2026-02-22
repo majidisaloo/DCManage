@@ -3,6 +3,12 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.60] - 2026-02-22
+### Fixed
+- Update runtime state now auto-clears stale error messages when the latest `update_apply` job has already completed successfully.
+- Dashboard no longer keeps showing old `Update archive missing modules/addons/dcmanage` after subsequent successful update jobs.
+- Runtime state now normalizes to `updated/idle` when installed version is already synced with latest cached release.
+
 ## [0.1.59] - 2026-02-22
 ### Fixed
 - Fixed Servers tab inline JavaScript parse error in Safari/WebKit (`SyntaxError: Invalid escape in identifier`) caused by escaped quotes in pager logic.

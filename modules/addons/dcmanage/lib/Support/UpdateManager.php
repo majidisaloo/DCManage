@@ -199,7 +199,28 @@ final class UpdateManager
 
             $state = self::getUpdateState();
             $stateStatus = strtolower(trim((string) ($state['status'] ?? '')));
-            if ($stateStatus === 'canceled' || $stateStatus === 'cancel-requested') {
+            $lastStatus = strtolower(trim((string) ($last->status ?? '')));
+
+            $currentVersion = self::readInstalledModuleVersion();
+            $latestCached = self::getCachedLatestRelease();
+            $latestVersion = self::normalizeVersion((string) ($latestCached['tag_name'] ?? ''));
+            $isVersionSynced = $latestVersion !== '' ? version_compare($currentVersion, $latestVersion, '>=') : true;
+
+            if ($lastStatus === 'done' && in_array($stateStatus, ['failed', 'running', 'queued', 'pending', 'cancel-requested', 'canceled'], true)) {
+                self::setUpdateState([
+                    'status' => $isVersionSynced ? 'updated' : 'idle',
+                    'message' => '',
+                    'job_id' => (int) ($last->id ?? 0),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            } elseif ($stateStatus === 'failed' && $isVersionSynced) {
+                self::setUpdateState([
+                    'status' => 'updated',
+                    'message' => '',
+                    'job_id' => (int) ($last->id ?? 0),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            } elseif ($stateStatus === 'canceled' || $stateStatus === 'cancel-requested') {
                 self::setUpdateState([
                     'status' => 'idle',
                     'message' => '',

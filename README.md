@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.59)
+## Features in this release (v0.1.60)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -218,5 +218,6 @@ The admin shell uses Bootstrap 4-compatible markup and responsive layout.
 4. Auto-buy invoice workflow and credit application.
 5. Client-area widgets and advanced charts.
   - Auto-update package path detection is now compatible with both release zip layouts (root or nested top folder) to prevent false `missing modules/addons/dcmanage` errors.
+  - Update runtime state now auto-cleans stale failure messages after a later successful update job.
   - Removed redundant dashboard header subtitle/version text block for a cleaner top section.
   - Cron health `OK` state now uses green semantic status pills across dashboard and settings.
