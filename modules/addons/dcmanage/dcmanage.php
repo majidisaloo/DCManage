@@ -346,11 +346,41 @@ function dcmanage_handle_actions(string $lang): string
                 throw new RuntimeException('Invalid datacenter');
             }
 
+            $name = trim((string) ($_POST['name'] ?? ''));
+            if ($name === '') {
+                throw new RuntimeException('Datacenter name is required');
+            }
+            $location = trim((string) ($_POST['location'] ?? ''));
+            $notes = trim((string) ($_POST['notes'] ?? ''));
+            $desiredRackCount = max(0, (int) ($_POST['rack_count'] ?? 0));
+            $rackUnits = max(1, (int) ($_POST['rack_units'] ?? 42));
+
             Capsule::table('mod_dcmanage_datacenters')->where('id', $id)->update([
-                'name' => trim((string) ($_POST['name'] ?? '')),
-                'location' => trim((string) ($_POST['location'] ?? '')),
-                'notes' => trim((string) ($_POST['notes'] ?? '')),
+                'name' => $name,
+                'location' => $location,
+                'notes' => $notes,
             ]);
+
+            $existingRacks = Capsule::table('mod_dcmanage_racks')
+                ->where('dc_id', $id)
+                ->orderBy('id')
+                ->get(['id']);
+            $existingCount = count($existingRacks);
+            if ($desiredRackCount > $existingCount) {
+                for ($i = $existingCount + 1; $i <= $desiredRackCount; $i++) {
+                    Capsule::table('mod_dcmanage_racks')->insert([
+                        'dc_id' => $id,
+                        'name' => $name . '-R' . $i,
+                        'total_u' => $rackUnits,
+                        'notes' => null,
+                    ]);
+                }
+            }
+            if ($rackUnits > 0) {
+                Capsule::table('mod_dcmanage_racks')->where('dc_id', $id)->update([
+                    'total_u' => $rackUnits,
+                ]);
+            }
 
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
         }
@@ -406,13 +436,19 @@ function dcmanage_handle_actions(string $lang): string
             }
             $name = trim((string) ($_POST['rack_name'] ?? ''));
             $totalU = max(1, (int) ($_POST['rack_total_u'] ?? 42));
+            $rowLabel = trim((string) ($_POST['rack_row'] ?? ''));
+            $rackLabel = trim((string) ($_POST['rack_code'] ?? ''));
+            $notes = trim((string) ($_POST['rack_notes'] ?? ''));
             if ($name === '') {
                 throw new RuntimeException('Rack name is required');
             }
 
             Capsule::table('mod_dcmanage_racks')->where('id', $rackId)->update([
                 'name' => $name,
+                'row' => $rowLabel !== '' ? $rowLabel : null,
+                'rack' => $rackLabel !== '' ? $rackLabel : null,
                 'total_u' => $totalU,
+                'notes' => $notes !== '' ? $notes : null,
             ]);
 
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('saved', $lang)) . '</div>';
@@ -732,8 +768,8 @@ function dcmanage_handle_actions(string $lang): string
                 'dc_id' => $dcId,
                 'rack_id' => $rackId > 0 ? $rackId : null,
                 'hostname' => $hostname,
-                'asset_tag' => trim((string) ($_POST['asset_tag'] ?? '')),
-                'serial' => trim((string) ($_POST['serial'] ?? '')),
+                'asset_tag' => '',
+                'serial' => '',
                 'u_start' => (int) ($_POST['u_start'] ?? 0) ?: null,
                 'u_height' => max(1, (int) ($_POST['u_height'] ?? 1)),
                 'notes' => trim((string) ($_POST['notes'] ?? '')),
@@ -1501,6 +1537,10 @@ function dcmanage_render_datacenters(string $lang): void
     echo '<div class="dcmanage-dc-table-wrap mb-4"><div class="table-responsive"><table class="table table-sm table-striped dcmanage-dc-table">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('datacenter_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_location', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
     foreach ($rows as $row) {
+        $dcRackUnits = (int) Capsule::table('mod_dcmanage_racks')->where('dc_id', (int) $row->id)->avg('total_u');
+        if ($dcRackUnits <= 0) {
+            $dcRackUnits = 42;
+        }
         echo '<tr>';
         echo '<td>' . (int) $row->id . '</td>';
         echo '<td>' . htmlspecialchars((string) $row->name) . '</td>';
@@ -1523,10 +1563,13 @@ function dcmanage_render_datacenters(string $lang): void
         echo '<form method="post" class="dcmanage-form-card">';
         echo '<input type="hidden" name="dcmanage_action" value="datacenter_update"><input type="hidden" name="dc_id" value="' . (int) $row->id . '">';
         echo '<div class="form-row">';
-        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_name', $lang)) . '</label><input name="name" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
+        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_name', $lang)) . '</label><input name="name" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '" required></div>';
         echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_location', $lang)) . '</label><input name="location" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->location) . '"></div>';
-        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input name="notes" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->notes) . '"></div>';
-        echo '</div><button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></form>';
+        echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('datacenter_rack_count', $lang)) . '</label><input type="number" min="0" name="rack_count" value="' . (int) $row->rack_count . '" class="form-control dcmanage-input"></div>';
+        echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('datacenter_rack_units', $lang)) . '</label><input type="number" min="1" name="rack_units" value="' . $dcRackUnits . '" class="form-control dcmanage-input"></div>';
+        echo '</div>';
+        echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><textarea name="notes" class="form-control dcmanage-input" rows="2">' . htmlspecialchars((string) $row->notes) . '</textarea></div>';
+        echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></form>';
         echo '</td></tr>';
 
         $servers = Capsule::table('mod_dcmanage_servers as s')
@@ -1600,8 +1643,11 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
         echo '<input type="hidden" name="dcmanage_action" value="rack_update">';
         echo '<input type="hidden" name="rack_id" value="' . $rackId . '">';
         echo '<div class="form-row align-items-end">';
-        echo '<div class="col-8"><label class="small mb-1">' . htmlspecialchars(I18n::t('label_name', $lang)) . '</label><input name="rack_name" class="form-control form-control-sm dcmanage-input" value="' . htmlspecialchars((string) $rack->name) . '"></div>';
-        echo '<div class="col-4"><label class="small mb-1">U</label><input type="number" min="1" max="60" name="rack_total_u" class="form-control form-control-sm dcmanage-input" value="' . $units . '"></div>';
+        echo '<div class="col-md-4"><label class="small mb-1">' . htmlspecialchars(I18n::t('label_name', $lang)) . '</label><input name="rack_name" class="form-control form-control-sm dcmanage-input" value="' . htmlspecialchars((string) $rack->name) . '" required></div>';
+        echo '<div class="col-md-2"><label class="small mb-1">U</label><input type="number" min="1" max="60" name="rack_total_u" class="form-control form-control-sm dcmanage-input" value="' . $units . '"></div>';
+        echo '<div class="col-md-2"><label class="small mb-1">Row</label><input name="rack_row" class="form-control form-control-sm dcmanage-input" value="' . htmlspecialchars((string) ($rack->row ?? '')) . '"></div>';
+        echo '<div class="col-md-2"><label class="small mb-1">Rack</label><input name="rack_code" class="form-control form-control-sm dcmanage-input" value="' . htmlspecialchars((string) ($rack->rack ?? '')) . '"></div>';
+        echo '<div class="col-md-2"><label class="small mb-1">' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input name="rack_notes" class="form-control form-control-sm dcmanage-input" value="' . htmlspecialchars((string) ($rack->notes ?? '')) . '"></div>';
         echo '</div>';
         echo '<button class="btn btn-sm btn-outline-primary mt-2 btn-block" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
         echo '</form>';
@@ -1622,7 +1668,7 @@ function dcmanage_render_rack_cards(int $dcId, string $lang): void
         echo '</div></div></div>';
     }
     echo '</div>';
-    echo '<script>(function(){var units=document.querySelectorAll(".dcmanage-rack-u[data-rack-id]");for(var i=0;i<units.length;i++){units[i].addEventListener("click",function(){var rid=this.getAttribute("data-rack-id");var u=this.getAttribute("data-u");var input=document.getElementById("dcmanage-u-no-"+rid);if(input){input.value=u;}var list=document.querySelectorAll(".dcmanage-rack-u[data-rack-id=\'"+rid+"\']");for(var j=0;j<list.length;j++){list[j].classList.remove("selected");}this.classList.add("selected");});}})();</script>';
+    echo '<script>(function(){var units=document.querySelectorAll(".dcmanage-rack-u[data-rack-id]");for(var i=0;i<units.length;i++){units[i].addEventListener("click",function(){var rid=this.getAttribute("data-rack-id");var u=this.getAttribute("data-u");var input=document.getElementById("dcmanage-u-no-"+rid);if(input){input.value=u;}var list=document.querySelectorAll(".dcmanage-rack-u[data-rack-id=\\""+rid+"\\"]");for(var j=0;j<list.length;j++){list[j].classList.remove("selected");}this.classList.add("selected");});}})();</script>';
 }
 
 function dcmanage_rack_usage(int $rackId, int $totalU): array
@@ -2479,19 +2525,19 @@ function dcmanage_render_switches(string $lang): void
         echo '</tr>';
 
         echo '<tr class="collapse" id="sw-edit-' . (int) $row->id . '"><td colspan="7">';
-        echo '<form method="post" class="dcmanage-form-card">';
+        echo '<form method="post" class="dcmanage-form-card dcmanage-switch-edit-form">';
         echo '<input type="hidden" name="dcmanage_action" value="switch_update"><input type="hidden" name="switch_id" value="' . (int) $row->id . '">';
         echo '<div class="form-row">';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" class="form-control dcmanage-input">';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" class="form-control dcmanage-input dcmanage-switch-edit-dc">';
         foreach ($dcs as $dc) {
             $sel = (int) $row->dc_id === (int) $dc->id ? ' selected' : '';
             echo '<option value="' . (int) $dc->id . '"' . $sel . '>' . htmlspecialchars((string) $dc->name) . '</option>';
         }
         echo '</select></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" class="form-control dcmanage-input"><option value="">--</option>';
+        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" class="form-control dcmanage-input dcmanage-switch-edit-rack"><option value="">--</option>';
         foreach ($racks as $rack) {
             $sel = (int) $row->rack_id === (int) $rack->id ? ' selected' : '';
-            echo '<option value="' . (int) $rack->id . '"' . $sel . '>' . htmlspecialchars((string) $rack->name) . '</option>';
+            echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '"' . $sel . '>' . htmlspecialchars((string) $rack->name) . '</option>';
         }
         echo '</select></div>';
         echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</label><input name="name" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
@@ -2553,10 +2599,11 @@ function dcmanage_render_switches(string $lang): void
     echo '<script>';
     echo '(function(){var dc=document.getElementById("dcmanage-switch-dc");var rack=document.getElementById("dcmanage-switch-rack");';
     echo 'if(dc&&rack){function filter(){var v=dc.value;for(var i=0;i<rack.options.length;i++){var o=rack.options[i];if(!o.value){o.hidden=false;continue;}o.hidden=(v!==""&&o.getAttribute("data-dc-id")!==v);}if(rack.selectedIndex>0&&rack.options[rack.selectedIndex].hidden){rack.selectedIndex=0;}}dc.addEventListener("change",filter);filter();}';
+    echo 'var editForms=document.querySelectorAll(".dcmanage-switch-edit-form");for(var ef=0;ef<editForms.length;ef++){(function(form){var edc=form.querySelector(".dcmanage-switch-edit-dc");var erack=form.querySelector(".dcmanage-switch-edit-rack");if(!edc||!erack){return;}function filterEdit(){var v=edc.value;for(var i=0;i<erack.options.length;i++){var o=erack.options[i];if(!o.value){o.hidden=false;continue;}o.hidden=(v!==""&&o.getAttribute("data-dc-id")!==v);}if(erack.selectedIndex>0&&erack.options[erack.selectedIndex].hidden){erack.selectedIndex=0;}}edc.addEventListener("change",filterEdit);filterEdit();})(editForms[ef]);}';
     echo 'function normalizeSearchText(v){var s=String(v||"").toLowerCase();s=s.replace(/[\\u0660-\\u0669]/g,function(ch){return String.fromCharCode(ch.charCodeAt(0)-1632+48);});s=s.replace(/[\\u06f0-\\u06f9]/g,function(ch){return String.fromCharCode(ch.charCodeAt(0)-1776+48);});s=s.replace(/\\u064a/g,"\\u06cc").replace(/\\u0643/g,"\\u06a9").replace(/\\u0629/g,"\\u0647");return s.trim();}';
-    echo 'function applyPager(tableId){var table=document.getElementById(tableId);if(!table){return;}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\'"+tableId+"\']");if(!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset && rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var x=0;x<rows.length;x++){rows[x].style.display=(rows[x].dataset&&rows[x].dataset.filtered==="1")?"none":"";}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var y=0;y<visible.length;y++){visible[y].style.display=(y>=start&&y<end)?"":"none";}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
+    echo 'function applyPager(tableId){var table=document.getElementById(tableId);if(!table){return;}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\\""+tableId+"\\"]");if(!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset && rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var x=0;x<rows.length;x++){rows[x].style.display=(rows[x].dataset&&rows[x].dataset.filtered==="1")?"none":"";}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var y=0;y<visible.length;y++){visible[y].style.display=(y>=start&&y<end)?"":"none";}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
     echo 'var pagers=document.querySelectorAll(".dcmanage-table-pager");for(var p=0;p<pagers.length;p++){(function(pg){var t=pg.getAttribute("data-target-table")||"";var prev=pg.querySelector(".dcmanage-page-prev");var next=pg.querySelector(".dcmanage-page-next");var sizeSel=pg.querySelector(".dcmanage-page-size");if(prev){prev.addEventListener("click",function(){pg._page=(pg._page||1)-1;applyPager(t);});}if(next){next.addEventListener("click",function(){pg._page=(pg._page||1)+1;applyPager(t);});}if(sizeSel){sizeSel.addEventListener("change",function(){pg._page=1;applyPager(t);});}applyPager(t);})(pagers[p]);}';
-    echo 'var inputs=document.querySelectorAll(".dcmanage-port-search");for(var s=0;s<inputs.length;s++){inputs[s].addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var tableId=this.getAttribute("data-target-table")||"";if(!tableId){return;}var table=document.getElementById(tableId);if(!table){return;}var rows=table.querySelectorAll("tbody tr");for(var r=0;r<rows.length;r++){var row=rows[r];var hay=normalizeSearchText(row.getAttribute("data-search")||"");row.dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\'"+tableId+"\']");if(pager){pager._page=1;}applyPager(tableId);});}';
+    echo 'var inputs=document.querySelectorAll(".dcmanage-port-search");for(var s=0;s<inputs.length;s++){inputs[s].addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var tableId=this.getAttribute("data-target-table")||"";if(!tableId){return;}var table=document.getElementById(tableId);if(!table){return;}var rows=table.querySelectorAll("tbody tr");for(var r=0;r<rows.length;r++){var row=rows[r];var hay=normalizeSearchText(row.getAttribute("data-search")||"");row.dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.querySelector(".dcmanage-table-pager[data-target-table=\\""+tableId+"\\"]");if(pager){pager._page=1;}applyPager(tableId);});}';
     echo '})();';
     echo '</script>';
 }
@@ -2658,10 +2705,16 @@ function dcmanage_render_servers(string $lang): void
         }
     }
 
-    echo '<div class="row">';
-    echo '<div class="col-lg-5 mb-4">';
-    echo '<h5>' . htmlspecialchars(I18n::t('server_add', $lang)) . '</h5>';
-    echo '<form method="post" action="" class="dcmanage-form-card">';
+    echo '<div class="d-flex justify-content-end align-items-center mb-3 dcmanage-section-toolbar">';
+    echo '<div class="dcmanage-action-buttons">';
+    echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-server-add">' . htmlspecialchars(I18n::t('server_add', $lang)) . '</button>';
+    echo '<button class="btn btn-outline-primary btn-sm" type="button" data-toggle="collapse" data-target="#dcmanage-server-bulk-add">' . htmlspecialchars(I18n::t('server_bulk_add', $lang)) . '</button>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="collapse mb-3" id="dcmanage-server-add">';
+    echo '<h5 class="mb-2">' . htmlspecialchars(I18n::t('server_add', $lang)) . '</h5>';
+    echo '<form method="post" action="" class="dcmanage-form-card dcmanage-centered-form">';
     echo '<input type="hidden" name="dcmanage_action" value="server_create">';
 
     echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" id="dcmanage-server-dc" required class="form-control dcmanage-input">';
@@ -2692,10 +2745,6 @@ function dcmanage_render_servers(string $lang): void
 
     echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</label><input required name="hostname" class="form-control dcmanage-input"></div>';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>Asset Tag</label><input name="asset_tag" class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-6"><label>Serial</label><input name="serial" class="form-control dcmanage-input"></div>';
-    echo '</div>';
-    echo '<div class="form-row">';
     echo '<div class="form-group col-md-6"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input"></div>';
     echo '<div class="form-group col-md-6"><label>U Height</label><input type="number" min="1" name="u_height" value="1" class="form-control dcmanage-input"></div>';
     echo '</div>';
@@ -2708,9 +2757,11 @@ function dcmanage_render_servers(string $lang): void
     echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="3"></textarea></div>';
     echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_server', $lang)) . '</button>';
     echo '</form>';
+    echo '</div>';
 
-    echo '<h5 class="mt-4">' . htmlspecialchars(I18n::t('server_bulk_add', $lang)) . '</h5>';
-    echo '<form method="post" action="" class="dcmanage-form-card">';
+    echo '<div class="collapse mb-4" id="dcmanage-server-bulk-add">';
+    echo '<h5 class="mb-2">' . htmlspecialchars(I18n::t('server_bulk_add', $lang)) . '</h5>';
+    echo '<form method="post" action="" class="dcmanage-form-card dcmanage-centered-form">';
     echo '<input type="hidden" name="dcmanage_action" value="server_create_bulk">';
     echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="bulk_dc_id" id="dcmanage-server-bulk-dc" required class="form-control dcmanage-input">';
     echo '<option value="">--</option>';
@@ -2731,7 +2782,6 @@ function dcmanage_render_servers(string $lang): void
     echo '</form>';
     echo '</div>';
 
-    echo '<div class="col-lg-7">';
     echo '<div class="form-group mb-2"><input type="text" id="dcmanage-server-table-search" class="form-control form-control-sm dcmanage-input" placeholder="' . htmlspecialchars(I18n::t('table_search', $lang)) . ': ID / Hostname / DC / Rack / iLO / Port / Sensor / U"></div>';
     echo '<div class="table-responsive dcmanage-table-wrap"><table id="dcmanage-server-table" class="table table-sm table-striped">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('server_ilo', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('table_sensor_count', $lang)) . '</th><th>U</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
@@ -2760,7 +2810,7 @@ function dcmanage_render_servers(string $lang): void
         $searchText = strtolower(trim((string) $serverId . ' ' . (string) $row->hostname . ' ' . (string) $row->dc_name . ' ' . (string) $row->rack_name . ' ' . strip_tags($iloLabel) . ' ' . strip_tags($portLabel) . ' ' . strip_tags($sensorLabel) . ' ' . $u));
         echo '<tr class="dcmanage-server-item" data-server-id="' . $serverId . '" data-search="' . htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') . '"><td>' . $serverId . '</td><td>' . htmlspecialchars((string) $row->hostname) . '</td><td>' . htmlspecialchars((string) $row->dc_name) . '</td><td>' . htmlspecialchars((string) $row->rack_name) . '</td><td>' . $iloLabel . '</td><td>' . $portLabel . '</td><td>' . $sensorLabel . '</td><td>' . htmlspecialchars($u) . '</td><td class="dcmanage-action-buttons"><button type="button" class="btn btn-sm dcmanage-btn-soft-primary dcmanage-server-map-toggle" data-target="' . htmlspecialchars($mapFormId) . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button><form method="post" style="display:inline" onsubmit="return confirm(\'Delete server?\')"><input type="hidden" name="dcmanage_action" value="server_delete"><input type="hidden" name="server_id" value="' . $serverId . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="server_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td></tr>';
         echo '<tr id="' . htmlspecialchars($mapFormId) . '" class="dcmanage-server-map-row" data-server-id="' . $serverId . '" style="display:none;"><td colspan="9">';
-        echo '<form method="post" class="dcmanage-form-card dcmanage-server-map" data-dc-id="' . (int) $row->dc_id . '">';
+        echo '<form method="post" class="dcmanage-form-card dcmanage-server-map dcmanage-centered-form" data-dc-id="' . (int) $row->dc_id . '">';
         echo '<input type="hidden" name="dcmanage_action" value="server_link_update">';
         echo '<input type="hidden" name="server_id" value="' . $serverId . '">';
         echo '<div class="form-row">';
@@ -2808,8 +2858,6 @@ function dcmanage_render_servers(string $lang): void
     echo '<span class="dcmanage-page-info">1/1</span>';
     echo '<button type="button" class="btn btn-sm btn-outline-secondary dcmanage-page-next">' . htmlspecialchars(I18n::t('pagination_next', $lang)) . '</button>';
     echo '</div>';
-    echo '</div>';
-    echo '</div>';
 
     echo '<script>';
     echo '(function(){';
@@ -2825,7 +2873,7 @@ function dcmanage_render_servers(string $lang): void
     echo 'function syncDcState(){var hasDc=dc.value!=="";rack.disabled=!hasDc;sw.disabled=!hasDc;if(!hasDc){rack.value="";sw.value="";}filterByDc(rack,dc.value);filterByDc(sw,dc.value);clearSwitchPorts(swp);if(hasDc&&sw.value!==""){loadSwitchPorts(swp,sw.value,dc.value,"");}}';
     echo 'dc.addEventListener("change",syncDcState);';
     echo 'sw.addEventListener("change",function(){loadSwitchPorts(swp,sw.value,dc.value,"");});';
-    echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){var row=rows[r];var sid=row.getAttribute("data-server-id")||"";var detail=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\'"+sid+"\']");if(row.dataset&&row.dataset.filtered==="1"){row.style.display="none";if(detail){detail.style.display="none";}}else{row.style.display="";}}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){var mainRow=visible[x];var sid2=mainRow.getAttribute("data-server-id")||"";var detailRow=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\'"+sid2+"\']");var show=(x>=start&&x<end);mainRow.style.display=show?"":"none";if(!show&&detailRow){detailRow.style.display="none";}}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
+    echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){var row=rows[r];var sid=row.getAttribute("data-server-id")||"";var detail=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid+"\\"]");if(row.dataset&&row.dataset.filtered==="1"){row.style.display="none";if(detail){detail.style.display="none";}}else{row.style.display="";}}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){var mainRow=visible[x];var sid2=mainRow.getAttribute("data-server-id")||"";var detailRow=document.querySelector("tr.dcmanage-server-map-row[data-server-id=\\""+sid2+"\\"]");var show=(x>=start&&x<end);mainRow.style.display=show?"":"none";if(!show&&detailRow){detailRow.style.display="none";}}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
     echo 'var serverSearch=document.getElementById("dcmanage-server-table-search");if(serverSearch){serverSearch.addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var rows=document.querySelectorAll("#dcmanage-server-table tbody tr.dcmanage-server-item");for(var i=0;i<rows.length;i++){var hay=normalizeSearchText(rows[i].getAttribute("data-search")||"");rows[i].dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.getElementById("dcmanage-server-table-pager");if(pager){pager._page=1;}applyServerPager();});}';
     echo 'var serverPager=document.getElementById("dcmanage-server-table-pager");if(serverPager){var p=serverPager.querySelector(".dcmanage-page-prev");var n=serverPager.querySelector(".dcmanage-page-next");var sz=serverPager.querySelector(".dcmanage-page-size");if(p){p.addEventListener("click",function(){serverPager._page=(serverPager._page||1)-1;applyServerPager();});}if(n){n.addEventListener("click",function(){serverPager._page=(serverPager._page||1)+1;applyServerPager();});}if(sz){sz.addEventListener("change",function(){serverPager._page=1;applyServerPager();});}}';
     echo 'var mapRows=document.querySelectorAll(".dcmanage-server-map");';

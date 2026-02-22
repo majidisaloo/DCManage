@@ -3,6 +3,20 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.61] - 2026-02-22
+### Changed
+- Servers tab now provides two top action buttons (`Add Server`, `Bulk Create Servers`) and each form is opened in its own collapsible section for cleaner workflow.
+- Server form cards and inline server edit cards are now centered and visually aligned for easier editing.
+- Removed `Asset Tag` and `Serial` fields from server create workflow as requested.
+
+### Fixed
+- Fixed Safari/WebKit selector escape issues in inline JS by replacing escaped attribute selectors, preventing `SyntaxError: Invalid escape in identifier` in server/rack/switch interactions.
+- Switch edit form now filters Rack options by selected Datacenter (same behavior as create form).
+
+### Added
+- Datacenter edit now supports rack management fields (`Rack Count`, `Rack Units`) and can auto-create missing racks directly from edit.
+- Rack edit now includes additional metadata fields (`Row`, `Rack`, `Notes`) and persists them.
+
 ## [0.1.60] - 2026-02-22
 ### Fixed
 - Update runtime state now auto-clears stale error messages when the latest `update_apply` job has already completed successfully.

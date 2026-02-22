@@ -511,6 +511,11 @@
   margin-top: 12px;
 }
 
+.dcmanage-centered-form {
+  max-width: 980px;
+  margin-inline: auto;
+}
+
 .dcmanage-shell .dcmanage-page-body > .dcmanage-form-card:first-of-type {
   margin-top: 0;
 }
@@ -656,6 +661,15 @@
 .dcmanage-section-toolbar {
   margin-top: 6px;
   margin-bottom: 14px !important;
+}
+
+.dcmanage-section-toolbar .dcmanage-action-buttons .btn {
+  min-width: 132px;
+}
+
+#dcmanage-server-add h5,
+#dcmanage-server-bulk-add h5 {
+  margin-inline: 4px;
 }
 
 .dcmanage-table-wrap {

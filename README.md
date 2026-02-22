@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.60)
+## Features in this release (v0.1.61)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -45,6 +45,13 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - compatible with hardened PHP setups where shell-related functions are disabled.
   - resilient shell-quote fallback keeps settings/cron pages stable even when `escapeshellarg` is blocked by host policy.
 - Inventory workflows:
+  - Servers page now uses two dedicated top actions (`Add Server`, `Bulk Create Servers`) with separate collapsible forms instead of stacked mixed layout.
+  - Server create/edit forms are centered for cleaner operator workflow.
+  - Server create flow no longer includes `Asset Tag` and `Serial`.
+  - Datacenter edit now includes rack controls (`Rack Count` and `Rack Units`) and can create missing racks directly from edit.
+  - Rack edit now supports `Row`, `Rack`, and `Notes` fields in addition to name/U.
+  - Switch edit now filters rack list by selected datacenter (same behavior as add switch).
+  - Fixed Safari/WebKit `Invalid escape in identifier` in dynamic selectors for servers/racks/switches.
   - Fixed Safari/WebKit JS parsing issue in Servers tab that blocked table actions.
   - Server `Edit` row toggle is restored and works correctly again.
   - Live table search now normalizes Persian/Arabic digits and common Arabic/Persian letter variants for reliable matching in mixed-language input.
