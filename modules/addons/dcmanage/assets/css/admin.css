@@ -763,6 +763,67 @@
   border-top-color: #e8eefb;
 }
 
+.dcmanage-port-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.dcmanage-port-table th:nth-child(1),
+.dcmanage-port-table td:nth-child(1) {
+  width: 170px;
+}
+
+.dcmanage-port-table th:nth-child(2),
+.dcmanage-port-table td:nth-child(2) {
+  width: 260px;
+}
+
+.dcmanage-port-table th:nth-child(3),
+.dcmanage-port-table td:nth-child(3) {
+  width: 70px;
+}
+
+.dcmanage-port-table th:nth-child(4),
+.dcmanage-port-table td:nth-child(4) {
+  width: 70px;
+}
+
+.dcmanage-port-table th:nth-child(5),
+.dcmanage-port-table td:nth-child(5),
+.dcmanage-port-table th:nth-child(6),
+.dcmanage-port-table td:nth-child(6) {
+  width: 160px;
+}
+
+.dcmanage-port-table th:nth-child(7),
+.dcmanage-port-table td:nth-child(7) {
+  width: 300px;
+}
+
+.dcmanage-port-desc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dcmanage-page-size-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-end: auto;
+}
+
+.dcmanage-page-size-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2a416f;
+  white-space: nowrap;
+}
+
+.dcmanage-page-size {
+  width: 88px;
+}
+
 .dcmanage-status-pill {
   display: inline-flex;
   align-items: center;

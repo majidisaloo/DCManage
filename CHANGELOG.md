@@ -3,6 +3,12 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.56] - 2026-02-22
+### Changed
+- Switch Ports table now uses fixed column layout so all rows stay vertically aligned even with long description text.
+- Switch Ports pagination controls were moved below the table.
+- Added per-page selector for Switch Ports pagination with default `15` (`10/15/25/50/100`).
+
 ## [0.1.55] - 2026-02-22
 ### Fixed
 - Fixed VLAN detection for SVI-style interfaces (`VlanX`, `vlanifX`) so VLAN column no longer stays empty when PVID mapping is unavailable.
