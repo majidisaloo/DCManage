@@ -467,10 +467,21 @@ final class UpdateManager
 
         $targetModule = dirname(__DIR__, 2);
         self::setUpdateState(['status' => 'running', 'message' => 'Applying files', 'tag' => $tag, 'updated_at' => date('Y-m-d H:i:s')]);
-        self::copyRecursive($sourceModule, $targetModule, true);
+        $fileCount = 0;
+        self::copyRecursive($sourceModule, $targetModule, true, $fileCount);
         self::checkCanceled('Canceled while applying files');
 
-        Logger::info('update', 'Auto-update files applied', ['tag' => $tag, 'bytes' => $downloadBytes, 'content_length' => $expectedBytes]);
+        // Flush OPcache so PHP serves fresh bytecode from the new files
+        self::setUpdateState(['status' => 'running', 'message' => 'Clearing OPcache', 'tag' => $tag, 'updated_at' => date('Y-m-d H:i:s')]);
+        $cacheCleared = self::clearOpcache($targetModule);
+
+        Logger::info('update', 'Auto-update files applied', [
+            'tag' => $tag,
+            'bytes' => $downloadBytes,
+            'content_length' => $expectedBytes,
+            'files_copied' => $fileCount,
+            'opcache_cleared' => $cacheCleared,
+        ]);
         self::cleanupTemp($zipFile, $extractDir);
     }
 
@@ -526,7 +537,7 @@ final class UpdateManager
         throw new \RuntimeException('Update archive missing modules/addons/dcmanage');
     }
 
-    private static function copyRecursive(string $src, string $dst, bool $root = false): void
+    private static function copyRecursive(string $src, string $dst, bool $root = false, int &$fileCount = 0): void
     {
         self::checkCanceled('Canceled while copying files');
 
@@ -548,13 +559,14 @@ final class UpdateManager
             $targetPath = $dst . DIRECTORY_SEPARATOR . $item;
 
             if (is_dir($sourcePath)) {
-                self::copyRecursive($sourcePath, $targetPath);
+                self::copyRecursive($sourcePath, $targetPath, false, $fileCount);
                 continue;
             }
 
             if (!copy($sourcePath, $targetPath)) {
                 throw new \RuntimeException('Failed to copy file: ' . $item);
             }
+            $fileCount++;
         }
 
         if ($root) {
@@ -564,7 +576,48 @@ final class UpdateManager
                     throw new \RuntimeException('Update validation failed after copy: missing ' . $file);
                 }
             }
+            Logger::info('update', 'File copy complete', ['total_files' => $fileCount]);
         }
+    }
+
+    /**
+     * Invalidate OPcache for all PHP files in the module directory.
+     * This is critical: without this, PHP serves stale compiled bytecode
+     * even after the source files have been overwritten on disk.
+     */
+    private static function clearOpcache(string $moduleRoot): bool
+    {
+        $cleared = false;
+
+        // Method 1: Invalidate each .php file individually
+        if (function_exists('opcache_invalidate')) {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($moduleRoot, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::LEAVES_ONLY
+            );
+            $phpCount = 0;
+            foreach ($iterator as $file) {
+                if ($file->isFile() && strtolower($file->getExtension()) === 'php') {
+                    opcache_invalidate($file->getPathname(), true);
+                    $phpCount++;
+                }
+            }
+            Logger::info('update', 'OPcache individual invalidation', ['php_files' => $phpCount]);
+            $cleared = true;
+        }
+
+        // Method 2: Full OPcache reset as safety net
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+            Logger::info('update', 'OPcache full reset executed');
+            $cleared = true;
+        }
+
+        if (!$cleared) {
+            Logger::warning('update', 'OPcache functions not available — PHP may serve stale bytecode');
+        }
+
+        return $cleared;
     }
 
     private static function cleanupTemp(string $zipFile, string $extractDir): void

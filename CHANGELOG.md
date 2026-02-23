@@ -3,6 +3,16 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.81] - 2026-02-23
+### Fixed
+- **Updater: OPcache invalidation** — After copying files, all `.php` files are now invalidated via `opcache_invalidate()` + `opcache_reset()`. This fixes the root cause of partial updates where PHP served stale compiled bytecode.
+- **Updater: Per-file logging** — `copyRecursive` now counts and logs total files copied for debugging.
+- Expanded friendly log message map (11 additional translations for dispatcher, switch discovery, poll_usage).
+- Badge colors on Logs page now use inline styles for guaranteed visibility in WHMCS theme.
+
+### Changed
+- Release workflow now builds and attaches a clean `DCManage-<tag>.zip` artifact to GitHub Releases.
+
 ## [0.1.80] - 2026-02-23
 ### Added
 - Traffic page: Download/Upload columns with per-column sorting (download, upload, total).

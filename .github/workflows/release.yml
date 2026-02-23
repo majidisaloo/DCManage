@@ -18,26 +18,41 @@ jobs:
       - name: Extract Release Notes from CHANGELOG.md
         id: extract_notes
         run: |
-          # Extract notes for the current tag (e.g., 0.1.77 or v1.0.0)
-          # Strips the leading 'v' if present for changelog matching if needed, 
-          # but our changelogs use [0.1.77] format.
           TAG_NAME="${{ github.ref_name }}"
           CLEAN_TAG=${TAG_NAME#v}
           
           echo "Extracting notes for version: $CLEAN_TAG"
           
-          # Use awk to print lines between the current version header and the next version header
           awk -v ver="## \\[$CLEAN_TAG\\]" '/^## \[/{
               if ($0 ~ ver) {flag=1; next} 
               else if (flag) {flag=0}
           } flag' CHANGELOG.md > RELEASE_NOTES.md
           
-          # If awk doesn't find anything, fallback to a default message so the release doesn't fail
           if [ ! -s RELEASE_NOTES.md ]; then
             echo "Release $TAG_NAME" > RELEASE_NOTES.md
           fi
           
           cat RELEASE_NOTES.md
+
+      - name: Build Release Zip
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          CLEAN_TAG=${TAG_NAME#v}
+          ZIP_NAME="DCManage-${CLEAN_TAG}.zip"
+          
+          echo "Building release zip: $ZIP_NAME"
+          
+          # Create a clean zip with only the module files
+          # The zip structure: modules/addons/dcmanage/...
+          cd "$GITHUB_WORKSPACE"
+          zip -r "$ZIP_NAME" \
+            modules/ \
+            VERSION \
+            -x "*.git*" "*.DS_Store" "*__MACOSX*"
+          
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          ls -lh "$ZIP_NAME"
+        id: build_zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -45,5 +60,6 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
+          files: ${{ steps.build_zip.outputs.zip_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
