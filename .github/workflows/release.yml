@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags:
+      - '0.*'
       - 'v*'
 
 permissions:
@@ -11,43 +12,38 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build WHMCS-ready package
+      - name: Extract Release Notes from CHANGELOG.md
+        id: extract_notes
         run: |
-          set -euo pipefail
-          mkdir -p dist/modules/addons
-          cp -R modules/addons/dcmanage dist/modules/addons/dcmanage
-          find dist -name '.DS_Store' -delete
-          cd dist
-          zip -r ../DCManage-${GITHUB_REF_NAME}.zip modules
-
-      - name: Resolve release notes
-        run: |
-          set -euo pipefail
-          NOTES_FILE="release-notes/${GITHUB_REF_NAME}.md"
-          if [ -f "$NOTES_FILE" ]; then
-            cp "$NOTES_FILE" dist/RELEASE_BODY.md
-          else
-            {
-              echo "Changed"
-              echo "- Packaging updated for this release."
-              echo "Added"
-              echo "- No additional notes were provided for this tag."
-              echo "Fixed"
-              echo "- Stability and maintenance improvements."
-            } > dist/RELEASE_BODY.md
+          # Extract notes for the current tag (e.g., 0.1.77 or v1.0.0)
+          # Strips the leading 'v' if present for changelog matching if needed, 
+          # but our changelogs use [0.1.77] format.
+          TAG_NAME="${{ github.ref_name }}"
+          CLEAN_TAG=${TAG_NAME#v}
+          
+          echo "Extracting notes for version: $CLEAN_TAG"
+          
+          # Use awk to print lines between the current version header and the next version header
+          awk -v ver="## \\[$CLEAN_TAG\\]" '/^## \[/{
+              if ($0 ~ ver) {flag=1; next} 
+              else if (flag) {flag=0}
+          } flag' CHANGELOG.md > RELEASE_NOTES.md
+          
+          # If awk doesn't find anything, fallback to a default message so the release doesn't fail
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Release $TAG_NAME" > RELEASE_NOTES.md
           fi
+          
+          cat RELEASE_NOTES.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            DCManage-${{ github.ref_name }}.zip
-          body_path: dist/RELEASE_BODY.md
-          generate_release_notes: false
-          draft: false
-          prerelease: false
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
