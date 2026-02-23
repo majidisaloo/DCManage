@@ -3,6 +3,10 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.82] - 2026-02-23
+### Fixed
+- Improved button padding and spacing on Logs page (filter actions and clear-log buttons).
+
 ## [0.1.81] - 2026-02-23
 ### Fixed
 - **Updater: OPcache invalidation** — After copying files, all `.php` files are now invalidated via `opcache_invalidate()` + `opcache_reset()`. This fixes the root cause of partial updates where PHP served stale compiled bytecode.
