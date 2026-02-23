@@ -145,7 +145,7 @@ final class PrtgClient
             'count' => max(20, min(1000, $limit)),
         ]);
 
-        $items = $this->normalizeTableRows($json['probes'] ?? [], 'probe');
+        $items = $this->normalizeTableRows($json['probes'] ?? [], 'probe', 'tags');
         if ($items === []) {
             return [];
         }
@@ -156,10 +156,19 @@ final class PrtgClient
         foreach ($items as $item) {
             $id = trim((string) ($item['id'] ?? ''));
             $name = trim((string) ($item['name'] ?? ''));
+            $name = preg_replace('/\s+/u', ' ', $name) ?? $name;
             $idInt = (int) $id;
+            $parentId = (int) ($item['parent_id'] ?? -1);
+            $tags = strtolower(trim((string) ($item['extra'] ?? '')));
 
             // Ignore internal/root pseudo rows often returned by some PRTG endpoints.
             if ($idInt <= 0) {
+                continue;
+            }
+            if ($parentId !== 0) {
+                continue;
+            }
+            if ($tags !== '' && (strpos($tags, 'internal') !== false || strpos($tags, 'group') !== false)) {
                 continue;
             }
             if ($name === '' || preg_match('/^-?\d+$/', $name) === 1) {
@@ -201,6 +210,7 @@ final class PrtgClient
         foreach ($items as $item) {
             $id = (int) ($item['id'] ?? 0);
             $name = trim((string) ($item['name'] ?? ''));
+            $name = preg_replace('/\s+/u', ' ', $name) ?? $name;
             if ($id <= 0) {
                 continue;
             }
@@ -238,6 +248,7 @@ final class PrtgClient
         foreach ($items as $item) {
             $id = (int) ($item['id'] ?? 0);
             $name = trim((string) ($item['name'] ?? ''));
+            $name = preg_replace('/\s+/u', ' ', $name) ?? $name;
             if ($id <= 0 || $name === '' || preg_match('/^-?\d+$/', $name) === 1) {
                 continue;
             }
@@ -424,7 +435,7 @@ final class PrtgClient
             }
             $items[] = [
                 'id' => $id,
-                'name' => trim((string) ($row[$nameKey] ?? $row['name'] ?? $id)),
+                'name' => trim((string) ($row[$nameKey] ?? $row['name'] ?? '')),
                 'status' => trim((string) ($row['status'] ?? '')),
                 'parent_id' => (int) ($row['parentid'] ?? 0),
                 'extra' => $extraKey !== null ? trim((string) ($row[$extraKey] ?? '')) : '',

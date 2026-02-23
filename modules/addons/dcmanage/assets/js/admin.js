@@ -527,22 +527,89 @@
         }
 
         var rows = res.data || [];
-        var html = '<div class="table-responsive"><table class="table table-sm table-striped">' +
-          '<thead><tr><th>Service</th><th>Status</th><th>Used (GB)</th><th>Allowed (GB)</th><th>Remaining (GB)</th><th>Cycle End</th></tr></thead><tbody>';
+        var blockedCount = rows.filter(function (r) { return String(r.status || '').toLowerCase() === 'blocked'; }).length;
+        var overusedCount = rows.filter(function (r) { return Number(r.remaining_bytes || 0) < 0; }).length;
+        var normalCount = rows.length - blockedCount;
+        var html = '<div class="row dcmanage-kpi mb-2">' +
+          '<div class="col-md-4 col-6 mb-3"><div class="card dcmanage-kpi-card"><div class="card-body"><div class="dcmanage-kpi-label">Services</div><div class="dcmanage-kpi-value">' + safeText(rows.length) + '</div></div></div></div>' +
+          '<div class="col-md-4 col-6 mb-3"><div class="card dcmanage-kpi-card"><div class="card-body"><div class="dcmanage-kpi-label">Blocked</div><div class="dcmanage-kpi-value text-danger">' + safeText(blockedCount) + '</div></div></div></div>' +
+          '<div class="col-md-4 col-12 mb-3"><div class="card dcmanage-kpi-card"><div class="card-body"><div class="dcmanage-kpi-label">Overused</div><div class="dcmanage-kpi-value text-warning">' + safeText(overusedCount) + '</div></div></div></div>' +
+        '</div>';
+        html += '<div class="dcmanage-form-card mb-3"><div class="form-row align-items-end">' +
+          '<div class="form-group col-md-4 mb-2"><label>Status Filter</label><select id="dcmanage-traffic-filter" class="form-control dcmanage-input"><option value="all">All</option><option value="blocked">Blocked</option><option value="overused">Overused</option><option value="normal">Normal</option></select></div>' +
+          '<div class="form-group col-md-4 mb-2"><label>Search Service</label><input id="dcmanage-traffic-search" class="form-control dcmanage-input" placeholder="service id / status"></div>' +
+          '<div class="form-group col-md-4 mb-2"><label>Sort</label><select id="dcmanage-traffic-sort" class="form-control dcmanage-input"><option value="service_asc">Service ASC</option><option value="remaining_asc">Remaining ASC</option><option value="remaining_desc">Remaining DESC</option></select></div>' +
+          '</div></div>';
+        html += '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped" id="dcmanage-traffic-table">' +
+          '<thead><tr><th>Service</th><th>Domain</th><th>Status</th><th>Used (GB)</th><th>Allowed (GB)</th><th>Remaining (GB)</th><th>Cycle End</th><th>Last Sample</th></tr></thead><tbody>';
 
         rows.forEach(function (r) {
-          html += '<tr>' +
+          var st = String(r.status || '').toLowerCase();
+          var cls = st === 'blocked' ? 'is-down' : (st === 'limited' ? 'is-unknown' : 'is-up');
+          html += '<tr data-service="' + safeText(r.service_id) + '" data-status="' + safeText(st) + '" data-remaining="' + safeText(r.remaining_bytes) + '">' +
             '<td>' + safeText(r.service_id) + '</td>' +
-            '<td>' + safeText(r.status) + '</td>' +
+            '<td>' + safeText(r.domain_status || '-') + '</td>' +
+            '<td><span class="dcmanage-status-pill ' + cls + '">' + safeText(st || '-') + '</span></td>' +
             '<td>' + toGb(r.used_bytes) + '</td>' +
             '<td>' + toGb(r.allowed_bytes) + '</td>' +
             '<td>' + toGb(r.remaining_bytes) + '</td>' +
             '<td>' + safeText(r.cycle_end || '-') + '</td>' +
+            '<td>' + safeText(r.last_sample_at || '-') + '</td>' +
             '</tr>';
         });
 
         html += '</tbody></table></div>';
         traffic.innerHTML = html;
+        (function bindTrafficFilters() {
+          var filter = document.getElementById('dcmanage-traffic-filter');
+          var search = document.getElementById('dcmanage-traffic-search');
+          var sort = document.getElementById('dcmanage-traffic-sort');
+          var table = document.getElementById('dcmanage-traffic-table');
+          if (!table) {
+            return;
+          }
+          function apply() {
+            var mode = filter ? String(filter.value || 'all') : 'all';
+            var q = String(search ? search.value || '' : '').toLowerCase().trim();
+            var body = table.querySelector('tbody');
+            var rowsNode = Array.prototype.slice.call(body.querySelectorAll('tr'));
+            rowsNode.forEach(function (row) {
+              var st = String(row.getAttribute('data-status') || '');
+              var rem = Number(row.getAttribute('data-remaining') || 0);
+              var service = String(row.getAttribute('data-service') || '');
+              var vis = true;
+              if (mode === 'blocked') {
+                vis = st === 'blocked';
+              } else if (mode === 'overused') {
+                vis = rem < 0;
+              } else if (mode === 'normal') {
+                vis = st !== 'blocked';
+              }
+              if (vis && q !== '') {
+                vis = (service + ' ' + st).indexOf(q) !== -1;
+              }
+              row.style.display = vis ? '' : 'none';
+            });
+            var ordered = rowsNode.slice(0);
+            var modeSort = sort ? String(sort.value || 'service_asc') : 'service_asc';
+            ordered.sort(function (a, b) {
+              if (modeSort === 'remaining_asc') {
+                return Number(a.getAttribute('data-remaining') || 0) - Number(b.getAttribute('data-remaining') || 0);
+              }
+              if (modeSort === 'remaining_desc') {
+                return Number(b.getAttribute('data-remaining') || 0) - Number(a.getAttribute('data-remaining') || 0);
+              }
+              return Number(a.getAttribute('data-service') || 0) - Number(b.getAttribute('data-service') || 0);
+            });
+            ordered.forEach(function (row) {
+              body.appendChild(row);
+            });
+          }
+          if (filter) { filter.addEventListener('change', apply); }
+          if (search) { search.addEventListener('input', apply); }
+          if (sort) { sort.addEventListener('change', apply); }
+          apply();
+        })();
 
         if (rows.length > 0) {
           renderSampleChart(baseTraffic, rows[0].service_id);

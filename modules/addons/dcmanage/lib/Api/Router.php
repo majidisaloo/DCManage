@@ -80,6 +80,9 @@ final class Router
                 case 'switch/ports':
                     $data = self::switchPorts();
                     break;
+                case 'switch/port-action':
+                    $data = self::switchPortAction();
+                    break;
                 default:
                     throw new \RuntimeException('Endpoint not found: ' . $endpoint);
             }
@@ -389,6 +392,54 @@ final class Router
         return [
             'items' => $rows,
             'count' => count($rows),
+        ];
+    }
+
+    private static function switchPortAction(): array
+    {
+        $portId = (int) ($_GET['port_id'] ?? 0);
+        $action = strtolower(trim((string) ($_GET['action'] ?? 'check')));
+        if ($portId <= 0) {
+            throw new \InvalidArgumentException('port_id is required');
+        }
+        if (!in_array($action, ['check', 'shut', 'noshut'], true)) {
+            throw new \InvalidArgumentException('Invalid action');
+        }
+
+        $port = Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->first();
+        if ($port === null) {
+            throw new \RuntimeException('Port not found');
+        }
+
+        $payload = [];
+        if ($action === 'check') {
+            $payload = [
+                'oper_status' => strtolower(trim((string) ($port->oper_status ?? 'unknown'))) === 'up' ? 'up' : 'down',
+                'last_seen' => date('Y-m-d H:i:s'),
+            ];
+        } elseif ($action === 'shut') {
+            $payload = [
+                'admin_status' => 'down',
+                'oper_status' => 'down',
+                'last_seen' => date('Y-m-d H:i:s'),
+            ];
+        } elseif ($action === 'noshut') {
+            $payload = [
+                'admin_status' => 'up',
+                'oper_status' => strtolower(trim((string) ($port->oper_status ?? ''))) === 'down' ? 'unknown' : (string) ($port->oper_status ?? 'unknown'),
+                'last_seen' => date('Y-m-d H:i:s'),
+            ];
+        }
+
+        Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->update($payload);
+        $updated = Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->first(['id', 'admin_status', 'oper_status', 'last_seen']);
+
+        return [
+            'id' => (int) $updated->id,
+            'admin_status' => (string) ($updated->admin_status ?? 'unknown'),
+            'oper_status' => (string) ($updated->oper_status ?? 'unknown'),
+            'last_seen' => (string) ($updated->last_seen ?? ''),
+            'action' => $action,
         ];
     }
 

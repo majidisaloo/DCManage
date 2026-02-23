@@ -3,6 +3,19 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.74] - 2026-02-23
+### Changed
+- Monitoring instance actions now keep context on the Monitoring tab and persist the active `View` modal state during mapping create/delete operations.
+- Monitoring labels are now vendor-agnostic (`Monitoring URL`, `Monitoring Username`, `Monitoring Secret`) while still supporting PRTG-specific auth controls.
+- Modal presentation was unified for Monitoring/Servers/Packages with shared spacing and button alignment styles.
+
+### Added
+- Added focused loading state UX for monitoring hierarchy mapping forms (row-level busy state with spinner).
+
+### Fixed
+- Fixed Server edit JavaScript selector escaping that was causing Safari/WebKit `SyntaxError: Invalid escape in identifier` and blocking edit interactions.
+- Improved PRTG hierarchy filtering to reduce invalid/numeric/internal probe/group/device rows and de-duplicate noisy results.
+
 ## [0.1.73] - 2026-02-22
 ### Changed
 - Servers table no longer renders inline row edit forms; server actions are now compact and include dedicated `View`, `Edit`, and `Delete`.
