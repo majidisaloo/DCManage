@@ -3,6 +3,31 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.76] - 2026-02-23
+### Fixed
+- Fixed Server View/Edit blank/black screen by wrapping modal auto-show script in `DOMContentLoaded` for reliable timing.
+- Fixed Monitoring View/Edit blank/black screen by adding non-jQuery fallback to edit modal auto-show and wrapping view/edit scripts in `DOMContentLoaded`.
+- Fixed Monitoring edit modal (early return path) missing non-jQuery display fallback, causing blank screen when Bootstrap modal plugin unavailable.
+- Fixed non-PRTG monitoring view (SolarWinds/Cacti) returning nearly blank page — now shows type-specific detail cards with URL, user, and back navigation.
+- Improved VLAN detection fallback to handle trunk/tagged sub-interface dot notation (e.g. `Eth1/1.100`, `ge-0/0/1.200`).
+- Fixed KPI card text/value bleeding into rounded corners by adding `overflow: hidden` and `text-overflow: ellipsis` to card content.
+- Fixed traffic page KPI cards overflowing their containers with explicit overflow containment.
+- Reduced port table horizontal scroll by lowering `min-width` from `1140px` to `880px` (mobile: `780px`).
+
+### Changed
+- Modernized global CSS palette from icy blue to deeper indigo primary (`#4f46e5`) with teal accent (`#0d9488`) and Tailwind-inspired slate tones for stronger contrast.
+- Strengthened soft-button color variants (primary/info/warning/success/danger) with higher-contrast backgrounds and borders.
+- Dashboard Test Mode indicator now renders **above** KPI cards as a prominent flag pill instead of below.
+- Dashboard flag pill styling upgraded with larger size, colored borders, status dot indicator, and box shadow.
+- Table header backgrounds updated to stronger slate tone for improved visual hierarchy.
+- Tab navigation hover/active styling updated to match new indigo palette.
+- KPI icon colors per category updated (datacenters=indigo, racks=violet, switches=emerald, servers=blue, breaches=orange, queue=red).
+
+### Added
+- Added log-level row color tinting in Logs tab: error rows tinted red, warning rows amber, info rows blue, debug rows gray — with left border accent.
+- Added queue job status row tinting: failed=red, pending=yellow, running=blue, done=green backgrounds for quick visual scanning.
+- Added CSS classes for dashboard flag pills (`is-warning`, `is-success`, `is-danger`) with dot indicator and prominent styling.
+
 ## [0.1.75] - 2026-02-23
 ### Fixed
 - Improved VLAN parsing fallback to detect additional interface formats (`Vl*`) and normalize numeric VLAN extraction when available.

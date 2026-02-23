@@ -233,6 +233,9 @@
           '<svg viewBox="0 0 220 70"><rect x="4" y="20" width="64" height="42" rx="8"/><rect x="78" y="10" width="64" height="52" rx="8"/><rect x="152" y="26" width="64" height="36" rx="8"/><circle cx="24" cy="35" r="4"/><circle cx="98" cy="29" r="4"/><circle cx="172" cy="39" r="4"/></svg>' +
         '</div>' +
       '</div>';
+      html += '<div class="dcmanage-dashboard-flags">';
+      html += '<span class="dcmanage-flag-pill ' + (testMode ? 'is-warning' : 'is-success') + '">' + safeText(T.testMode + ': ' + (testMode ? T.testModeOn : T.testModeOff)) + '</span>';
+      html += '</div>';
       html += '<div class="row dcmanage-kpi">';
       cards.forEach(function (k) {
         var cardValue = c[k.key] || 0;
@@ -253,9 +256,6 @@
           '</a>' +
           '</div>';
       });
-      html += '</div>';
-      html += '<div class="dcmanage-dashboard-flags">';
-      html += '<span class="dcmanage-flag-pill ' + (testMode ? 'is-warning' : 'is-success') + '">' + safeText(T.testMode + ': ' + (testMode ? T.testModeOn : T.testModeOff)) + '</span>';
       html += '</div>';
       dashboard.innerHTML = html;
     }).catch(function (e) {

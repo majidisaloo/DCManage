@@ -1653,13 +1653,23 @@ function dcmanage_render_monitoring(string $lang): void
 
     if ($viewInstance === null) {
         if ($editInstanceId > 0) {
-            $script = '(function(){var m=document.getElementById("dcmanage-monitoring-edit-modal");if(!m){return;}if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=' . json_encode($moduleLink . '&tab=monitoring') . ';});}})();';
+            $script = '(function(){var m=document.getElementById("dcmanage-monitoring-edit-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}})();';
             echo '<script>' . $script . '</script>';
         }
         return;
     }
-    if (strtolower((string) ($viewInstance->type ?? 'prtg')) !== 'prtg') {
-        echo '<div class="alert alert-info">' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . ': ' . htmlspecialchars(strtoupper((string) ($viewInstance->type ?? ''))) . '</div>';
+    $instanceType = strtolower((string) ($viewInstance->type ?? 'prtg'));
+    if ($instanceType !== 'prtg') {
+        $typeLabel = htmlspecialchars(strtoupper((string) ($viewInstance->type ?? '')));
+        echo '<div class="dcmanage-form-card">';
+        echo '<h5>' . htmlspecialchars(I18n::t('action_view', $lang)) . ': ' . htmlspecialchars((string) $viewInstance->name) . '</h5>';
+        echo '<div class="dcmanage-server-details-grid" style="grid-template-columns:repeat(3,1fr)">';
+        echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . '</span><strong>' . $typeLabel . '</strong></div>';
+        echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_url', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->base_url ?? '-')) . '</strong></div>';
+        echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_user', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->user ?? '-')) . '</strong></div>';
+        echo '</div>';
+        echo '<div class="mt-3"><a href="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '" class="btn btn-sm btn-outline-secondary">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</a></div>';
+        echo '</div>';
         return;
     }
 
@@ -1960,10 +1970,10 @@ function dcmanage_render_monitoring(string $lang): void
 JS;
     $script = str_replace('__LOADING_JSON__', $loadingJson, $script);
     if ($viewInstanceId > 0) {
-        $script .= '(function(){var m=document.getElementById("dcmanage-monitoring-view-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}})();';
+        $script .= '(function(){function showViewModal(){var m=document.getElementById("dcmanage-monitoring-view-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",showViewModal);}else{showViewModal();}})();';
     }
     if ($editInstanceId > 0) {
-        $script .= '(function(){var m=document.getElementById("dcmanage-monitoring-edit-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}})();';
+        $script .= '(function(){function showEditModal(){var m=document.getElementById("dcmanage-monitoring-edit-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",showEditModal);}else{showEditModal();}})();';
     }
     echo '<script>' . $script . '</script>';
 }
@@ -2760,6 +2770,20 @@ function dcmanage_vlan_fallback_for_interface(string $ifName, string $ifDesc = '
     // Secondary fallback from description if it explicitly includes VLAN id.
     if (preg_match('/\bvlan(?:if)?\s*[-_\/\.]?\s*(\d{1,4})\b/i', $ifDesc, $m) === 1) {
         return (string) ((int) $m[1]);
+    }
+
+    // Trunk/tagged sub-interface notation: Eth1/1.100, ge-0/0/1.200, etc.
+    if (preg_match('/\.(\d{1,4})$/i', $ifName, $m) === 1) {
+        $vid = (int) $m[1];
+        if ($vid > 0 && $vid <= 4094) {
+            return (string) $vid;
+        }
+    }
+    if ($ifDesc !== '' && preg_match('/\.(\d{1,4})$/i', $ifDesc, $m) === 1) {
+        $vid = (int) $m[1];
+        if ($vid > 0 && $vid <= 4094) {
+            return (string) $vid;
+        }
     }
 
     return '';
@@ -4184,7 +4208,7 @@ function dcmanage_render_servers(string $lang): void
     echo 'var serverPager=document.getElementById("dcmanage-server-table-pager");if(serverPager){var p=serverPager.querySelector(".dcmanage-page-prev");var n=serverPager.querySelector(".dcmanage-page-next");var sz=serverPager.querySelector(".dcmanage-page-size");if(p){p.addEventListener("click",function(){serverPager._page=(serverPager._page||1)-1;applyServerPager();});}if(n){n.addEventListener("click",function(){serverPager._page=(serverPager._page||1)+1;applyServerPager();});}if(sz){sz.addEventListener("change",function(){serverPager._page=1;applyServerPager();});}}';
     echo 'function initServerDiscovery(scope){if(!scope){return;}var host=scope.querySelector(".dcmanage-server-discovery-host");var ports=scope.querySelector(".dcmanage-server-discovery-ports");var run=scope.querySelector(".dcmanage-server-discovery-run");var out=scope.querySelector(".dcmanage-server-discovery-result");if(!run){return;}run.addEventListener("click",function(){var target=host?String(host.value||"").trim():"";if(target===""){if(out){out.textContent="Target IP / Host is required";}return;}if(out){out.textContent="Running...";}fetch(apiUrl("monitoring/discover",{host:target,ports:(ports?ports.value:"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var data=res.data||{};var rows=data.ports||[];if(!out){return;}if(rows.length===0){out.textContent="No results";return;}var txt=[];for(var i=0;i<rows.length;i++){var it=rows[i]||{};txt.push(String(it.port)+": "+(it.open?"open":"closed")+" ("+String(it.latency_ms||0)+"ms)");}out.textContent="Resolved IP: "+String(data.resolved_ip||"-")+" | "+txt.join(" | ");}).catch(function(err){if(out){out.textContent=String(err&&err.message?err.message:"error");}});});}';
     echo 'var createForm=document.querySelector("#dcmanage-server-add-modal form");if(createForm){initServerForm(createForm);}var editForm=document.querySelector("#dcmanage-server-details-modal form.dcmanage-server-map");if(editForm){initServerForm(editForm);}var discoveryWraps=document.querySelectorAll(".dcmanage-server-discovery-wrap");for(var dw=0;dw<discoveryWraps.length;dw++){initServerDiscovery(discoveryWraps[dw]);}';
-    echo 'var detailsModal=document.getElementById("dcmanage-server-details-modal");if(detailsModal){var back=' . json_encode($moduleLink) . ';var bindClose=function(){var items=detailsModal.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(detailsModal).modal("show");jQuery(detailsModal).on("hidden.bs.modal",function(){window.location.href=back;});}else{detailsModal.style.display="block";detailsModal.classList.add("show");detailsModal.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}}';
+    echo 'function showServerDetailsModal(){var detailsModal=document.getElementById("dcmanage-server-details-modal");if(!detailsModal){return;}var back=' . json_encode($moduleLink) . ';var bindClose=function(){var items=detailsModal.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(detailsModal).modal("show");jQuery(detailsModal).on("hidden.bs.modal",function(){window.location.href=back;});}else{detailsModal.style.display="block";detailsModal.classList.add("show");detailsModal.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",showServerDetailsModal);}else{showServerDetailsModal();}';
     echo 'var iloBtns=document.querySelectorAll(".dcmanage-ilo-test-btn");for(var ib=0;ib<iloBtns.length;ib++){iloBtns[ib].addEventListener("click",function(){var form=this.closest("form");if(!form){return;}var host=form.querySelector("input[name=ilo_host]");var user=form.querySelector("input[name=ilo_user]");var pass=form.querySelector("input[name=ilo_pass]");var out=form.querySelector(".dcmanage-ilo-test-result");if(out){out.textContent="Testing...";}fetch(apiUrl("ilo/test",{server_id:this.getAttribute("data-server-id")||"",host:(host?host.value:""),user:(user?user.value:""),pass:(pass?pass.value:"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}if(out){var d=res.data||{};out.textContent=String(d.power_status||"ok")+" | host: "+String(d.host||"-");}}).catch(function(err){if(out){out.textContent=String(err&&err.message?err.message:"error");}});});}';
     echo 'applyServerPager();';
     echo '})();';
@@ -4602,7 +4626,8 @@ function dcmanage_render_logs(string $lang): void
     foreach ($logRows as $row) {
         $lv = strtolower((string) $row->level);
         $badge = $lv === 'error' ? 'danger' : ($lv === 'warning' ? 'warning' : 'info');
-        echo '<tr><td>' . (int) $row->id . '</td><td><span class="badge badge-' . $badge . '">' . htmlspecialchars((string) $row->level) . '</span></td><td>' . htmlspecialchars((string) $row->source) . '</td><td>' . htmlspecialchars((string) $row->message) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
+        $rowClass = $lv === 'error' ? ' class="dcmanage-log-error"' : ($lv === 'warning' ? ' class="dcmanage-log-warning"' : ($lv === 'info' ? ' class="dcmanage-log-info"' : ' class="dcmanage-log-debug"'));
+        echo '<tr' . $rowClass . '><td>' . (int) $row->id . '</td><td><span class="badge badge-' . $badge . '">' . htmlspecialchars((string) $row->level) . '</span></td><td>' . htmlspecialchars((string) $row->source) . '</td><td>' . htmlspecialchars((string) $row->message) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
     }
     if (count($logRows) === 0) {
         echo '<tr><td colspan="5">-</td></tr>';
@@ -4689,7 +4714,8 @@ function dcmanage_render_queue(string $lang): void
     foreach ($rows as $row) {
         $status = strtolower((string) $row->status);
         $badge = $status === 'done' ? 'success' : ($status === 'failed' ? 'danger' : ($status === 'running' ? 'warning' : ($status === 'canceled' ? 'secondary' : 'info')));
-        echo '<tr>';
+        $jobClass = $status === 'failed' ? ' class="dcmanage-job-failed"' : ($status === 'pending' ? ' class="dcmanage-job-pending"' : ($status === 'running' ? ' class="dcmanage-job-running"' : ($status === 'done' ? ' class="dcmanage-job-done"' : '')));
+        echo '<tr' . $jobClass . '>';
         echo '<td>' . (int) $row->id . '</td>';
         echo '<td>' . htmlspecialchars((string) $row->type) . '</td>';
         echo '<td><span class="badge badge-' . $badge . '">' . htmlspecialchars((string) $row->status) . '</span></td>';

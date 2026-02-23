@@ -1,11 +1,11 @@
 .dcmanage-shell {
-  --dc-primary: #1f6feb;
-  --dc-accent: #0ea5a4;
-  --dc-soft: #f3f6fb;
-  --dc-text: #1e2a45;
+  --dc-primary: #4f46e5;
+  --dc-accent: #0d9488;
+  --dc-soft: #f1f5f9;
+  --dc-text: #1e293b;
   --dc-surface: #ffffff;
-  --dc-border: #d7e0ee;
-  --dc-muted: #5d6b84;
+  --dc-border: #cbd5e1;
+  --dc-muted: #64748b;
   max-width: none;
   width: 100%;
   margin: 0 auto;
@@ -48,8 +48,8 @@
   border: 0;
   border-radius: 12px;
   padding: 9px 14px;
-  color: #2b3a57;
-  background: #eef2f7;
+  color: #334155;
+  background: #e2e8f0;
   font-weight: 700;
   transition: all .2s ease;
   display: inline-flex;
@@ -64,7 +64,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #36558f;
+  color: #4f46e5;
   opacity: .94;
 }
 
@@ -79,14 +79,14 @@
 }
 
 .dcmanage-shell .dcmanage-tabs .nav-link:hover {
-  background: #e2e8f3;
-  color: #153a74;
+  background: #c7d2fe;
+  color: #312e81;
 }
 
 .dcmanage-shell .dcmanage-tabs .nav-link.active {
   color: #fff;
   background: linear-gradient(135deg, var(--dc-primary), var(--dc-accent));
-  box-shadow: 0 8px 20px rgba(17, 95, 255, .28);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, .30);
 }
 
 .dcmanage-shell .card {
@@ -107,7 +107,7 @@
   margin-top: 0 !important;
 }
 
-.dcmanage-shell .dcmanage-page-body > :first-child {
+.dcmanage-shell .dcmanage-page-body> :first-child {
   margin-top: 0 !important;
 }
 
@@ -141,20 +141,21 @@
 }
 
 .dcmanage-kpi .card {
-  border: 1px solid #dce7ff;
-  box-shadow: 0 10px 24px rgba(9, 42, 106, .10);
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 10px 24px rgba(79, 70, 229, .08);
   overflow: hidden;
 }
 
 .dcmanage-kpi .dcmanage-click-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 28px rgba(7, 37, 102, .14);
+  box-shadow: 0 16px 28px rgba(79, 70, 229, .16);
 }
 
 .dcmanage-kpi .dcmanage-click-card .card-body {
   text-align: center;
-  padding: 16px 12px 14px;
-  background: linear-gradient(180deg, #fbfdff, #eef4ff);
+  padding: 18px 14px 16px;
+  background: linear-gradient(180deg, #fafbff, #eef2ff);
+  overflow: hidden;
 }
 
 .dcmanage-kpi-card {
@@ -244,8 +245,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #2456b0;
-  background: #dce9ff;
+  color: #4338ca;
+  background: #e0e7ff;
 }
 
 .dcmanage-kpi-icon svg {
@@ -258,7 +259,7 @@
   font-size: 14px;
   font-weight: 700;
   letter-spacing: .15px;
-  color: #4f618b;
+  color: #475569;
   margin-bottom: 0;
 }
 
@@ -267,15 +268,44 @@
   line-height: 1;
   font-weight: 800;
   color: var(--dc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.dcmanage-kpi-card.is-datacenters .dcmanage-kpi-icon { color: #2156c9; background: #dbe8ff; }
-.dcmanage-kpi-card.is-racks .dcmanage-kpi-icon { color: #5646d3; background: #e6e0ff; }
-.dcmanage-kpi-card.is-switches .dcmanage-kpi-icon { color: #0c8f6a; background: #daf8ee; }
-.dcmanage-kpi-card.is-servers .dcmanage-kpi-icon { color: #1a6fb8; background: #dff0ff; }
-.dcmanage-kpi-card.is-ports .dcmanage-kpi-icon { color: #0d7f8f; background: #d9f8ff; }
-.dcmanage-kpi-card.is-usage-breaches-today .dcmanage-kpi-icon { color: #b14e14; background: #ffe8d8; }
-.dcmanage-kpi-card.is-jobs-pending .dcmanage-kpi-icon { color: #99452f; background: #ffe1d8; }
+.dcmanage-kpi-card.is-datacenters .dcmanage-kpi-icon {
+  color: #4338ca;
+  background: #e0e7ff;
+}
+
+.dcmanage-kpi-card.is-racks .dcmanage-kpi-icon {
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.dcmanage-kpi-card.is-switches .dcmanage-kpi-icon {
+  color: #059669;
+  background: #d1fae5;
+}
+
+.dcmanage-kpi-card.is-servers .dcmanage-kpi-icon {
+  color: #2563eb;
+  background: #dbeafe;
+}
+
+.dcmanage-kpi-card.is-ports .dcmanage-kpi-icon {
+  color: #0891b2;
+  background: #cffafe;
+}
+
+.dcmanage-kpi-card.is-usage-breaches-today .dcmanage-kpi-icon {
+  color: #ea580c;
+  background: #ffedd5;
+}
+
+.dcmanage-kpi-card.is-jobs-pending .dcmanage-kpi-icon {
+  color: #dc2626;
+  background: #fee2e2;
+}
 
 .dcmanage-version-card {
   border-radius: 16px;
@@ -520,7 +550,7 @@
   margin-inline: auto;
 }
 
-.dcmanage-shell .dcmanage-page-body > .dcmanage-form-card:first-of-type {
+.dcmanage-shell .dcmanage-page-body>.dcmanage-form-card:first-of-type {
   margin-top: 0;
 }
 
@@ -570,7 +600,7 @@
   margin-inline-end: -8px;
 }
 
-.dcmanage-shell .form-row > [class*="col-"] {
+.dcmanage-shell .form-row>[class*="col-"] {
   padding-left: 8px;
   padding-right: 8px;
   padding-inline-start: 8px;
@@ -615,7 +645,7 @@
   color: #3a4b68;
 }
 
-.dcmanage-shell .dcmanage-form-actions .btn + .btn {
+.dcmanage-shell .dcmanage-form-actions .btn+.btn {
   margin-inline-start: 0;
 }
 
@@ -659,9 +689,9 @@
 }
 
 .dcmanage-shell .table thead th {
-  background: #eef2f8;
+  background: #e2e8f0;
   border-bottom: 0;
-  color: #25375a;
+  color: #1e293b;
   font-weight: 800;
 }
 
@@ -686,10 +716,10 @@
   min-height: 34px;
 }
 
-.dcmanage-shell .btn + .btn,
-.dcmanage-shell .btn + a.btn,
-.dcmanage-shell a.btn + .btn,
-.dcmanage-shell a.btn + a.btn {
+.dcmanage-shell .btn+.btn,
+.dcmanage-shell .btn+a.btn,
+.dcmanage-shell a.btn+.btn,
+.dcmanage-shell a.btn+a.btn {
   margin-inline-start: 0;
 }
 
@@ -717,10 +747,10 @@
   justify-content: center;
 }
 
-.dcmanage-action-buttons .btn + .btn,
-.dcmanage-action-buttons a.btn + .btn,
-.dcmanage-action-buttons .btn + a.btn,
-.dcmanage-action-buttons a.btn + a.btn {
+.dcmanage-action-buttons .btn+.btn,
+.dcmanage-action-buttons a.btn+.btn,
+.dcmanage-action-buttons .btn+a.btn,
+.dcmanage-action-buttons a.btn+a.btn {
   margin-inline-start: 0;
 }
 
@@ -778,17 +808,17 @@
   overflow-y: visible;
 }
 
-.dcmanage-table-wrap > .table {
+.dcmanage-table-wrap>.table {
   margin-bottom: 0;
 }
 
-.dcmanage-section-toolbar + .dcmanage-table-wrap {
+.dcmanage-section-toolbar+.dcmanage-table-wrap {
   margin-top: 12px;
 }
 
-.dcmanage-shell .dcmanage-page-body > .dcmanage-table-wrap,
-.dcmanage-shell .dcmanage-page-body > .dcmanage-dc-table-wrap,
-.dcmanage-shell .dcmanage-page-body > .table-responsive {
+.dcmanage-shell .dcmanage-page-body>.dcmanage-table-wrap,
+.dcmanage-shell .dcmanage-page-body>.dcmanage-dc-table-wrap,
+.dcmanage-shell .dcmanage-page-body>.table-responsive {
   margin-top: 14px;
 }
 
@@ -834,33 +864,33 @@
 }
 
 .dcmanage-btn-soft-primary {
-  color: #1a4fa3;
-  background: #e6eefb;
-  border-color: #c5d7f5;
+  color: #3730a3;
+  background: #e0e7ff;
+  border-color: #a5b4fc;
 }
 
 .dcmanage-btn-soft-info {
-  color: #0d6674;
-  background: #e6f5f7;
-  border-color: #bfe3e8;
+  color: #0e7490;
+  background: #cffafe;
+  border-color: #67e8f9;
 }
 
 .dcmanage-btn-soft-warning {
-  color: #82520a;
-  background: #fff4dc;
-  border-color: #f1ddb0;
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fcd34d;
 }
 
 .dcmanage-btn-soft-success {
-  color: #146641;
-  background: #e7f8ef;
-  border-color: #c4e8d5;
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #6ee7b7;
 }
 
 .dcmanage-btn-soft-danger {
-  color: #8a2935;
-  background: #fdecef;
-  border-color: #efcad1;
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 .dcmanage-btn-soft-primary:hover,
@@ -869,10 +899,10 @@
 .dcmanage-btn-soft-success:hover,
 .dcmanage-btn-soft-danger:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(14, 45, 109, .12);
+  box-shadow: 0 8px 16px rgba(79, 70, 229, .14);
 }
 
-.dcmanage-switch-table > tbody > tr > td {
+.dcmanage-switch-table>tbody>tr>td {
   background: #fff;
 }
 
@@ -887,25 +917,46 @@
 .dcmanage-port-table {
   width: 100%;
   table-layout: auto;
-  min-width: 1140px;
+  min-width: 880px;
 }
 
 .dcmanage-port-table th:nth-child(1),
-.dcmanage-port-table td:nth-child(1) { min-width: 150px; }
+.dcmanage-port-table td:nth-child(1) {
+  min-width: 150px;
+}
+
 .dcmanage-port-table th:nth-child(2),
-.dcmanage-port-table td:nth-child(2) { min-width: 250px; max-width: 340px; }
+.dcmanage-port-table td:nth-child(2) {
+  min-width: 250px;
+  max-width: 340px;
+}
+
 .dcmanage-port-table th:nth-child(3),
-.dcmanage-port-table td:nth-child(3) { min-width: 90px; }
+.dcmanage-port-table td:nth-child(3) {
+  min-width: 90px;
+}
+
 .dcmanage-port-table th:nth-child(4),
-.dcmanage-port-table td:nth-child(4) { min-width: 90px; }
+.dcmanage-port-table td:nth-child(4) {
+  min-width: 90px;
+}
+
 .dcmanage-port-table th:nth-child(5),
-.dcmanage-port-table td:nth-child(5) { min-width: 160px; }
+.dcmanage-port-table td:nth-child(5) {
+  min-width: 160px;
+}
+
 .dcmanage-port-table th:nth-child(6),
 .dcmanage-port-table td:nth-child(6),
 .dcmanage-port-table th:nth-child(7),
-.dcmanage-port-table td:nth-child(7) { min-width: 140px; }
+.dcmanage-port-table td:nth-child(7) {
+  min-width: 140px;
+}
+
 .dcmanage-port-table th:nth-child(8),
-.dcmanage-port-table td:nth-child(8) { min-width: 280px; }
+.dcmanage-port-table td:nth-child(8) {
+  min-width: 280px;
+}
 
 .dcmanage-port-desc {
   white-space: nowrap;
@@ -1001,7 +1052,7 @@
   margin-bottom: 10px !important;
 }
 
-.dcmanage-monitoring-view-card > .dcmanage-form-card {
+.dcmanage-monitoring-view-card>.dcmanage-form-card {
   background: #fff;
   border-color: #dce6fb;
 }
@@ -1069,7 +1120,9 @@
 }
 
 @keyframes dcmanage-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .dcmanage-port-select-search {
@@ -1177,11 +1230,25 @@
   vertical-align: middle;
 }
 
-.dcmanage-dot.server { background: #2a78ff; }
-.dcmanage-dot.switch { background: #1fb77f; }
-.dcmanage-dot.reserved { background: #9c6bff; }
-.dcmanage-dot.cable { background: #f39a2b; }
-.dcmanage-dot.air { background: #25bcd1; }
+.dcmanage-dot.server {
+  background: #2a78ff;
+}
+
+.dcmanage-dot.switch {
+  background: #1fb77f;
+}
+
+.dcmanage-dot.reserved {
+  background: #9c6bff;
+}
+
+.dcmanage-dot.cable {
+  background: #f39a2b;
+}
+
+.dcmanage-dot.air {
+  background: #25bcd1;
+}
 
 .dcmanage-rack-frame {
   border: 2px solid #8498c7;
@@ -1203,8 +1270,13 @@
   border-radius: 6px;
 }
 
-.dcmanage-rack-frame::before { left: 7px; }
-.dcmanage-rack-frame::after { right: 7px; }
+.dcmanage-rack-frame::before {
+  left: 7px;
+}
+
+.dcmanage-rack-frame::after {
+  right: 7px;
+}
 
 .dcmanage-rack-title {
   text-align: center;
@@ -1440,7 +1512,7 @@
   }
 
   .dcmanage-port-table {
-    min-width: 920px;
+    min-width: 780px;
   }
 
   .modal.dcmanage-modal .modal-body {
@@ -1460,4 +1532,99 @@
   .dcmanage-shell .dcmanage-tabs .nav-link {
     padding: 10px 20px;
   }
+}
+
+/* Dashboard flags (Test Mode indicator) - prominent */
+.dcmanage-dashboard-flags {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.dcmanage-flag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 10px 20px;
+  letter-spacing: .3px;
+  border: 2px solid transparent;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .06);
+}
+
+.dcmanage-flag-pill::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.dcmanage-flag-pill.is-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+.dcmanage-flag-pill.is-success {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+
+.dcmanage-flag-pill.is-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+/* Log-level row tinting for quick scanning */
+.dcmanage-log-error {
+  background: #fef2f2 !important;
+  border-left: 3px solid #ef4444;
+}
+
+.dcmanage-log-warning {
+  background: #fffbeb !important;
+  border-left: 3px solid #f59e0b;
+}
+
+.dcmanage-log-info {
+  background: #eff6ff !important;
+  border-left: 3px solid #3b82f6;
+}
+
+.dcmanage-log-debug {
+  background: #f9fafb !important;
+  border-left: 3px solid #9ca3af;
+}
+
+/* Queue job status row tinting */
+.dcmanage-job-failed {
+  background: #fef2f2 !important;
+}
+
+.dcmanage-job-pending {
+  background: #fffbeb !important;
+}
+
+.dcmanage-job-running {
+  background: #eff6ff !important;
+}
+
+.dcmanage-job-done {
+  background: #f0fdf4 !important;
+}
+
+/* Traffic KPI card overflow containment */
+.dcmanage-kpi-card .dcmanage-kpi-label,
+.dcmanage-kpi-card .dcmanage-kpi-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
