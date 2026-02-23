@@ -917,45 +917,21 @@
 .dcmanage-port-table {
   width: 100%;
   table-layout: auto;
-  min-width: 880px;
 }
 
-.dcmanage-port-table th:nth-child(1),
-.dcmanage-port-table td:nth-child(1) {
-  min-width: 150px;
+.dcmanage-port-table th,
+.dcmanage-port-table td {
+  word-wrap: break-word;
 }
 
 .dcmanage-port-table th:nth-child(2),
 .dcmanage-port-table td:nth-child(2) {
-  min-width: 250px;
-  max-width: 340px;
-}
-
-.dcmanage-port-table th:nth-child(3),
-.dcmanage-port-table td:nth-child(3) {
-  min-width: 90px;
-}
-
-.dcmanage-port-table th:nth-child(4),
-.dcmanage-port-table td:nth-child(4) {
-  min-width: 90px;
-}
-
-.dcmanage-port-table th:nth-child(5),
-.dcmanage-port-table td:nth-child(5) {
   min-width: 160px;
-}
-
-.dcmanage-port-table th:nth-child(6),
-.dcmanage-port-table td:nth-child(6),
-.dcmanage-port-table th:nth-child(7),
-.dcmanage-port-table td:nth-child(7) {
-  min-width: 140px;
 }
 
 .dcmanage-port-table th:nth-child(8),
 .dcmanage-port-table td:nth-child(8) {
-  min-width: 280px;
+  min-width: 160px;
 }
 
 .dcmanage-port-desc {
@@ -975,6 +951,8 @@
   align-items: center;
   gap: 8px;
   margin-inline-end: auto;
+  flex-wrap: wrap;
+  /* allow wrapping on small screens */
 }
 
 .dcmanage-page-size-label {
@@ -985,7 +963,9 @@
 }
 
 .dcmanage-page-size {
-  width: 88px;
+  width: auto;
+  /* removed the fixed 88px width */
+  min-width: 65px;
 }
 
 .dcmanage-status-pill {
@@ -1512,7 +1492,7 @@
   }
 
   .dcmanage-port-table {
-    min-width: 780px;
+    min-width: 100%;
   }
 
   .modal.dcmanage-modal .modal-body {

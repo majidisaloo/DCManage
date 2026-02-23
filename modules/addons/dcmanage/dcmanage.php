@@ -1665,8 +1665,8 @@ function dcmanage_render_monitoring(string $lang): void
         echo '<h5>' . htmlspecialchars(I18n::t('action_view', $lang)) . ': ' . htmlspecialchars((string) $viewInstance->name) . '</h5>';
         echo '<div class="dcmanage-server-details-grid" style="grid-template-columns:repeat(3,1fr)">';
         echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . '</span><strong>' . $typeLabel . '</strong></div>';
-        echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_url', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->base_url ?? '-')) . '</strong></div>';
-        echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_user', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->user ?? '-')) . '</strong></div>';
+        echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_url', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->base_url ?? '—')) . '</strong></div>';
+        echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_user', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->user ?? '—')) . '</strong></div>';
         echo '</div>';
         echo '<div class="mt-3"><a href="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '" class="btn btn-sm btn-outline-secondary">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</a></div>';
         echo '</div>';
@@ -1751,11 +1751,11 @@ function dcmanage_render_monitoring(string $lang): void
         foreach ($rows as $mapRow) {
             echo '<tr>';
             echo '<td>' . (int) $mapRow->id . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->switch_name ?? '-')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->probe_id ?? '-')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->group_id ?? '-')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->subgroup_id ?? '-')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->device_id ?? '-')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->switch_name ?? '—')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->probe_id ?? '—')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->group_id ?? '—')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->subgroup_id ?? '—')) . '</td>';
+            echo '<td>' . htmlspecialchars((string) ($mapRow->device_id ?? '—')) . '</td>';
             echo '<td class="dcmanage-action-buttons"><form method="post" action="' . htmlspecialchars($monitoringViewAction) . '" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('action_delete', $lang), ENT_QUOTES, 'UTF-8') . '?\')"><input type="hidden" name="dcmanage_action" value="monitoring_map_delete"><input type="hidden" name="map_id" value="' . (int) $mapRow->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-danger">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td>';
             echo '</tr>';
         }
@@ -1811,12 +1811,17 @@ function dcmanage_render_monitoring(string $lang): void
     return u;
   }
   function fetchJson(endpoint,params){
-    return fetch(apiUrl(endpoint,params),{credentials:"same-origin"})
-      .then(function(r){return r.text();})
+    var controller=new AbortController();
+    var timeoutId=setTimeout(function(){controller.abort();},15000);
+    return fetch(apiUrl(endpoint,params),{credentials:"same-origin",signal:controller.signal})
+      .then(function(r){clearTimeout(timeoutId);return r.text();})
       .then(function(raw){
         var out=parsePayload(raw);
         if(!out.ok){throw new Error(out.error||"API error");}
         return out.data||{};
+      }).catch(function(err){
+        clearTimeout(timeoutId);
+        throw err;
       });
   }
   function fillSelect(select,items){
@@ -2464,7 +2469,7 @@ function dcmanage_render_datacenters(string $lang): void
             ->get(['s.hostname', 'r.name as rack_name', 's.u_start', 's.u_height']);
         echo '<tr class="collapse" id="dc-servers-' . (int) $row->id . '"><td colspan="5"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>' . htmlspecialchars(I18n::t('label_hostname', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_u', $lang)) . '</th></tr></thead><tbody>';
         foreach ($servers as $s) {
-            echo '<tr><td>' . htmlspecialchars((string) $s->hostname) . '</td><td>' . htmlspecialchars((string) ($s->rack_name ?? '-')) . '</td><td>' . htmlspecialchars(((string) ($s->u_start ?? '-')) . '/' . (string) ($s->u_height ?? 1)) . '</td></tr>';
+            echo '<tr><td>' . htmlspecialchars((string) $s->hostname) . '</td><td>' . htmlspecialchars((string) ($s->rack_name ?? '—')) . '</td><td>' . htmlspecialchars(((string) ($s->u_start ?? '—')) . '/' . (string) ($s->u_height ?? 1)) . '</td></tr>';
         }
         if (count($servers) === 0) {
             echo '<tr><td colspan="3">-</td></tr>';
@@ -2802,18 +2807,18 @@ function dcmanage_interface_is_vlan(string $ifName): bool
 
 function dcmanage_vlan_for_interface(string $ifName, string $vlan, string $ifDesc = ''): string
 {
-    if (!dcmanage_interface_is_vlan($ifName)) {
-        return '';
-    }
-
     $vlan = trim($vlan);
     if ($vlan !== '') {
+        if (preg_match('/^\d{1,4}$/', $vlan)) {
+            return $vlan;
+        }
         if (preg_match('/\d{1,4}/', $vlan, $m) === 1) {
             return (string) ((int) $m[0]);
         }
         return $vlan;
     }
 
+    // If no primary VLAN found via SNMP, try extracting from interface name/desc
     return dcmanage_vlan_fallback_for_interface($ifName, $ifDesc);
 }
 
@@ -3322,7 +3327,7 @@ function dcmanage_switch_snmp_state(int $switchId): array
     }
     return [
         'ok' => !empty($parsed['ok']),
-        'message' => (string) ($parsed['message'] ?? '-'),
+        'message' => (string) ($parsed['message'] ?? '—'),
         'tested' => true,
     ];
 }
@@ -3677,7 +3682,7 @@ function dcmanage_render_servers(string $lang): void
             if (!isset($serverPortMap[$serverId])) {
                 $serverPortMap[$serverId] = [];
             }
-            $portLabel = (string) ($port->switch_if ?? '-');
+            $portLabel = (string) ($port->switch_if ?? '—');
             if (trim((string) ($port->if_desc ?? '')) !== '') {
                 $portLabel .= ' | ' . (string) $port->if_desc;
             }
@@ -3689,7 +3694,7 @@ function dcmanage_render_servers(string $lang): void
             } elseif ($linkStatus === 'absent') {
                 $portLabel .= ' | ' . I18n::t('port_link_absent', $lang);
             }
-            $serverPortMap[$serverId][] = trim((string) ($port->switch_name ?? '-') . ' / ' . $portLabel);
+            $serverPortMap[$serverId][] = trim((string) ($port->switch_name ?? '—') . ' / ' . $portLabel);
 
             if (!isset($serverLinkDefaults[$serverId])) {
                 $serverLinkDefaults[$serverId] = [
@@ -3766,35 +3771,46 @@ function dcmanage_render_servers(string $lang): void
     echo '</div>';
 
     echo '<div id="dcmanage-server-add-modal" class="modal fade dcmanage-modal" tabindex="-1" role="dialog" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('server_add', $lang)) . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
-    echo '<form method="post" action="" class="dcmanage-form-card dcmanage-centered-form mt-0">';
+    echo '<form method="post" action="" class="dcmanage-centered-form mt-0">';
     echo '<input type="hidden" name="dcmanage_action" value="server_create">';
 
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" id="dcmanage-server-dc" required class="form-control dcmanage-input">';
+    // Section 1: Basic Info
+    echo '<div class="dcmanage-form-card mb-3">';
+    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_basic_info', $lang)) . '</h6>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" id="dcmanage-server-dc" required class="form-control dcmanage-input">';
     echo '<option value="">--</option>';
     foreach ($dcs as $dc) {
         echo '<option value="' . (int) $dc->id . '">' . htmlspecialchars((string) $dc->name) . '</option>';
     }
     echo '</select></div>';
-
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" id="dcmanage-server-rack" class="form-control dcmanage-input" disabled>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" id="dcmanage-server-rack" class="form-control dcmanage-input" disabled>';
     echo '<option value="">--</option>';
     foreach ($racks as $rack) {
         echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '">' . htmlspecialchars((string) $rack->name) . '</option>';
     }
     echo '</select></div>';
+    echo '<div class="form-group col-md-2"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>U Height</label><input type="number" min="1" name="u_height" value="1" class="form-control dcmanage-input"></div>';
+    echo '</div>'; // end row
 
-    echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_network_control', $lang)) . '</div>';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_switch', $lang)) . '</label><select name="action_switch_id" class="form-control dcmanage-input dcmanage-control-switch" disabled>';
-    echo '<option value="">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</option>';
-    foreach ($switches as $switch) {
-        echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '">' . htmlspecialchars((string) $switch->name) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_port', $lang)) . '</label><select name="action_port_id" class="form-control dcmanage-input dcmanage-control-port" disabled><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
-    echo '</div>';
+    echo '<div class="form-group col-md-12"><label>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</label><input required name="hostname" class="form-control dcmanage-input"></div>';
+    echo '</div>'; // end row
 
-    echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</div>';
+    echo '<div class="form-row">';
+    echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('server_ilo_host', $lang)) . '</label><input name="ilo_host" class="form-control dcmanage-input" placeholder="192.0.2.10"></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_user', $lang)) . '</label><input name="ilo_user" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5">iLO5</option><option value="ilo4">iLO4</option></select></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input"></div>';
+    echo '</div>'; // end row
+
+    echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="2"></textarea></div>';
+    echo '</div>'; // end card
+
+    // Section 2: Traffic Ports
+    echo '<div class="dcmanage-form-card mb-3">';
+    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</h6>';
     echo '<div class="dcmanage-traffic-rows" data-role="traffic-rows">';
     echo '<div class="dcmanage-traffic-row form-row align-items-end">';
     echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="traffic_switch_id[]" class="form-control dcmanage-input dcmanage-traffic-switch" disabled>';
@@ -3810,20 +3826,25 @@ function dcmanage_render_servers(string $lang): void
     echo '</div>';
     echo '</div>';
     echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-traffic-row">' . htmlspecialchars(I18n::t('server_add_traffic_row', $lang)) . '</button></div>';
+    echo '</div>'; // end card
 
-    echo '<div class="form-group"><label>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</label><input required name="hostname" class="form-control dcmanage-input"></div>';
+    // Section 3: Control Port (Block/Unblock)
+    echo '<div class="dcmanage-form-card mb-3">';
+    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_network_control', $lang)) . '</h6>';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-6"><label>U Height</label><input type="number" min="1" name="u_height" value="1" class="form-control dcmanage-input"></div>';
+    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_switch', $lang)) . '</label><select name="action_switch_id" class="form-control dcmanage-input dcmanage-control-switch" disabled>';
+    echo '<option value="">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</option>';
+    foreach ($switches as $switch) {
+        echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '">' . htmlspecialchars((string) $switch->name) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_port', $lang)) . '</label><select name="action_port_id" class="form-control dcmanage-input dcmanage-control-port" disabled><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
     echo '</div>';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('server_ilo_host', $lang)) . '</label><input name="ilo_host" class="form-control dcmanage-input" placeholder="192.0.2.10"></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_user', $lang)) . '</label><input name="ilo_user" class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5">iLO5</option><option value="ilo4">iLO4</option></select></div>';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input"></div>';
-    echo '</div>';
-    echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="3"></textarea></div>';
-    echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</div>';
+    echo '</div>'; // end card
+
+    // Section 4: Traffic / Hardware Sensors (PRTG)
+    echo '<div class="dcmanage-form-card mb-3">';
+    echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</h6>';
     echo '<div class="dcmanage-monitor-rows dcmanage-monitor-rows-traffic">';
     echo '<div class="dcmanage-monitor-row form-row align-items-end" data-sensor-type="traffic">';
     echo '<input type="hidden" name="monitor_sensor_type[]" value="traffic">';
@@ -3840,7 +3861,7 @@ function dcmanage_render_servers(string $lang): void
     echo '</div>';
     echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-monitor-row" data-target=".dcmanage-monitor-rows-traffic">' . htmlspecialchars(I18n::t('server_add_monitor_row', $lang)) . '</button></div>';
 
-    echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_hardware_sensors', $lang)) . '</div>';
+    echo '<h6 class="mb-3 mt-4">' . htmlspecialchars(I18n::t('server_hardware_sensors', $lang)) . '</h6>';
     echo '<div class="dcmanage-monitor-rows dcmanage-monitor-rows-hardware">';
     echo '<div class="dcmanage-monitor-row form-row align-items-end" data-sensor-type="hardware">';
     echo '<input type="hidden" name="monitor_sensor_type[]" value="hardware">';
@@ -3856,7 +3877,15 @@ function dcmanage_render_servers(string $lang): void
     echo '</div>';
     echo '</div>';
     echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-monitor-row" data-target=".dcmanage-monitor-rows-hardware">' . htmlspecialchars(I18n::t('server_add_monitor_row', $lang)) . '</button></div>';
-    echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_server', $lang)) . '</button>';
+    echo '</div>'; // end card
+
+    // Section 5: Discovery Placeholder (for Add modal, just a hint since Server needs ID to be discoverable)
+    echo '<div class="dcmanage-form-card mb-4 bg-light text-muted">';
+    echo '<h6 class="mb-2">' . htmlspecialchars(I18n::t('monitoring_discovery', $lang)) . '</h6>';
+    echo '<small>Save the server first to enable Network Discovery tools and mapping.</small>';
+    echo '</div>';
+
+    echo '<div class="dcmanage-form-actions"><button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('create_server', $lang)) . '</button></div>';
     echo '</form>';
     echo '</div></div></div></div>';
 
@@ -3979,22 +4008,49 @@ function dcmanage_render_servers(string $lang): void
         echo '<div class="dcmanage-server-details-head"><div class="dcmanage-action-buttons"><a class="btn btn-sm dcmanage-btn-soft-info" href="' . htmlspecialchars($moduleLink . '&server_id=' . $selectedId . '&server_mode=view') . '">' . htmlspecialchars(I18n::t('action_view', $lang)) . '</a><a class="btn btn-sm dcmanage-btn-soft-primary" href="' . htmlspecialchars($moduleLink . '&server_id=' . $selectedId . '&server_mode=edit') . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</a></div></div>';
 
         if (!$modeIsEdit) {
+            // Section 1: Basic Info
+            echo '<div class="dcmanage-form-card mb-3">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_basic_info', $lang)) . '</h6>';
             echo '<div class="dcmanage-server-details-grid">';
-            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</span><strong>' . htmlspecialchars((string) ($selectedServer->dc_name ?? '-')) . '</strong></div>';
-            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</span><strong>' . htmlspecialchars((string) ($selectedServer->rack_name ?? '-')) . '</strong></div>';
+            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</span><strong>' . htmlspecialchars((string) ($selectedServer->dc_name ?? '—')) . '</strong></div>';
+            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</span><strong>' . htmlspecialchars((string) ($selectedServer->rack_name ?? '—')) . '</strong></div>';
             echo '<div class="dcmanage-view-item"><span>U</span><strong>' . htmlspecialchars((string) (($selectedServer->u_start !== null ? $selectedServer->u_start : '-') . '/' . ($selectedServer->u_height ?? 1))) . '</strong></div>';
-            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('server_ilo', $lang)) . '</span><strong>' . htmlspecialchars((string) (($selectedServer->ilo_host ?? '-') ?: '-')) . '</strong></div>';
+            echo '</div>';
+            if (trim((string) ($selectedServer->notes ?? '')) !== '') {
+                echo '<div class="mt-3"><small class="text-muted d-block">Notes:</small> ' . nl2br(htmlspecialchars((string) $selectedServer->notes)) . '</div>';
+            }
+
+            echo '<div class="dcmanage-server-agg-cards mt-4">';
+            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('server_total_download', $lang)) . '</span><strong>' . number_format($sumIn) . '</strong></div>';
+            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('server_total_upload', $lang)) . '</span><strong>' . number_format($sumOut) . '</strong></div>';
+            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('server_total_traffic', $lang)) . '</span><strong>' . number_format($sumTotal) . '</strong></div>';
+            echo '</div>';
+            if ($trafficApiErrors > 0) {
+                echo '<div class="small text-muted mt-2">' . htmlspecialchars(I18n::t('server_traffic_counter_note', $lang)) . '</div>';
+            }
             echo '</div>';
 
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_network_control', $lang)) . '</div>';
-            echo '<div class="dcmanage-view-line">';
+            // Section 2: Traffic Links & Control Port
+            echo '<div class="dcmanage-form-card mb-3">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</h6>';
+            echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th></tr></thead><tbody>';
+            foreach ($trafficRows as $tr) {
+                echo '<tr><td>' . htmlspecialchars((string) ($tr['switch_name'] ?? '—')) . '</td><td>' . htmlspecialchars((string) ($tr['switch_if'] ?? '—')) . (trim((string) ($tr['if_desc'] ?? '')) !== '' ? '<br><small class="text-muted">' . htmlspecialchars((string) $tr['if_desc']) . '</small>' : '') . '</td><td>' . dcmanage_render_port_oper_pill((string) ($tr['oper_status'] ?? ''), $lang) . '</td></tr>';
+            }
+            if ($trafficRows === []) {
+                echo '<tr><td colspan="3">-</td></tr>';
+            }
+            echo '</tbody></table></div>';
+
+            echo '<h6 class="mb-3 mt-4">' . htmlspecialchars(I18n::t('server_network_control', $lang)) . '</h6>';
+            echo '<div class="dcmanage-view-line bg-light p-2 rounded">';
             if ($controlPortId > 0) {
                 $cp = Capsule::table('mod_dcmanage_switch_ports as p')
                     ->leftJoin('mod_dcmanage_switches as s', 's.id', '=', 'p.switch_id')
                     ->where('p.id', $controlPortId)
                     ->first(['p.if_name', 'p.if_desc', 's.name as switch_name']);
                 if ($cp !== null) {
-                    $cpText = (string) ($cp->switch_name ?? '-') . ' / ' . (string) ($cp->if_name ?? '-');
+                    $cpText = (string) ($cp->switch_name ?? '—') . ' / ' . (string) ($cp->if_name ?? '—');
                     if (trim((string) ($cp->if_desc ?? '')) !== '') {
                         $cpText .= ' | ' . (string) $cp->if_desc;
                     }
@@ -4006,49 +4062,59 @@ function dcmanage_render_servers(string $lang): void
                 echo '-';
             }
             echo '</div>';
+            echo '</div>';
 
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</div>';
-            echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th></tr></thead><tbody>';
-            foreach ($trafficRows as $tr) {
-                echo '<tr><td>' . htmlspecialchars((string) ($tr['switch_name'] ?? '-')) . '</td><td>' . htmlspecialchars((string) ($tr['switch_if'] ?? '-')) . (trim((string) ($tr['if_desc'] ?? '')) !== '' ? '<br><small class="text-muted">' . htmlspecialchars((string) $tr['if_desc']) . '</small>' : '') . '</td><td>' . dcmanage_render_port_oper_pill((string) ($tr['oper_status'] ?? ''), $lang) . '</td></tr>';
+            // Section 3: iLO Management
+            echo '<div class="dcmanage-form-card mb-3">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_ilo', $lang)) . ' Management</h6>';
+            if (trim((string) ($selectedServer->ilo_host ?? '')) !== '') {
+                echo '<div class="d-flex align-items-center justify-content-between flex-wrap gap-3">';
+                echo '<div><strong>Host:</strong> ' . htmlspecialchars((string) $selectedServer->ilo_host) . '</div>';
+                echo '<div class="dcmanage-action-buttons">';
+                echo '<button type="button" class="btn btn-sm btn-outline-success dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="On">Power On</button>';
+                echo '<button type="button" class="btn btn-sm btn-outline-secondary dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="GracefulRestart">Graceful Restart</button>';
+                echo '<button type="button" class="btn btn-sm btn-outline-warning dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="ForceRestart">Force Restart</button>';
+                echo '<button type="button" class="btn btn-sm btn-outline-danger dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="ForceOff">Power Off</button>';
+                
+                // HTML5 Console. Need global settings for proxy if used, but for now just link to https://ilo-ip/
+                $iloProxyHttp = trim((string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_host')->value('meta_value')) !== '' ? true : false;
+                // If direct:
+                $consoleHref = 'https://' . htmlspecialchars((string) $selectedServer->ilo_host) . '/';
+                echo '<a href="' . $consoleHref . '" class="btn btn-sm btn-primary dcmanage-ilo-console-btn" target="_blank">HTML5 Console <i class="fas fa-external-link-alt"></i></a>';
+                echo '</div>';
+                echo '</div>';
+                echo '<div class="small text-muted mt-3 dcmanage-ilo-action-result"></div>';
+            } else {
+                echo '<div class="text-muted small">No iLO interface configured for this server.</div>';
             }
-            if ($trafficRows === []) {
+            echo '</div>';
+
+            // Section 4: PRTG Sensors
+            echo '<div class="dcmanage-form-card mb-3">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</h6>';
+            echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>PRTG</th><th>Sensor</th><th>' . htmlspecialchars(I18n::t('server_monitor_action', $lang)) . '</th></tr></thead><tbody>';
+            foreach ($trafficSensorRows as $sr) {
+                echo '<tr><td>' . (int) ($sr['prtg_id'] ?? 0) . '</td><td>' . htmlspecialchars((string) ($sr['sensor_id'] ?? '—')) . '</td><td>' . htmlspecialchars((string) ($sr['alert_action'] ?? 'none')) . '</td></tr>';
+            }
+            if ($trafficSensorRows === []) {
                 echo '<tr><td colspan="3">-</td></tr>';
             }
             echo '</tbody></table></div>';
 
-            echo '<div class="dcmanage-server-agg-cards">';
-            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('server_total_download', $lang)) . '</span><strong>' . number_format($sumIn) . '</strong></div>';
-            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('server_total_upload', $lang)) . '</span><strong>' . number_format($sumOut) . '</strong></div>';
-            echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('server_total_traffic', $lang)) . '</span><strong>' . number_format($sumTotal) . '</strong></div>';
-            echo '</div>';
-            if ($trafficApiErrors > 0) {
-                echo '<div class="small text-muted">' . htmlspecialchars(I18n::t('server_traffic_counter_note', $lang)) . '</div>';
-            }
-
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_traffic_sensors', $lang)) . '</div>';
-            echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>PRTG</th><th>Sensor</th><th>' . htmlspecialchars(I18n::t('server_monitor_action', $lang)) . '</th></tr></thead><tbody>';
-            foreach ($trafficSensorRows as $sr) {
-                echo '<tr><td>' . (int) ($sr['prtg_id'] ?? 0) . '</td><td>' . htmlspecialchars((string) ($sr['sensor_id'] ?? '-')) . '</td><td>' . htmlspecialchars((string) ($sr['alert_action'] ?? 'none')) . '</td></tr>';
-            }
-            echo '</tbody></table></div>';
-
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_hardware_sensors', $lang)) . '</div>';
+            echo '<h6 class="mb-3 mt-4">' . htmlspecialchars(I18n::t('server_hardware_sensors', $lang)) . '</h6>';
             echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>PRTG</th><th>Sensor</th><th>' . htmlspecialchars(I18n::t('server_monitor_action', $lang)) . '</th></tr></thead><tbody>';
             foreach ($hardwareSensorRows as $sr) {
-                echo '<tr><td>' . (int) ($sr['prtg_id'] ?? 0) . '</td><td>' . htmlspecialchars((string) ($sr['sensor_id'] ?? '-')) . '</td><td>' . htmlspecialchars((string) ($sr['alert_action'] ?? 'none')) . '</td></tr>';
+                echo '<tr><td>' . (int) ($sr['prtg_id'] ?? 0) . '</td><td>' . htmlspecialchars((string) ($sr['sensor_id'] ?? '—')) . '</td><td>' . htmlspecialchars((string) ($sr['alert_action'] ?? 'none')) . '</td></tr>';
+            }
+            if ($hardwareSensorRows === []) {
+                echo '<tr><td colspan="3">-</td></tr>';
             }
             echo '</tbody></table></div>';
-
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('monitoring_discovery', $lang)) . '</div>';
-            echo '<div class="form-row align-items-end dcmanage-server-discovery-wrap">';
-            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_target_host', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-host" value="' . htmlspecialchars((string) ($selectedServer->hostname ?? '')) . '" placeholder="203.0.113.10"></div>';
-            echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('monitoring_ports', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-ports" value="22,80,443,3389,8080,8443"></div>';
-            echo '<div class="form-group col-md-3"><button type="button" class="btn btn-outline-primary btn-sm dcmanage-server-discovery-run">' . htmlspecialchars(I18n::t('monitoring_run_discovery', $lang)) . '</button></div>';
-            echo '<div class="col-12"><div class="small text-muted dcmanage-server-discovery-result">-</div></div>';
             echo '</div>';
 
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_whmcs_discovery_status', $lang)) . '</div>';
+            // Section 5: Discovery Log/Status
+            echo '<div class="dcmanage-form-card mb-3 bg-light">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_whmcs_discovery_status', $lang)) . '</h6>';
             echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>ID</th><th>Status</th><th>Attempts</th><th>Created</th><th>Error</th></tr></thead><tbody>';
             foreach ($discoveryJobs as $job) {
                 echo '<tr><td>' . (int) $job->id . '</td><td>' . htmlspecialchars((string) $job->status) . '</td><td>' . (int) $job->attempts . '</td><td>' . htmlspecialchars((string) $job->created_at) . '</td><td>' . htmlspecialchars((string) ($job->last_error ?? '')) . '</td></tr>';
@@ -4059,16 +4125,22 @@ function dcmanage_render_servers(string $lang): void
             echo '</tbody></table></div>';
 
             if (count($discoveryLogs) > 0) {
+                echo '<h6 class="mb-3 mt-4">Discovery Logs</h6>';
                 echo '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Level</th><th>Message</th><th>Date</th></tr></thead><tbody>';
                 foreach ($discoveryLogs as $logRow) {
                     echo '<tr><td>' . htmlspecialchars((string) $logRow->level) . '</td><td>' . htmlspecialchars((string) $logRow->message) . '</td><td>' . htmlspecialchars((string) $logRow->created_at) . '</td></tr>';
                 }
                 echo '</tbody></table></div>';
             }
+            echo '</div>';
         } else {
-            echo '<form method="post" class="dcmanage-form-card dcmanage-server-map dcmanage-centered-form" data-dc-id="' . (int) $selectedServer->dc_id . '">';
+            echo '<form method="post" class="dcmanage-server-map dcmanage-centered-form mt-0" data-dc-id="' . (int) $selectedServer->dc_id . '">';
             echo '<input type="hidden" name="dcmanage_action" value="server_link_update">';
             echo '<input type="hidden" name="server_id" value="' . $selectedId . '">';
+
+            // Section 1: Basic Info
+            echo '<div class="dcmanage-form-card mb-3">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_basic_info', $lang)) . '</h6>';
             echo '<div class="form-row">';
             echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" class="form-control dcmanage-input dcmanage-map-dc">';
             echo '<option value="">--</option>';
@@ -4084,27 +4156,32 @@ function dcmanage_render_servers(string $lang): void
                 echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '"' . $selectedRack . '>' . htmlspecialchars((string) $rack->name) . '</option>';
             }
             echo '</select></div>';
-            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</label><input name="hostname" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $selectedServer->hostname) . '"></div>';
-            echo '</div>';
-            echo '<div class="form-row">';
-            echo '<div class="form-group col-md-6"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->u_start ?? '')) . '"></div>';
-            echo '<div class="form-group col-md-6"><label>U Height</label><input type="number" min="1" name="u_height" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->u_height ?? 1)) . '"></div>';
-            echo '</div>';
-            echo '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="2">' . htmlspecialchars((string) ($selectedServer->notes ?? '')) . '</textarea></div>';
+            echo '<div class="form-group col-md-2"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->u_start ?? '')) . '"></div>';
+            echo '<div class="form-group col-md-2"><label>U Height</label><input type="number" min="1" name="u_height" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->u_height ?? 1)) . '"></div>';
+            echo '</div>'; // end row
 
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_network_control', $lang)) . '</div>';
             echo '<div class="form-row">';
-            echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_switch', $lang)) . '</label><select name="action_switch_id" class="form-control dcmanage-input dcmanage-control-switch">';
-            echo '<option value="">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</option>';
-            foreach ($switches as $switch) {
-                $selectedSwitch = (int) $switch->id === $controlSwitchId ? ' selected' : '';
-                echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '"' . $selectedSwitch . '>' . htmlspecialchars((string) $switch->name) . '</option>';
-            }
-            echo '</select></div>';
-            echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_port', $lang)) . '</label><select name="action_port_id" class="form-control dcmanage-input dcmanage-control-port" data-selected="' . $controlPortId . '"><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
+            echo '<div class="form-group col-md-12"><label>' . htmlspecialchars(I18n::t('server_hostname', $lang)) . '</label><input name="hostname" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $selectedServer->hostname) . '"></div>';
+            echo '</div>'; // end row
+
+            echo '<div class="form-row">';
+            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('server_ilo_host', $lang)) . '</label><input name="ilo_host" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->ilo_host ?? '')) . '" placeholder="192.0.2.10"></div>';
+            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_user', $lang)) . '</label><input name="ilo_user" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->ilo_user ?? '')) . '"></div>';
+            echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5"' . ((string) ($selectedServer->ilo_type ?? 'ilo5') === 'ilo5' ? ' selected' : '') . '>iLO5</option><option value="ilo4"' . ((string) ($selectedServer->ilo_type ?? '') === 'ilo4' ? ' selected' : '') . '>iLO4</option></select></div>';
+            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input" placeholder="••••••"></div>';
+            echo '</div>'; // end row
+
+            echo '<div class="form-row align-items-end mb-2">';
+            echo '<div class="form-group col-md-3 mb-0"><button type="button" class="btn btn-outline-secondary btn-sm dcmanage-ilo-test-btn" data-server-id="' . $selectedId . '">' . htmlspecialchars(I18n::t('server_ilo_test', $lang)) . '</button></div>';
+            echo '<div class="form-group col-md-9 mb-0"><div class="small text-muted dcmanage-ilo-test-result">-</div></div>';
             echo '</div>';
 
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</div>';
+            echo '<div class="form-group mt-2"><label>Notes</label><textarea name="notes" class="form-control dcmanage-input" rows="2">' . htmlspecialchars((string) ($selectedServer->notes ?? '')) . '</textarea></div>';
+            echo '</div>'; // end card
+
+            // Section 2: Traffic Ports
+            echo '<div class="dcmanage-form-card mb-3">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_traffic_links', $lang)) . '</h6>';
             echo '<div class="dcmanage-traffic-rows" data-role="traffic-rows">';
             $trafficSeed = $trafficRows !== [] ? $trafficRows : [['switch_id' => 0, 'switch_port_id' => 0]];
             foreach ($trafficSeed as $trafficRow) {
@@ -4122,10 +4199,28 @@ function dcmanage_render_servers(string $lang): void
             }
             echo '</div>';
             echo '<div class="form-group"><button type="button" class="btn btn-sm btn-outline-primary dcmanage-add-traffic-row">' . htmlspecialchars(I18n::t('server_add_traffic_row', $lang)) . '</button></div>';
+            echo '</div>'; // end card
 
+            // Section 3: Control Port
+            echo '<div class="dcmanage-form-card mb-3">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_network_control', $lang)) . '</h6>';
+            echo '<div class="form-row">';
+            echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_switch', $lang)) . '</label><select name="action_switch_id" class="form-control dcmanage-input dcmanage-control-switch">';
+            echo '<option value="">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</option>';
+            foreach ($switches as $switch) {
+                $selectedSwitch = (int) $switch->id === $controlSwitchId ? ' selected' : '';
+                echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '"' . $selectedSwitch . '>' . htmlspecialchars((string) $switch->name) . '</option>';
+            }
+            echo '</select></div>';
+            echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('server_control_port', $lang)) . '</label><select name="action_port_id" class="form-control dcmanage-input dcmanage-control-port" data-selected="' . $controlPortId . '"><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
+            echo '</div>';
+            echo '</div>'; // end card
+
+            // Section 4: PRTG Sensors
+            echo '<div class="dcmanage-form-card mb-3">';
             $renderMonitorSection = static function (string $type, array $seedRows, iterable $prtgInstances, string $lang): void {
                 $title = $type === 'hardware' ? I18n::t('server_hardware_sensors', $lang) : I18n::t('server_traffic_sensors', $lang);
-                echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars($title) . '</div>';
+                echo '<h6 class="mb-3' . ($type === 'hardware' ? ' mt-4' : '') . '">' . htmlspecialchars($title) . '</h6>';
                 echo '<div class="dcmanage-monitor-rows dcmanage-monitor-rows-' . htmlspecialchars($type) . '">';
                 foreach ($seedRows as $monitorRow) {
                     $monitorSensorId = (string) ($monitorRow['sensor_id'] ?? '');
@@ -4153,25 +4248,18 @@ function dcmanage_render_servers(string $lang): void
             };
             $renderMonitorSection('traffic', $trafficSensorRows, $prtgInstances, $lang);
             $renderMonitorSection('hardware', $hardwareSensorRows, $prtgInstances, $lang);
+            echo '</div>'; // end card
 
-            echo '<div class="form-row">';
-            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('server_ilo_host', $lang)) . '</label><input name="ilo_host" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->ilo_host ?? '')) . '" placeholder="192.0.2.10"></div>';
-            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_user', $lang)) . '</label><input name="ilo_user" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($selectedServer->ilo_user ?? '')) . '"></div>';
-            echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_ilo_type', $lang)) . '</label><select name="ilo_type" class="form-control dcmanage-input"><option value="ilo5"' . ((string) ($selectedServer->ilo_type ?? 'ilo5') === 'ilo5' ? ' selected' : '') . '>iLO5</option><option value="ilo4"' . ((string) ($selectedServer->ilo_type ?? '') === 'ilo4' ? ' selected' : '') . '>iLO4</option></select></div>';
-            echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_ilo_pass', $lang)) . '</label><input type="password" name="ilo_pass" class="form-control dcmanage-input" placeholder="••••••"></div>';
-            echo '</div>';
-            echo '<div class="form-row align-items-end">';
-            echo '<div class="form-group col-md-3"><button type="button" class="btn btn-outline-secondary btn-sm dcmanage-ilo-test-btn" data-server-id="' . $selectedId . '">' . htmlspecialchars(I18n::t('server_ilo_test', $lang)) . '</button></div>';
-            echo '<div class="form-group col-md-9"><div class="small text-muted dcmanage-ilo-test-result">-</div></div>';
-            echo '</div>';
-
-            echo '<div class="dcmanage-form-subtitle">' . htmlspecialchars(I18n::t('monitoring_discovery', $lang)) . '</div>';
+            // Section 5: Discovery Tools
+            echo '<div class="dcmanage-form-card mb-4 bg-light">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('monitoring_discovery', $lang)) . '</h6>';
             echo '<div class="form-row align-items-end dcmanage-server-discovery-wrap">';
-            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('monitoring_target_host', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-host" value="' . htmlspecialchars((string) ($selectedServer->hostname ?? '')) . '" placeholder="203.0.113.10"></div>';
-            echo '<div class="form-group col-md-5"><label>' . htmlspecialchars(I18n::t('monitoring_ports', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-ports" value="22,80,443,3389,8080,8443"></div>';
-            echo '<div class="form-group col-md-3"><button type="button" class="btn btn-outline-primary btn-sm dcmanage-server-discovery-run">' . htmlspecialchars(I18n::t('monitoring_run_discovery', $lang)) . '</button></div>';
-            echo '<div class="col-12"><div class="small text-muted dcmanage-server-discovery-result">-</div></div>';
+            echo '<div class="form-group col-md-4 mb-0"><label>' . htmlspecialchars(I18n::t('monitoring_target_host', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-host" value="' . htmlspecialchars((string) ($selectedServer->hostname ?? '')) . '" placeholder="203.0.113.10"></div>';
+            echo '<div class="form-group col-md-5 mb-0"><label>' . htmlspecialchars(I18n::t('monitoring_ports', $lang)) . '</label><input class="form-control dcmanage-input dcmanage-server-discovery-ports" value="22,80,443,3389,8080,8443"></div>';
+            echo '<div class="form-group col-md-3 mb-0"><button type="button" class="btn btn-outline-primary btn-sm dcmanage-server-discovery-run">' . htmlspecialchars(I18n::t('monitoring_run_discovery', $lang)) . '</button></div>';
+            echo '<div class="col-12 mt-2"><div class="small text-muted dcmanage-server-discovery-result">-</div></div>';
             echo '</div>';
+            echo '</div>'; // end card
 
             echo '<div class="dcmanage-form-actions">';
             echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
@@ -4196,8 +4284,8 @@ function dcmanage_render_servers(string $lang): void
     echo 'function portOperLabel(status){var s=String(status||"").toLowerCase();if(s==="up"){return ' . $jsPortConnected . ';}if(s==="down"){return ' . $jsPortNotConnected . ';}if(s==="absent"){return ' . $jsPortAbsent . ';}return ' . $jsPortUnknown . ';}';
     echo 'function clearSwitchPorts(selectEl){if(!selectEl){return;}selectEl.innerHTML="";var first=document.createElement("option");first.value="";first.textContent=' . $jsSelectSwitchPort . ';selectEl.appendChild(first);selectEl.disabled=true;}';
     echo 'function filterSelectByQuery(selectEl,q){if(!selectEl){return;}for(var i=0;i<selectEl.options.length;i++){var o=selectEl.options[i];if(!o.value){o.hidden=false;continue;}var hay=normalizeSearchText(o.getAttribute("data-search")||o.textContent||"");o.hidden=(q!==""&&hay.indexOf(q)===-1);}if(selectEl.selectedIndex>0&&selectEl.options[selectEl.selectedIndex].hidden){selectEl.selectedIndex=0;}}';
-    echo 'function loadSwitchPorts(selectEl,switchId,dcId,selectedId){clearSwitchPorts(selectEl);if(!selectEl||!switchId||!dcId){return Promise.resolve();}return fetch(apiUrl("switch/ports",{switch_id:switchId,dc_id:dcId}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];for(var i=0;i<items.length;i++){var it=items[i]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.if_name||"-");if(String(it.if_desc||"").trim()!==""){label+=" | "+String(it.if_desc);}if(String(it.vlan||"").trim()!==""){label+=" | VLAN:"+String(it.vlan);}label+=" | "+portOperLabel(it.oper_status||"");opt.textContent=label;opt.setAttribute("data-search",label);if(String(selectedId||"")!==""&&String(selectedId)===String(opt.value)){opt.selected=true;}selectEl.appendChild(opt);}selectEl.disabled=false;}).catch(function(){clearSwitchPorts(selectEl);});}';
-    echo 'function loadSensorsForRow(row){var prtgSel=row.querySelector(".dcmanage-monitor-prtg");var sensorSel=row.querySelector(".dcmanage-monitor-sensor");var search=row.querySelector(".dcmanage-monitor-sensor-search");if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML="<option value=\"\">--</option>";return;}fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(search?search.value:""),limit:250}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var selected=sensorSel.value;var items=(res.data&&res.data.items)?res.data.items:[];sensorSel.innerHTML="<option value=\"\">--</option>";for(var i=0;i<items.length;i++){var it=items[i]||{};var id=String(it.id||"");if(id===""){continue;}var opt=document.createElement("option");opt.value=id;opt.textContent=id+" | "+String(it.name||"");if(selected!==""&&selected===id){opt.selected=true;}sensorSel.appendChild(opt);}}).catch(function(){});}';
+    echo 'function loadSwitchPorts(selectEl,switchId,dcId,selectedId){clearSwitchPorts(selectEl);if(!selectEl||!switchId||!dcId){return Promise.resolve();}selectEl.innerHTML="<option value=\"\">Loading...</option>";selectEl.disabled=true;var controller=new AbortController();var timeoutId=setTimeout(function(){controller.abort();},15000);return fetch(apiUrl("switch/ports",{switch_id:switchId,dc_id:dcId}),{credentials:"same-origin",signal:controller.signal}).then(function(r){clearTimeout(timeoutId);return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}clearSwitchPorts(selectEl);var items=(res.data&&res.data.items)?res.data.items:[];for(var i=0;i<items.length;i++){var it=items[i]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.if_name||"-");if(String(it.if_desc||"").trim()!==""){label+=" | "+String(it.if_desc);}if(String(it.vlan||"").trim()!==""){label+=" | VLAN:"+String(it.vlan);}label+=" | "+portOperLabel(it.oper_status||"");opt.textContent=label;opt.setAttribute("data-search",label);if(String(selectedId||"")!==""&&String(selectedId)===String(opt.value)){opt.selected=true;}selectEl.appendChild(opt);}selectEl.disabled=false;}).catch(function(e){clearTimeout(timeoutId);clearSwitchPorts(selectEl);});}';
+    echo 'function loadSensorsForRow(row){var prtgSel=row.querySelector(".dcmanage-monitor-prtg");var sensorSel=row.querySelector(".dcmanage-monitor-sensor");var search=row.querySelector(".dcmanage-monitor-sensor-search");if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML="<option value=\"\">--</option>";return;}sensorSel.innerHTML="<option value=\"\">Loading...</option>";sensorSel.disabled=true;var controller=new AbortController();var timeoutId=setTimeout(function(){controller.abort();},15000);fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(search?search.value:""),limit:250}),{credentials:"same-origin",signal:controller.signal}).then(function(r){clearTimeout(timeoutId);return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var selected=sensorSel.value;var items=(res.data&&res.data.items)?res.data.items:[];sensorSel.innerHTML="<option value=\"\">--</option>";for(var i=0;i<items.length;i++){var it=items[i]||{};var id=String(it.id||"");if(id===""){continue;}var opt=document.createElement("option");opt.value=id;opt.textContent=id+" | "+String(it.name||"");if(selected!==""&&selected===id){opt.selected=true;}sensorSel.appendChild(opt);}sensorSel.disabled=false;}).catch(function(){clearTimeout(timeoutId);sensorSel.innerHTML="<option value=\"\">--</option>";sensorSel.disabled=false;});}';
     echo 'function initTrafficRow(row,dcSelect){if(!row){return;}var sw=row.querySelector(".dcmanage-traffic-switch");var port=row.querySelector(".dcmanage-traffic-port");var search=row.querySelector(".dcmanage-port-select-search");if(!sw||!port){return;}function refresh(selectedId){var dcId=dcSelect?String(dcSelect.value||""):"";sw.disabled=(dcId==="");if(dcId===""){sw.value="";clearSwitchPorts(port);return;}filterByDc(sw,dcId);if(String(sw.value||"")===""){clearSwitchPorts(port);return;}loadSwitchPorts(port,sw.value,dcId,selectedId||port.getAttribute("data-selected")||"").then(function(){if(search){filterSelectByQuery(port,normalizeSearchText(search.value||""));}});}sw.addEventListener("change",function(){port.setAttribute("data-selected","");refresh("");});if(search){search.addEventListener("input",function(){filterSelectByQuery(port,normalizeSearchText(this.value||""));});}row._dcRefresh=refresh;refresh();}';
     echo 'function initMonitorRow(row){if(!row){return;}var load=row.querySelector(".dcmanage-monitor-load");var search=row.querySelector(".dcmanage-monitor-sensor-search");var prtg=row.querySelector(".dcmanage-monitor-prtg");if(load){load.addEventListener("click",function(){loadSensorsForRow(row);});}if(prtg){prtg.addEventListener("change",function(){loadSensorsForRow(row);});}if(search){search.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();loadSensorsForRow(row);}});} }';
     echo 'function cloneRow(container,rowSelector){var first=container.querySelector(rowSelector);if(!first){return null;}var clone=first.cloneNode(true);var els=clone.querySelectorAll("input,select,textarea");for(var i=0;i<els.length;i++){var el=els[i];if(el.tagName==="SELECT"){el.selectedIndex=0;if(el.classList.contains("dcmanage-traffic-port")){clearSwitchPorts(el);} }else{el.value="";}}return clone;}';
@@ -4210,6 +4298,7 @@ function dcmanage_render_servers(string $lang): void
     echo 'var createForm=document.querySelector("#dcmanage-server-add-modal form");if(createForm){initServerForm(createForm);}var editForm=document.querySelector("#dcmanage-server-details-modal form.dcmanage-server-map");if(editForm){initServerForm(editForm);}var discoveryWraps=document.querySelectorAll(".dcmanage-server-discovery-wrap");for(var dw=0;dw<discoveryWraps.length;dw++){initServerDiscovery(discoveryWraps[dw]);}';
     echo 'function showServerDetailsModal(){var detailsModal=document.getElementById("dcmanage-server-details-modal");if(!detailsModal){return;}var back=' . json_encode($moduleLink) . ';var bindClose=function(){var items=detailsModal.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(detailsModal).modal("show");jQuery(detailsModal).on("hidden.bs.modal",function(){window.location.href=back;});}else{detailsModal.style.display="block";detailsModal.classList.add("show");detailsModal.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",showServerDetailsModal);}else{showServerDetailsModal();}';
     echo 'var iloBtns=document.querySelectorAll(".dcmanage-ilo-test-btn");for(var ib=0;ib<iloBtns.length;ib++){iloBtns[ib].addEventListener("click",function(){var form=this.closest("form");if(!form){return;}var host=form.querySelector("input[name=ilo_host]");var user=form.querySelector("input[name=ilo_user]");var pass=form.querySelector("input[name=ilo_pass]");var out=form.querySelector(".dcmanage-ilo-test-result");if(out){out.textContent="Testing...";}fetch(apiUrl("ilo/test",{server_id:this.getAttribute("data-server-id")||"",host:(host?host.value:""),user:(user?user.value:""),pass:(pass?pass.value:"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}if(out){var d=res.data||{};out.textContent=String(d.power_status||"ok")+" | host: "+String(d.host||"-");}}).catch(function(err){if(out){out.textContent=String(err&&err.message?err.message:"error");}});});}';
+    echo 'var iloActionBtns=document.querySelectorAll(".dcmanage-ilo-action-btn");for(var iab=0;iab<iloActionBtns.length;iab++){iloActionBtns[iab].addEventListener("click",function(){var btn=this;var action=btn.getAttribute("data-action");if(!confirm("Are you sure you want to perform action: "+action+"?")){return;}var out=document.querySelector(".dcmanage-ilo-action-result");if(out){out.textContent="Executing "+action+"...";out.className="small mt-3 dcmanage-ilo-action-result text-info";}fetch(apiUrl("ilo/action",{server_id:btn.getAttribute("data-server-id")||"",power_action:action}),{credentials:"same-origin","method":"POST"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}if(out){out.textContent="Success: "+(res.message||"Action executed");out.className="small mt-3 dcmanage-ilo-action-result text-success";}}).catch(function(err){if(out){out.textContent="Error: "+String(err&&err.message?err.message:"Action failed");out.className="small mt-3 dcmanage-ilo-action-result text-danger";}});});}';
     echo 'applyServerPager();';
     echo '})();';
     echo '</script>';
@@ -4248,274 +4337,11 @@ function dcmanage_parse_csv_ids(string $raw): array
 
 function dcmanage_render_traffic_management(string $lang): void
 {
-    $section = strtolower(trim((string) ($_GET['tm_section'] ?? 'scope')));
-    if (!in_array($section, ['scope', 'packages'], true)) {
-        $section = 'scope';
-    }
-
-    $base = 'addonmodules.php?module=dcmanage&tab=traffic_mgmt';
-    $scopeActive = $section === 'scope' ? ' active' : '';
-    $packActive = $section === 'packages' ? ' active' : '';
-
-    echo '<div class="dcmanage-action-buttons mb-3">';
-    echo '<a class="btn btn-sm dcmanage-btn-soft-primary' . $scopeActive . '" href="' . htmlspecialchars($base . '&tm_section=scope') . '">' . htmlspecialchars(I18n::t('tab_scope', $lang)) . '</a>';
-    echo '<a class="btn btn-sm dcmanage-btn-soft-primary' . $packActive . '" href="' . htmlspecialchars($base . '&tm_section=packages') . '">' . htmlspecialchars(I18n::t('tab_packages', $lang)) . '</a>';
+    echo '<div class="dcmanage-form-card dcmanage-centered-form text-center py-5">';
+    echo '<div class="text-primary mb-3"><i class="fas fa-tools fa-3x"></i></div>';
+    echo '<h4 class="mb-3">Traffic Management Redesign</h4>';
+    echo '<p class="text-muted">This section is currently undergoing a complete redesign to provide a better user experience and improved functionality. Please check back later.</p>';
     echo '</div>';
-
-    if ($section === 'packages') {
-        dcmanage_render_packages($lang);
-        return;
-    }
-
-    dcmanage_render_scope($lang);
-}
-
-function dcmanage_render_scope(string $lang): void
-{
-    $tab = strtolower(trim((string) ($_GET['tab'] ?? 'scope')));
-    $tab = $tab === 'traffic_mgmt' ? 'traffic_mgmt' : 'scope';
-    $scopeGidRaw = trim((string) ($_GET['scope_gid'] ?? ''));
-    $scopePidRaw = trim((string) ($_GET['scope_pid'] ?? ''));
-    $scopeGids = dcmanage_parse_csv_ids($scopeGidRaw);
-    $scopePids = dcmanage_parse_csv_ids($scopePidRaw);
-    $hasScopeFilter = $scopeGids !== [] || $scopePids !== [];
-
-    $productsQuery = Capsule::table('tblproducts as p')
-        ->leftJoin('tblproductgroups as g', 'g.id', '=', 'p.gid')
-        ->orderBy('p.id', 'asc');
-
-    if ($hasScopeFilter) {
-        if ($scopeGids !== [] || $scopePids !== []) {
-            $productsQuery->where(static function ($w) use ($scopeGids, $scopePids): void {
-                if ($scopeGids !== []) {
-                    $w->whereIn('p.gid', $scopeGids);
-                }
-                if ($scopePids !== []) {
-                    $scopeGids === []
-                        ? $w->whereIn('p.id', $scopePids)
-                        : $w->orWhereIn('p.id', $scopePids);
-                }
-            });
-        }
-    } else {
-        $productsQuery->whereRaw('1=0');
-    }
-
-    $products = $productsQuery->get([
-        'p.id',
-        'p.gid',
-        'p.name',
-        'p.hidden',
-        'g.name as group_name',
-    ]);
-
-    $productIds = [];
-    $productGids = [];
-    foreach ($products as $product) {
-        $productIds[] = (int) $product->id;
-        $productGids[(int) $product->gid] = (int) $product->gid;
-    }
-
-    $scopeRows = [];
-    if ($productIds !== []) {
-        $scopeRows = Capsule::table('mod_dcmanage_scope')
-            ->where('type', 'pid')
-            ->whereIn('ref_id', $productIds)
-            ->get()
-            ->keyBy(static function ($row) {
-                return (int) $row->ref_id;
-            });
-    }
-
-    $groupScopeRows = [];
-    if ($productGids !== []) {
-        $groupScopeRows = Capsule::table('mod_dcmanage_scope')
-            ->where('type', 'gid')
-            ->whereIn('ref_id', array_values($productGids))
-            ->get()
-            ->keyBy(static function ($row) {
-                return (int) $row->ref_id;
-            });
-    }
-
-    $selectedGroups = [];
-    if ($scopeGids !== []) {
-        $selectedGroups = Capsule::table('tblproductgroups')
-            ->whereIn('id', $scopeGids)
-            ->orderBy('id', 'asc')
-            ->get(['id', 'name']);
-    }
-
-    $baseUrl = 'addonmodules.php?module=dcmanage&tab=' . $tab;
-    echo '<form method="get" class="dcmanage-form-card mb-3">';
-    echo '<input type="hidden" name="module" value="dcmanage"><input type="hidden" name="tab" value="' . htmlspecialchars($tab) . '">';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('scope_gid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_gid" value="' . htmlspecialchars($scopeGidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_gid_csv_placeholder', $lang)) . '"></div>';
-    echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('scope_pid_csv', $lang)) . '</label><input class="form-control dcmanage-input" name="scope_pid" value="' . htmlspecialchars($scopePidRaw) . '" placeholder="' . htmlspecialchars(I18n::t('scope_pid_csv_placeholder', $lang)) . '"></div>';
-    echo '</div>';
-    echo '<div class="dcmanage-form-actions d-flex flex-wrap">';
-    echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('scope_load_products', $lang)) . '</button>';
-    echo '</div>';
-    echo '</form>';
-
-    if (count($selectedGroups) > 0) {
-        foreach ($selectedGroups as $group) {
-            $gid = (int) $group->id;
-            $groupScope = $groupScopeRows[$gid] ?? null;
-            $downValue = $groupScope !== null && $groupScope->down_limit_gb !== null ? (string) $groupScope->down_limit_gb : '';
-            $upValue = $groupScope !== null && $groupScope->up_limit_gb !== null ? (string) $groupScope->up_limit_gb : '';
-            $totalValue = $groupScope !== null && $groupScope->total_limit_gb !== null ? (string) $groupScope->total_limit_gb : '';
-            $downUnlimited = $groupScope !== null && (int) ($groupScope->down_unlimited ?? 0) === 1;
-            $upUnlimited = $groupScope !== null && (int) ($groupScope->up_unlimited ?? 0) === 1;
-            $totalUnlimited = $groupScope !== null && (int) ($groupScope->total_unlimited ?? 0) === 1;
-
-            echo '<form method="post" class="dcmanage-form-card mb-3 dcmanage-scope-group-form">';
-            echo '<input type="hidden" name="dcmanage_action" value="scope_limits_save"><input type="hidden" name="scope_type" value="gid"><input type="hidden" name="scope_ref_id" value="' . $gid . '">';
-            echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('scope_group_defaults', $lang)) . ' - ' . htmlspecialchars((string) $group->name) . ' (#' . $gid . ')</h5>';
-            echo '<div class="form-row">';
-            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_download_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="down_limit_gb" value="' . htmlspecialchars($downValue) . '" class="form-control dcmanage-input"' . ($downUnlimited ? ' disabled' : '') . '></div>';
-            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_upload_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="up_limit_gb" value="' . htmlspecialchars($upValue) . '" class="form-control dcmanage-input"' . ($upUnlimited ? ' disabled' : '') . '></div>';
-            echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('scope_total_gb', $lang)) . '</label><input type="number" step="0.001" min="0" name="total_limit_gb" value="' . htmlspecialchars($totalValue) . '" class="form-control dcmanage-input"' . ($totalUnlimited ? ' disabled' : '') . '></div>';
-            echo '</div>';
-            echo '<div class="form-row">';
-            echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="down_unlimited" value="1"' . ($downUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
-            echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="up_unlimited" value="1"' . ($upUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
-            echo '<div class="form-group col-md-4"><label class="dcmanage-check-label"><input type="checkbox" name="total_unlimited" value="1"' . ($totalUnlimited ? ' checked' : '') . '> ' . htmlspecialchars(I18n::t('scope_unlimited', $lang)) . '</label></div>';
-            echo '</div>';
-            echo '<div class="dcmanage-form-actions"><button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></div>';
-            echo '</form>';
-        }
-    }
-
-    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped dcmanage-dc-table">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('scope_product', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('scope_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('scope_download_gb', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('scope_upload_gb', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('scope_total_gb', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
-
-    foreach ($products as $product) {
-        $pid = (int) $product->id;
-        $scopeRow = $scopeRows[$pid] ?? null;
-        $fallbackRow = $groupScopeRows[(int) $product->gid] ?? null;
-        $effective = $scopeRow ?? $fallbackRow;
-
-        $downUnlimited = $effective !== null && (int) ($effective->down_unlimited ?? 0) === 1;
-        $upUnlimited = $effective !== null && (int) ($effective->up_unlimited ?? 0) === 1;
-        $totalUnlimited = $effective !== null && (int) ($effective->total_unlimited ?? 0) === 1;
-
-        $downValue = $effective !== null && $effective->down_limit_gb !== null ? (string) $effective->down_limit_gb : '';
-        $upValue = $effective !== null && $effective->up_limit_gb !== null ? (string) $effective->up_limit_gb : '';
-        $totalValue = $effective !== null && $effective->total_limit_gb !== null ? (string) $effective->total_limit_gb : '';
-
-        echo '<tr>';
-        echo '<td>' . $pid . '</td>';
-        echo '<td>' . htmlspecialchars((string) $product->name) . ((int) ($product->hidden ?? 0) === 1 ? ' <span class="badge badge-warning">hidden</span>' : '') . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($product->group_name ?? '-')) . ' (#' . (int) $product->gid . ')</td>';
-        echo '<td colspan="4">';
-        echo '<form method="post" class="dcmanage-scope-row-form">';
-        echo '<input type="hidden" name="dcmanage_action" value="scope_limits_save"><input type="hidden" name="scope_type" value="pid"><input type="hidden" name="scope_ref_id" value="' . $pid . '">';
-        echo '<div class="form-row align-items-end">';
-        echo '<div class="form-group col-md-3 mb-2"><input type="number" step="0.001" min="0" name="down_limit_gb" value="' . htmlspecialchars($downValue) . '" class="form-control form-control-sm dcmanage-input"' . ($downUnlimited ? ' disabled' : '') . '></div>';
-        echo '<div class="form-group col-md-3 mb-2"><input type="number" step="0.001" min="0" name="up_limit_gb" value="' . htmlspecialchars($upValue) . '" class="form-control form-control-sm dcmanage-input"' . ($upUnlimited ? ' disabled' : '') . '></div>';
-        echo '<div class="form-group col-md-3 mb-2"><input type="number" step="0.001" min="0" name="total_limit_gb" value="' . htmlspecialchars($totalValue) . '" class="form-control form-control-sm dcmanage-input"' . ($totalUnlimited ? ' disabled' : '') . '></div>';
-        echo '<div class="form-group col-md-3 mb-2"><div class="dcmanage-scope-actions">';
-        echo '<label class="dcmanage-check-label mb-0"><input type="checkbox" name="down_unlimited" value="1"' . ($downUnlimited ? ' checked' : '') . '> D∞</label>';
-        echo '<label class="dcmanage-check-label mb-0"><input type="checkbox" name="up_unlimited" value="1"' . ($upUnlimited ? ' checked' : '') . '> U∞</label>';
-        echo '<label class="dcmanage-check-label mb-0"><input type="checkbox" name="total_unlimited" value="1"' . ($totalUnlimited ? ' checked' : '') . '> T∞</label>';
-        echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
-        echo '</div></div>';
-        echo '</div>';
-        echo '</form>';
-        echo '</td>';
-        echo '</tr>';
-    }
-
-    if (count($products) === 0) {
-        echo '<tr><td colspan="7">-</td></tr>';
-    }
-    echo '</tbody></table></div>';
-    echo '<script>(function(){var forms=document.querySelectorAll(".dcmanage-scope-row-form,.dcmanage-scope-group-form");for(var i=0;i<forms.length;i++){var f=forms[i];var d=f.querySelector("input[name=down_limit_gb]");var u=f.querySelector("input[name=up_limit_gb]");var t=f.querySelector("input[name=total_limit_gb]");var dc=f.querySelector("input[name=down_unlimited]");var uc=f.querySelector("input[name=up_unlimited]");var tc=f.querySelector("input[name=total_unlimited]");var sync=function(inp,chk){if(!inp||!chk){return;}inp.disabled=chk.checked;};if(dc&&d){dc.addEventListener("change",function(){sync(d,dc);});sync(d,dc);}if(uc&&u){uc.addEventListener("change",function(){sync(u,uc);});sync(u,uc);}if(tc&&t){tc.addEventListener("change",function(){sync(t,tc);});sync(t,tc);}}})();</script>';
-}
-
-function dcmanage_render_packages(string $lang): void
-{
-    $dcs = Capsule::table('mod_dcmanage_datacenters')->orderBy('name')->get(['id', 'name']);
-    $rows = Capsule::table('mod_dcmanage_packages as p')
-        ->leftJoin('mod_dcmanage_datacenters as d', 'd.id', '=', 'p.dc_id')
-        ->orderBy('p.id', 'desc')
-        ->get(['p.id', 'p.dc_id', 'p.name', 'p.size_gb', 'p.price', 'p.taxed', 'p.active', 'd.name as dc_name']);
-
-    echo '<div class="d-flex justify-content-end align-items-center mb-3 dcmanage-section-toolbar">';
-    echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="modal" data-target="#dcmanage-package-add-modal">' . htmlspecialchars(I18n::t('package_add', $lang)) . '</button>';
-    echo '</div>';
-
-    echo '<div id="dcmanage-package-add-modal" class="modal fade dcmanage-modal" tabindex="-1" role="dialog" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('package_add', $lang)) . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
-    echo '<form id="dcmanage-package-add-form" method="post" action="" class="dcmanage-form-card dcmanage-centered-form mt-0">';
-    echo '<input type="hidden" name="dcmanage_action" value="package_create">';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" required class="form-control dcmanage-input"><option value="">--</option>';
-    foreach ($dcs as $dc) {
-        echo '<option value="' . (int) $dc->id . '">' . htmlspecialchars((string) $dc->name) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('package_name', $lang)) . '</label><input name="name" required class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_size_gb', $lang)) . '</label><input type="number" step="0.001" min="0.001" name="size_gb" value="10" required class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_price', $lang)) . '</label><input type="number" step="0.01" min="0" name="price" value="0" required class="form-control dcmanage-input"></div>';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</label><select name="taxed" class="form-control dcmanage-input"><option value="1">' . htmlspecialchars(I18n::t('yes', $lang)) . '</option><option value="0">' . htmlspecialchars(I18n::t('no', $lang)) . '</option></select></div>';
-    echo '</div>';
-    echo '<div class="form-row">';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</label><select name="active" class="form-control dcmanage-input"><option value="1">' . htmlspecialchars(I18n::t('status_active', $lang)) . '</option><option value="0">' . htmlspecialchars(I18n::t('status_inactive', $lang)) . '</option></select></div>';
-    echo '</div>';
-    echo '</form>';
-    echo '</div><div class="modal-footer"><button class="btn btn-outline-secondary btn-sm" type="button" data-dismiss="modal">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</button><button class="btn btn-primary btn-sm" type="submit" form="dcmanage-package-add-form" name="dcmanage_action_btn" value="package_create">' . htmlspecialchars(I18n::t('package_create', $lang)) . '</button></div></div></div></div>';
-
-    echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped dcmanage-dc-table">';
-    echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_size_gb', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_price', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
-
-    $modalsHtml = '';
-    foreach ($rows as $row) {
-        $taxed = (int) ($row->taxed ?? 0) === 1 ? I18n::t('yes', $lang) : I18n::t('no', $lang);
-        $activeLabel = (int) ($row->active ?? 0) === 1 ? I18n::t('status_active', $lang) : I18n::t('status_inactive', $lang);
-        echo '<tr>';
-        echo '<td>' . (int) $row->id . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($row->dc_name ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) $row->name) . '</td>';
-        echo '<td>' . htmlspecialchars((string) $row->size_gb) . '</td>';
-        echo '<td>' . htmlspecialchars((string) $row->price) . '</td>';
-        echo '<td>' . htmlspecialchars($taxed) . '</td>';
-        echo '<td>' . htmlspecialchars($activeLabel) . '</td>';
-        echo '<td><div class="dcmanage-action-buttons">';
-        echo '<button class="btn btn-sm dcmanage-btn-soft-warning" type="button" data-toggle="modal" data-target="#pkg-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
-        echo '<form method="post" style="display:inline" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('delete_confirm_package', $lang), ENT_QUOTES, 'UTF-8') . '\')">';
-        echo '<input type="hidden" name="dcmanage_action" value="package_delete"><input type="hidden" name="package_id" value="' . (int) $row->id . '">';
-        echo '<button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="package_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button>';
-        echo '</form>';
-        echo '</div></td>';
-        echo '</tr>';
-
-        $modalsHtml .= '<div class="modal fade dcmanage-modal" id="pkg-edit-' . (int) $row->id . '" tabindex="-1" role="dialog" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('action_edit', $lang)) . ' #' . (int) $row->id . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
-        $modalsHtml .= '<form id="dcmanage-package-edit-form-' . (int) $row->id . '" method="post" class="dcmanage-form-card dcmanage-centered-form mt-0">';
-        $modalsHtml .= '<input type="hidden" name="dcmanage_action" value="package_update"><input type="hidden" name="package_id" value="' . (int) $row->id . '">';
-        $modalsHtml .= '<div class="form-row">';
-        $modalsHtml .= '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" required class="form-control dcmanage-input">';
-        foreach ($dcs as $dc) {
-            $selected = (int) $dc->id === (int) ($row->dc_id ?? 0) ? ' selected' : '';
-            $modalsHtml .= '<option value="' . (int) $dc->id . '"' . $selected . '>' . htmlspecialchars((string) $dc->name) . '</option>';
-        }
-        $modalsHtml .= '</select></div>';
-        $modalsHtml .= '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('package_name', $lang)) . '</label><input name="name" required class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
-        $modalsHtml .= '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_size_gb', $lang)) . '</label><input type="number" step="0.001" min="0.001" name="size_gb" required class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->size_gb) . '"></div>';
-        $modalsHtml .= '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_price', $lang)) . '</label><input type="number" step="0.01" min="0" name="price" required class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->price) . '"></div>';
-        $modalsHtml .= '</div>';
-        $modalsHtml .= '<div class="form-row">';
-        $modalsHtml .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</label><select name="taxed" class="form-control dcmanage-input"><option value="1"' . ((int) $row->taxed === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('yes', $lang)) . '</option><option value="0"' . ((int) $row->taxed === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('no', $lang)) . '</option></select></div>';
-        $modalsHtml .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</label><select name="active" class="form-control dcmanage-input"><option value="1"' . ((int) $row->active === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_active', $lang)) . '</option><option value="0"' . ((int) $row->active === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_inactive', $lang)) . '</option></select></div>';
-        $modalsHtml .= '</div>';
-        $modalsHtml .= '</form></div><div class="modal-footer"><button class="btn btn-outline-secondary btn-sm" type="button" data-dismiss="modal">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</button><button class="btn btn-primary btn-sm" type="submit" form="dcmanage-package-edit-form-' . (int) $row->id . '" name="dcmanage_action_btn" value="package_update">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></div></div></div></div>';
-    }
-
-    if (count($rows) === 0) {
-        echo '<tr><td colspan="8">-</td></tr>';
-    }
-    echo '</tbody></table></div>';
-    echo $modalsHtml;
 }
 
 function dcmanage_render_simple_pagination(string $baseUrl, int $page, int $perPage, int $total, string $lang, string $pageParam): string
@@ -4720,11 +4546,11 @@ function dcmanage_render_queue(string $lang): void
         echo '<td>' . htmlspecialchars((string) $row->type) . '</td>';
         echo '<td><span class="badge badge-' . $badge . '">' . htmlspecialchars((string) $row->status) . '</span></td>';
         echo '<td>' . (int) $row->attempts . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($row->created_at ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($row->started_at ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($row->finished_at ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($row->run_after ?? '-')) . '</td>';
-        echo '<td>' . htmlspecialchars((string) ($row->last_error ?? '-')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->created_at ?? '—')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->started_at ?? '—')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->finished_at ?? '—')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->run_after ?? '—')) . '</td>';
+        echo '<td>' . htmlspecialchars((string) ($row->last_error ?? '—')) . '</td>';
         echo '<td class="dcmanage-action-buttons">';
         if (in_array($status, ['pending', 'running'], true)) {
             echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="queue_cancel_job"><input type="hidden" name="job_id" value="' . (int) $row->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-warning" name="dcmanage_action_btn" value="queue_cancel_job">Cancel</button></form>';

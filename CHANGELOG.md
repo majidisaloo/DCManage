@@ -3,6 +3,28 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.77] - 2026-02-23
+### Added
+- Added `ilo/action` API endpoint to handle Server Redfish power actions (On, Off, Graceful Restart, Force Restart).
+- Added POST request body support to `iloCurlJson` helper for Redfish interactions.
+- Added visual loading indicators (spinners) and timeouts to all dependent selector fetch requests to prevent UI hangs.
+
+### Changed
+- Expanded the Server Add/Edit modals to modal-xl for better width and responsiveness.
+- Redesigned Server View modal into a 4-card structure (Basic Info, Network Ports, Control Port, Discovery/Monitoring) for improved readability.
+- Replaced internal keys (like `power_status`) with human-friendly translated text labels.
+- Replaced `-` placeholders with typographically correct em-dashes `—`.
+- Enforced left-to-right order dependency for Monitoring Mapping dropdowns (Probe -> Group -> Subgroup -> Device).
+- Improved PRTG list displays to show item Names alongside IDs.
+
+### Fixed
+- Fixed pagination layout and padding issues on the Switches module interface.
+- Fixed search insensitivity for both Persian and English numeric digits across all module search boxes.
+- Fixed modals not auto-closing after a successful save operation.
+
+### Removed
+- Removed the legacy internal 'Traffic Management' PHP pages/logic entirely and replaced them with a placeholder pending a full redesign.
+
 ## [0.1.76] - 2026-02-23
 ### Fixed
 - Fixed Server View/Edit blank/black screen by wrapping modal auto-show script in `DOMContentLoaded` for reliable timing.

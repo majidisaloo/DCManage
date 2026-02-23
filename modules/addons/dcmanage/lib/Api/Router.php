@@ -77,6 +77,9 @@ final class Router
                 case 'ilo/test':
                     $data = self::iloTest();
                     break;
+                case 'ilo/action':
+                    $data = self::iloAction();
+                    break;
                 case 'switch/ports':
                     $data = self::switchPorts();
                     break;
@@ -504,7 +507,79 @@ final class Router
         ];
     }
 
-    private static function iloCurlJson(string $url, string $user, string $pass, bool $verifySsl): array
+    private static function iloAction(): array
+    {
+        $serverId = (int) ($_POST['server_id'] ?? ($_GET['server_id'] ?? 0));
+        $action = trim((string) ($_POST['power_action'] ?? ($_GET['power_action'] ?? '')));
+        $host = trim((string) ($_POST['host'] ?? ($_GET['host'] ?? '')));
+        $user = trim((string) ($_POST['user'] ?? ($_GET['user'] ?? '')));
+        $pass = (string) ($_POST['pass'] ?? ($_GET['pass'] ?? ''));
+        $verify = (int) ($_POST['verify_ssl'] ?? ($_GET['verify_ssl'] ?? 0)) === 1;
+
+        if ($action === '') {
+            throw new \RuntimeException('power_action is required');
+        }
+
+        if ($serverId > 0 && ($host === '' || $user === '' || $pass === '')) {
+            $server = Capsule::table('mod_dcmanage_servers as s')
+                ->leftJoin('mod_dcmanage_ilos as il', 'il.id', '=', 's.ilo_id')
+                ->where('s.id', $serverId)
+                ->first(['il.host as ilo_host', 'il.user as ilo_user', 'il.pass_enc as ilo_pass_enc']);
+            if ($server !== null) {
+                if ($host === '') {
+                    $host = trim((string) ($server->ilo_host ?? ''));
+                }
+                if ($user === '') {
+                    $user = trim((string) ($server->ilo_user ?? ''));
+                }
+                if ($pass === '' && trim((string) ($server->ilo_pass_enc ?? '')) !== '') {
+                    $pass = Crypto::decrypt((string) $server->ilo_pass_enc);
+                }
+            }
+        }
+
+        if ($host === '' || $user === '' || $pass === '') {
+            throw new \RuntimeException('iLO host, user and password are required');
+        }
+
+        $base = preg_match('#^https?://#i', $host) === 1 ? rtrim($host, '/') : ('https://' . rtrim($host, '/'));
+        $root = self::iloCurlJson($base . '/redfish/v1/', $user, $pass, $verify);
+
+        $systemsUrl = '';
+        if (isset($root['data']['Systems']['@odata.id'])) {
+            $systems = self::iloCurlJson($base . (string) $root['data']['Systems']['@odata.id'], $user, $pass, $verify);
+            $members = $systems['data']['Members'] ?? [];
+            if (is_array($members) && isset($members[0]['@odata.id'])) {
+                $systemsUrl = (string) $members[0]['@odata.id'];
+            }
+        }
+
+        if ($systemsUrl === '') {
+            throw new \RuntimeException('Could not discover Redfish System endpoint');
+        }
+
+        // Fetch the system to find the Reset action target URI
+        $systemInfo = self::iloCurlJson($base . $systemsUrl, $user, $pass, $verify);
+        $resetUri = '';
+        if (isset($systemInfo['data']['Actions']['#ComputerSystem.Reset']['target'])) {
+            $resetUri = (string) $systemInfo['data']['Actions']['#ComputerSystem.Reset']['target'];
+        }
+
+        if ($resetUri === '') {
+            throw new \RuntimeException('ComputerSystem.Reset action not available');
+        }
+
+        $payload = ['ResetType' => $action];
+        $result = self::iloCurlJson($base . $resetUri, $user, $pass, $verify, $payload);
+
+        return [
+            'ok' => true,
+            'status_code' => (int) $result['status_code'],
+            'message' => 'Action ' . $action . ' executed successfully',
+        ];
+    }
+
+    private static function iloCurlJson(string $url, string $user, string $pass, bool $verifySsl, ?array $postBody = null): array
     {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -514,7 +589,16 @@ final class Router
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verifySsl ? 2 : 0);
         curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
         curl_setopt($ch, CURLOPT_USERPWD, $user . ':' . $pass);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+
+        $headers = ['Accept: application/json'];
+        if ($postBody !== null) {
+            $jsonBody = json_encode($postBody);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonBody);
+            $headers[] = 'Content-Type: application/json';
+            $headers[] = 'Content-Length: ' . strlen($jsonBody);
+        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $proxyHost = trim((string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_host')->value('meta_value'));
         $proxyPort = (int) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_port')->value('meta_value');
@@ -545,11 +629,15 @@ final class Router
         curl_close($ch);
 
         if ($status >= 400) {
-            throw new \RuntimeException('iLO HTTP ' . $status);
+            throw new \RuntimeException('iLO HTTP ' . $status . ' ' . $body);
         }
-        $data = json_decode((string) $body, true);
-        if (!is_array($data)) {
-            throw new \RuntimeException('iLO returned invalid JSON');
+
+        $data = [];
+        if (trim($body) !== '') {
+            $decoded = json_decode((string) $body, true);
+            if (is_array($decoded)) {
+                $data = $decoded;
+            }
         }
 
         return [
