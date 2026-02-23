@@ -3,9 +3,10 @@
   --dc-accent: #12b3c7;
   --dc-soft: #eef4ff;
   --dc-text: #173063;
-  max-width: 1820px;
+  max-width: none;
+  width: 100%;
   margin: 0 auto;
-  padding: 0 16px 26px;
+  padding: 0 12px 26px;
 }
 
 .dcmanage-shell.dcmanage-rtl {
@@ -96,7 +97,7 @@
 }
 
 .dcmanage-shell .dcmanage-page-body {
-  padding: 22px 22px 24px !important;
+  padding: 18px 18px 22px !important;
 }
 
 .dcmanage-shell .dcmanage-page-card {
@@ -682,6 +683,13 @@
   min-height: 34px;
 }
 
+.dcmanage-shell .btn + .btn,
+.dcmanage-shell .btn + a.btn,
+.dcmanage-shell a.btn + .btn,
+.dcmanage-shell a.btn + a.btn {
+  margin-inline-start: 8px;
+}
+
 .dcmanage-action-buttons {
   display: inline-flex;
   flex-wrap: wrap;
@@ -704,6 +712,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.dcmanage-action-buttons .btn + .btn,
+.dcmanage-action-buttons a.btn + .btn,
+.dcmanage-action-buttons .btn + a.btn,
+.dcmanage-action-buttons a.btn + a.btn {
+  margin-inline-start: 0;
 }
 
 .dcmanage-scope-row-form .form-row {
@@ -731,15 +746,11 @@
 
 .dcmanage-section-toolbar {
   margin-top: 6px;
-  margin-bottom: 14px !important;
+  margin-bottom: 16px !important;
 }
 
 .dcmanage-section-toolbar .dcmanage-action-buttons .btn {
   min-width: 132px;
-}
-
-.dcmanage-section-toolbar + .collapse {
-  margin-top: 2px;
 }
 
 #dcmanage-server-add h5,
@@ -752,9 +763,15 @@
   border: 1px solid #d9e3fb;
   border-radius: 14px;
   background: #fcfdff;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   padding: 0;
   margin-top: 12px;
+}
+
+.dcmanage-shell .table-responsive {
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .dcmanage-table-wrap > .table {
@@ -763,6 +780,16 @@
 
 .dcmanage-section-toolbar + .dcmanage-table-wrap {
   margin-top: 12px;
+}
+
+.dcmanage-shell .dcmanage-page-body > .dcmanage-table-wrap,
+.dcmanage-shell .dcmanage-page-body > .dcmanage-dc-table-wrap,
+.dcmanage-shell .dcmanage-page-body > .table-responsive {
+  margin-top: 14px;
+}
+
+.dcmanage-modal .modal-body .dcmanage-form-card {
+  margin-bottom: 0;
 }
 
 .dcmanage-dc-add-wrap {

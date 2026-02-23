@@ -3,6 +3,26 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.75] - 2026-02-23
+### Fixed
+- Improved VLAN parsing fallback to detect additional interface formats (`Vl*`) and normalize numeric VLAN extraction when available.
+- Fixed Monitoring and Servers black-screen behavior caused by forced static-open modal rendering.
+- Reduced cases where server details routes became unstable by removing synchronous PRTG counter fetch calls from render path.
+- Fixed malformed Monitoring markup that could break layout flow after opening add/view/edit dialogs.
+
+### Changed
+- Standardized create flows to modal UX in key pages:
+  - Datacenters create
+  - Switches create
+  - Traffic Packages create
+- Monitoring edit flow now uses modal UX (consistent with add/view behavior).
+- Services/Group filter action label changed to explicit product loading action (`Load Products`).
+- Traffic dashboard sort labels were rewritten to human-friendly wording.
+- Improved global spacing/responsiveness (page width, table wrappers, action buttons, modal form spacing) to reduce side-scroll and overlap.
+
+### Added
+- Added i18n key for scoped product loading action in both English and Persian.
+
 ## [0.1.74] - 2026-02-23
 ### Changed
 - Monitoring instance actions now keep context on the Monitoring tab and persist the active `View` modal state during mapping create/delete operations.

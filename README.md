@@ -2,7 +2,7 @@
 
 DCManage is an API-first datacenter management core inside WHMCS.
 
-## Features in this release (v0.1.74)
+## Features in this release (v0.1.75)
 - Datacenter domain model foundations:
   - Datacenters, Racks, Networks, Switches, Servers, Ports, iLO, PRTG mappings.
 - Traffic/usage foundations:
@@ -45,6 +45,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - compatible with hardened PHP setups where shell-related functions are disabled.
   - resilient shell-quote fallback keeps settings/cron pages stable even when `escapeshellarg` is blocked by host policy.
 - Inventory workflows:
+  - Create forms for Datacenters, Switches, and Traffic Packages now open in consistent modals (no inline collapse forms).
   - Servers UI refactor:
     - Removed inline edit expansion from table rows.
     - Added per-row actions: `View`, `Edit`, `Delete` (with confirmation).
@@ -52,6 +53,8 @@ DCManage is an API-first datacenter management core inside WHMCS.
     - Added explicit single control-port mapping support for SNMP block/unblock target.
     - Added separated traffic/hardware sensor typing in server mappings.
     - Server details now include discovery status/log visibility and cleaner overview sections.
+    - Server details modal now uses safe Bootstrap open/close flow (no forced static overlay), reducing black-screen behavior on `server_mode=view|edit`.
+    - Removed synchronous PRTG counter pulls from server details render path to reduce page latency/timeouts.
   - Fixed Safari/WebKit JS parsing/selector escapes that were breaking server edit actions.
   - `Services / Group` scope now stays strictly PID/GID CSV based.
   - Server action port target now syncs from selected traffic link for enforce operations.
@@ -65,6 +68,7 @@ DCManage is an API-first datacenter management core inside WHMCS.
   - GID/PID parser now supports Persian/Arabic digits in CSV input.
   - Group default limit forms are rendered per selected GID (multi-group edit in one page).
   - Monitoring tab top action now uses generic `Add Monitoring Instance` label for multi-platform usage.
+  - Monitoring Edit now opens in modal mode, and View/Edit routes auto-open matching modal then cleanly return to tab URL after close.
   - Added Monitoring `View` flow and group mapping layer (per instance/per switch) for purposes:
     - Traffic
     - Hardware

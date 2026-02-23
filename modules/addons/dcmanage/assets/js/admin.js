@@ -538,7 +538,7 @@
         html += '<div class="dcmanage-form-card mb-3"><div class="form-row align-items-end">' +
           '<div class="form-group col-md-4 mb-2"><label>Status Filter</label><select id="dcmanage-traffic-filter" class="form-control dcmanage-input"><option value="all">All</option><option value="blocked">Blocked</option><option value="overused">Overused</option><option value="normal">Normal</option></select></div>' +
           '<div class="form-group col-md-4 mb-2"><label>Search Service</label><input id="dcmanage-traffic-search" class="form-control dcmanage-input" placeholder="service id / status"></div>' +
-          '<div class="form-group col-md-4 mb-2"><label>Sort</label><select id="dcmanage-traffic-sort" class="form-control dcmanage-input"><option value="service_asc">Service ASC</option><option value="remaining_asc">Remaining ASC</option><option value="remaining_desc">Remaining DESC</option></select></div>' +
+          '<div class="form-group col-md-4 mb-2"><label>Sort By</label><select id="dcmanage-traffic-sort" class="form-control dcmanage-input"><option value="service_asc">Service (Oldest First)</option><option value="remaining_asc">Remaining (Low to High)</option><option value="remaining_desc">Remaining (High to Low)</option></select></div>' +
           '</div></div>';
         html += '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped" id="dcmanage-traffic-table">' +
           '<thead><tr><th>Service</th><th>Domain</th><th>Status</th><th>Used (GB)</th><th>Allowed (GB)</th><th>Remaining (GB)</th><th>Cycle End</th><th>Last Sample</th></tr></thead><tbody>';
