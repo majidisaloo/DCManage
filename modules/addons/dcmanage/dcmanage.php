@@ -4512,7 +4512,8 @@ function dcmanage_render_logs(string $lang): void
     $logRows = $query->offset(($logPage - 1) * $perPageLogs)->limit($perPageLogs)->get(['id', 'level', 'source', 'message', 'created_at']);
 
     echo '<h5 class="mb-3">' . htmlspecialchars(I18n::t('logs_system', $lang)) . '</h5>';
-    echo '<form method="get" class="dcmanage-form-card mb-3" id="logFilterForm">';
+    echo '<div class="dcmanage-log-filter-wrap">';
+    echo '<form method="get" class="dcmanage-form-card mb-0" id="logFilterForm">';
     echo '<input type="hidden" name="module" value="dcmanage"><input type="hidden" name="tab" value="logs">';
     echo '<div class="form-row">';
     echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('logs_sort', $lang)) . '</label><select class="form-control dcmanage-input" name="log_sort">';
@@ -4535,7 +4536,6 @@ function dcmanage_render_logs(string $lang): void
     echo '<div class="form-group col-md-3"><label>Date To</label><input type="date" class="form-control dcmanage-input" name="log_date_to" value="' . htmlspecialchars($dateTo) . '"></div>';
     echo '</div>';
     echo '</form>';
-
     echo '<div class="dcmanage-all-actions">';
     echo '<button class="btn btn-primary btn-sm" type="submit" form="logFilterForm">' . htmlspecialchars(I18n::t('logs_apply_filter', $lang)) . '</button>';
     echo '<a class="btn btn-outline-secondary btn-sm" href="addonmodules.php?module=dcmanage&tab=logs">' . htmlspecialchars(I18n::t('logs_reset_filter', $lang)) . '</a>';
@@ -4543,6 +4543,7 @@ function dcmanage_render_logs(string $lang): void
     echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="system"><button class="btn btn-outline-danger btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_system', $lang)) . '</button></form>';
     echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="purchase"><button class="btn btn-outline-warning btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear">' . htmlspecialchars(I18n::t('logs_clear_purchase', $lang)) . '</button></form>';
     echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="logs_clear"><input type="hidden" name="scope" value="all"><button class="btn btn-danger btn-sm" type="submit" name="dcmanage_action_btn" value="logs_clear" onclick="return confirm(\'Are you sure you want to clear ALL logs? This cannot be undone.\')">' . htmlspecialchars(I18n::t('logs_clear_all', $lang)) . '</button></form>';
+    echo '</div>';
     echo '</div>';
 
     echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped">';
