@@ -625,16 +625,23 @@
   display: flex !important;
   flex-wrap: wrap;
   align-items: center;
-  margin-top: 12px;
-  margin-bottom: 12px;
-  padding-top: 10px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+  padding-top: 12px;
   border-top: 1px solid #e4ebff;
-  gap: 12px !important;
+  gap: 10px !important;
 }
 
-.dcmanage-shell .dcmanage-form-actions .btn {
+.dcmanage-shell .dcmanage-form-actions .btn,
+.dcmanage-shell .dcmanage-inline-actions .btn {
   margin: 0;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
   min-width: 120px;
+  line-height: 1.4;
+  transition: background .15s, box-shadow .15s;
 }
 
 .dcmanage-shell .dcmanage-form-actions a.btn,
@@ -659,8 +666,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin: 0 0 14px;
+  gap: 10px;
+  margin: 12px 0 16px;
+  padding: 10px 0 0;
 }
 
 .dcmanage-shell .dcmanage-inline-actions form {
