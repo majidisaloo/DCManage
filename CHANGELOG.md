@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.83] - 2026-02-23
+### Fixed
+- Moved Apply Filter and Reset buttons into the Date row so they no longer appear below the Sort dropdown.
+- Reordered filter fields: Sort → Source → Level → Search.
+
 ## [0.1.82] - 2026-02-23
 ### Fixed
 - Improved button padding and spacing on Logs page (filter actions and clear-log buttons).

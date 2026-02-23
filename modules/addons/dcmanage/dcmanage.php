@@ -4515,26 +4515,25 @@ function dcmanage_render_logs(string $lang): void
     echo '<form method="get" class="dcmanage-form-card mb-3">';
     echo '<input type="hidden" name="module" value="dcmanage"><input type="hidden" name="tab" value="logs">';
     echo '<div class="form-row">';
-    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('logs_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input" name="log_q" value="' . htmlspecialchars($q) . '"></div>';
-    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('logs_level', $lang)) . '</label><select class="form-control dcmanage-input" name="log_level"><option value="">All</option><option value="error"' . ($level === 'error' ? ' selected' : '') . '>error</option><option value="warning"' . ($level === 'warning' ? ' selected' : '') . '>warning</option><option value="info"' . ($level === 'info' ? ' selected' : '') . '>info</option></select></div>';
-    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('logs_source', $lang)) . '</label><select class="form-control dcmanage-input" name="log_source"><option value="">All</option>';
-    foreach ($sources as $s) {
-        $sv = (string) $s;
-        echo '<option value="' . htmlspecialchars($sv) . '"' . ($source === $sv ? ' selected' : '') . '>' . htmlspecialchars($sv) . '</option>';
-    }
-    echo '</select></div>';
     echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('logs_sort', $lang)) . '</label><select class="form-control dcmanage-input" name="log_sort">';
     $sortOptions = ['id_desc' => 'Newest', 'id_asc' => 'Oldest', 'level_asc' => 'Level (high->low)', 'level_desc' => 'Level (low->high)', 'date_asc' => 'Date asc'];
     foreach ($sortOptions as $k => $v) {
         echo '<option value="' . htmlspecialchars($k) . '"' . ($sort === $k ? ' selected' : '') . '>' . htmlspecialchars($v) . '</option>';
     }
     echo '</select></div>';
+    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('logs_source', $lang)) . '</label><select class="form-control dcmanage-input" name="log_source"><option value="">All</option>';
+    foreach ($sources as $s) {
+        $sv = (string) $s;
+        echo '<option value="' . htmlspecialchars($sv) . '"' . ($source === $sv ? ' selected' : '') . '>' . htmlspecialchars($sv) . '</option>';
+    }
+    echo '</select></div>';
+    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('logs_level', $lang)) . '</label><select class="form-control dcmanage-input" name="log_level"><option value="">All</option><option value="error"' . ($level === 'error' ? ' selected' : '') . '>error</option><option value="warning"' . ($level === 'warning' ? ' selected' : '') . '>warning</option><option value="info"' . ($level === 'info' ? ' selected' : '') . '>info</option></select></div>';
+    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('logs_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input" name="log_q" value="' . htmlspecialchars($q) . '"></div>';
     echo '</div>';
-    echo '<div class="form-row mt-2">';
+    echo '<div class="form-row align-items-end mt-2">';
     echo '<div class="form-group col-md-3"><label>Date From</label><input type="date" class="form-control dcmanage-input" name="log_date_from" value="' . htmlspecialchars($dateFrom) . '"></div>';
     echo '<div class="form-group col-md-3"><label>Date To</label><input type="date" class="form-control dcmanage-input" name="log_date_to" value="' . htmlspecialchars($dateTo) . '"></div>';
-    echo '</div>';
-    echo '<div class="dcmanage-form-actions d-flex flex-wrap">';
+    echo '<div class="form-group col-md-6 dcmanage-form-actions" style="border:none;margin:0;padding:0;">';
     echo '<button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('logs_apply_filter', $lang)) . '</button>';
     echo '<a class="btn btn-outline-secondary btn-sm" href="addonmodules.php?module=dcmanage&tab=logs">' . htmlspecialchars(I18n::t('logs_reset_filter', $lang)) . '</a>';
     echo '</div>';
