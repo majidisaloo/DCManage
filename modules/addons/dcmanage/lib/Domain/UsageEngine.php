@@ -32,6 +32,8 @@ final class UsageEngine
                 'us.base_quota_gb',
                 'us.extra_quota_gb',
                 'us.used_bytes',
+                'us.download_bytes',
+                'us.upload_bytes',
                 'us.last_in_octets',
                 'us.last_out_octets',
                 'us.cycle_start',
@@ -66,6 +68,8 @@ final class UsageEngine
                 'base_quota_gb' => 0,
                 'extra_quota_gb' => 0,
                 'used_bytes' => 0,
+                'download_bytes' => 0,
+                'upload_bytes' => 0,
                 'last_status' => 'ok',
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
@@ -76,11 +80,15 @@ final class UsageEngine
         $stateCycleEnd = isset($state->cycle_end) ? strtotime((string) $state->cycle_end) : null;
 
         $usedBytes = (int) ($state->used_bytes ?? 0);
+        $downloadBytes = (int) ($state->download_bytes ?? 0);
+        $uploadBytes = (int) ($state->upload_bytes ?? 0);
         $lastIn = isset($state->last_in_octets) ? (int) $state->last_in_octets : null;
         $lastOut = isset($state->last_out_octets) ? (int) $state->last_out_octets : null;
 
         if ($stateCycleEnd === null || $stateCycleEnd !== $cycleEnd->getTimestamp()) {
             $usedBytes = 0;
+            $downloadBytes = 0;
+            $uploadBytes = 0;
             $lastIn = null;
             $lastOut = null;
             Logger::info('usage', 'Cycle reset detected', ['service_id' => $serviceId]);
@@ -108,6 +116,8 @@ final class UsageEngine
         }
 
         $usedBytes += $delta;
+        $downloadBytes += $deltaIn;
+        $uploadBytes += $deltaOut;
 
         $limit = $this->resolveLimitByMode($scope, $mode);
         $isUnlimited = (bool) ($limit['unlimited'] ?? false);
@@ -128,6 +138,8 @@ final class UsageEngine
             'mode' => $mode,
             'base_quota_gb' => $baseQuota,
             'used_bytes' => max(0, $usedBytes),
+            'download_bytes' => max(0, $downloadBytes),
+            'upload_bytes' => max(0, $uploadBytes),
             'last_in_octets' => $currentIn,
             'last_out_octets' => $currentOut,
             'last_sample_at' => date('Y-m-d H:i:s'),

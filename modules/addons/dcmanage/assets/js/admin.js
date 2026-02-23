@@ -230,9 +230,9 @@
       var html = '<div class="dcmanage-hero-band">' +
         '<div class="dcmanage-hero-title">' + safeText(isFa ? 'نمای کلی زیرساخت' : 'Infrastructure Snapshot') + '</div>' +
         '<div class="dcmanage-hero-art" aria-hidden="true">' +
-          '<svg viewBox="0 0 220 70"><rect x="4" y="20" width="64" height="42" rx="8"/><rect x="78" y="10" width="64" height="52" rx="8"/><rect x="152" y="26" width="64" height="36" rx="8"/><circle cx="24" cy="35" r="4"/><circle cx="98" cy="29" r="4"/><circle cx="172" cy="39" r="4"/></svg>' +
+        '<svg viewBox="0 0 220 70"><rect x="4" y="20" width="64" height="42" rx="8"/><rect x="78" y="10" width="64" height="52" rx="8"/><rect x="152" y="26" width="64" height="36" rx="8"/><circle cx="24" cy="35" r="4"/><circle cx="98" cy="29" r="4"/><circle cx="172" cy="39" r="4"/></svg>' +
         '</div>' +
-      '</div>';
+        '</div>';
       html += '<div class="dcmanage-dashboard-flags">';
       html += '<span class="dcmanage-flag-pill ' + (testMode ? 'is-warning' : 'is-success') + '">' + safeText(T.testMode + ': ' + (testMode ? T.testModeOn : T.testModeOff)) + '</span>';
       html += '</div>';
@@ -544,22 +544,24 @@
           '<div class="col-md-4 col-6 mb-3"><div class="card dcmanage-kpi-card"><div class="card-body"><div class="dcmanage-kpi-label">Services</div><div class="dcmanage-kpi-value">' + safeText(rows.length) + '</div></div></div></div>' +
           '<div class="col-md-4 col-6 mb-3"><div class="card dcmanage-kpi-card"><div class="card-body"><div class="dcmanage-kpi-label">Blocked</div><div class="dcmanage-kpi-value text-danger">' + safeText(blockedCount) + '</div></div></div></div>' +
           '<div class="col-md-4 col-12 mb-3"><div class="card dcmanage-kpi-card"><div class="card-body"><div class="dcmanage-kpi-label">Overused</div><div class="dcmanage-kpi-value text-warning">' + safeText(overusedCount) + '</div></div></div></div>' +
-        '</div>';
+          '</div>';
         html += '<div class="dcmanage-form-card mb-3"><div class="form-row align-items-end">' +
           '<div class="form-group col-md-4 mb-2"><label>Status Filter</label><select id="dcmanage-traffic-filter" class="form-control dcmanage-input"><option value="all">All</option><option value="blocked">Blocked</option><option value="overused">Overused</option><option value="normal">Normal</option></select></div>' +
           '<div class="form-group col-md-4 mb-2"><label>Search Service</label><input id="dcmanage-traffic-search" class="form-control dcmanage-input" placeholder="service id / status"></div>' +
-          '<div class="form-group col-md-4 mb-2"><label>Sort By</label><select id="dcmanage-traffic-sort" class="form-control dcmanage-input"><option value="service_asc">Service name A→Z</option><option value="remaining_asc">Remaining low→high</option><option value="remaining_desc">Remaining high→low</option></select></div>' +
+          '<div class="form-group col-md-4 mb-2"><label>Sort By</label><select id="dcmanage-traffic-sort" class="form-control dcmanage-input"><option value="service_asc">Service name A→Z</option><option value="remaining_asc">Remaining low→high</option><option value="remaining_desc">Remaining high→low</option><option value="download_desc">Download high→low</option><option value="upload_desc">Upload high→low</option><option value="total_desc">Total Used high→low</option></select></div>' +
           '</div></div>';
         html += '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped" id="dcmanage-traffic-table">' +
-          '<thead><tr><th>Service</th><th>Domain</th><th>Status</th><th>Used (GB)</th><th>Allowed (GB)</th><th>Remaining (GB)</th><th>Cycle End</th><th>Last Sample</th></tr></thead><tbody>';
+          '<thead><tr><th>Service</th><th>Domain</th><th>Status</th><th>Download (GB)</th><th>Upload (GB)</th><th>Total Used (GB)</th><th>Allowed (GB)</th><th>Remaining (GB)</th><th>Cycle End</th><th>Last Sample</th></tr></thead><tbody>';
 
         rows.forEach(function (r) {
           var st = String(r.status || '').toLowerCase();
           var cls = st === 'blocked' ? 'is-down' : (st === 'limited' ? 'is-unknown' : 'is-up');
-          html += '<tr data-service="' + safeText(r.service_id) + '" data-status="' + safeText(st) + '" data-remaining="' + safeText(r.remaining_bytes) + '">' +
+          html += '<tr data-service="' + safeText(r.service_id) + '" data-status="' + safeText(st) + '" data-remaining="' + safeText(r.remaining_bytes) + '" data-download="' + safeText(r.download_bytes) + '" data-upload="' + safeText(r.upload_bytes) + '" data-total="' + safeText(r.used_bytes) + '">' +
             '<td>' + safeText(r.service_id) + '</td>' +
             '<td>' + safeText(r.domain_status || '-') + '</td>' +
             '<td><span class="dcmanage-status-pill ' + cls + '">' + safeText(st || '-') + '</span></td>' +
+            '<td>' + toGb(r.download_bytes) + '</td>' +
+            '<td>' + toGb(r.upload_bytes) + '</td>' +
             '<td>' + toGb(r.used_bytes) + '</td>' +
             '<td>' + toGb(r.allowed_bytes) + '</td>' +
             '<td>' + toGb(r.remaining_bytes) + '</td>' +
@@ -608,6 +610,15 @@
               }
               if (modeSort === 'remaining_desc') {
                 return Number(b.getAttribute('data-remaining') || 0) - Number(a.getAttribute('data-remaining') || 0);
+              }
+              if (modeSort === 'download_desc') {
+                return Number(b.getAttribute('data-download') || 0) - Number(a.getAttribute('data-download') || 0);
+              }
+              if (modeSort === 'upload_desc') {
+                return Number(b.getAttribute('data-upload') || 0) - Number(a.getAttribute('data-upload') || 0);
+              }
+              if (modeSort === 'total_desc') {
+                return Number(b.getAttribute('data-total') || 0) - Number(a.getAttribute('data-total') || 0);
               }
               return Number(a.getAttribute('data-service') || 0) - Number(b.getAttribute('data-service') || 0);
             });
@@ -677,4 +688,91 @@
     }).catch(function () {
     });
   }
+
+  (function initServerGraph() {
+    var graphContainers = document.querySelectorAll('.dcmanage-graph-container canvas');
+    if (graphContainers.length === 0 || typeof Chart === 'undefined') {
+      return;
+    }
+
+    var baseApi = document.getElementById('dcmanage-api-base');
+    if (!baseApi) { return; }
+    baseApi = baseApi.getAttribute('data-url');
+
+    var currentChart = null;
+
+    function renderServerGraph(serverId, canvasId, range) {
+      var canvas = document.getElementById(canvasId);
+      var loader = canvas ? canvas.nextElementSibling : null;
+      if (!canvas) { return; }
+
+      if (loader) { loader.style.display = 'block'; }
+      if (currentChart) { currentChart.destroy(); }
+
+      getJson(apiUrl(baseApi, 'graphs/get', { service_id: serverId, from: range, to: 'now', avg: 300 })).then(function (res) {
+        if (loader) { loader.style.display = 'none'; }
+        if (!res.ok) { return; }
+
+        var hist = ((res.data || {}).payload || {}).histdata || [];
+        var labels = [];
+        var values = [];
+
+        hist.forEach(function (item) {
+          labels.push(item.datetime || '');
+          values.push(Number(item.value_raw || 0));
+        });
+
+        currentChart = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Traffic',
+              data: values,
+              borderColor: '#2f6fed',
+              backgroundColor: 'rgba(47,111,237,0.12)',
+              tension: 0.25,
+              pointRadius: 0,
+              fill: true,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              x: { display: true },
+              y: { display: true, beginAtZero: true },
+            },
+          },
+        });
+      }).catch(function () {
+        if (loader) { loader.style.display = 'none'; }
+      });
+    }
+
+    var btnsContainers = document.querySelectorAll('.dcmanage-graph-range-btns');
+    btnsContainers.forEach(function (container) {
+      var serverId = container.getAttribute('data-server-id');
+      var canvasId = 'dcmanage-server-graph-' + serverId;
+      var buttons = container.querySelectorAll('.dcmanage-graph-range');
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          buttons.forEach(function (b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          var range = this.getAttribute('data-range');
+          renderServerGraph(serverId, canvasId, range);
+        });
+      });
+
+      // Init first active
+      var activeBtn = container.querySelector('.active') || buttons[0];
+      if (activeBtn) {
+        renderServerGraph(serverId, canvasId, activeBtn.getAttribute('data-range'));
+      }
+    });
+  })();
+
 })();
+

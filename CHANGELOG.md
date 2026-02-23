@@ -3,6 +3,25 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.80] - 2026-02-23
+### Added
+- Traffic page: Download/Upload columns with per-column sorting (download, upload, total).
+- Server View: Traffic graph (Chart.js) with 2h/2d/7d/30d/1Y range selector.
+- Server View: Exact numeric Download/Upload/Total readouts in both Bytes and GB.
+- Server View: iLO power buttons with solid Bootstrap colors and Font Awesome icons.
+- Logs page: Date range filter (Date From / Date To).
+- Logs page: Friendly human-readable message names replacing internal task identifiers.
+- 8 new I18n keys for both English and Persian (server_ilo_test, server_basic_info, etc.).
+
+### Fixed
+- Fixed JS syntax error in admin.js (stray closing brace broke outer IIFE closure).
+- Fixed broken I18n key reference (`monitoring_map_notes_placeholder` → `monitoring_notes`).
+
+### Changed
+- Standardized all remaining modals (Datacenter Add, Monitoring Add, Bulk Server) to `modal-xl`.
+- Server Edit: iLO test button styled as `btn-warning` with vial icon; failures show `alert-danger`.
+- Server Edit: iLO test success shows `alert-success` instead of plain text.
+
 ## [0.1.79] - 2026-02-23
 ### Fixed
 - Fixed Datacenters Rack/Units styling constraint issues where elements were stretched too tall vertically.

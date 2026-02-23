@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 14;
+    private const SCHEMA_VERSION = 15;
 
     public static function migrate(): void
     {
@@ -84,6 +84,11 @@ final class Schema
         if ($current < 14) {
             self::migrationV14();
             self::setCurrentVersion(14);
+        }
+
+        if ($current < 15) {
+            self::migrationV15();
+            self::setCurrentVersion(15);
         }
     }
 
@@ -345,6 +350,8 @@ final class Schema
                 $table->decimal('base_quota_gb', 12, 3)->default(0);
                 $table->decimal('extra_quota_gb', 12, 3)->default(0);
                 $table->unsignedBigInteger('used_bytes')->default(0);
+                $table->unsignedBigInteger('download_bytes')->default(0);
+                $table->unsignedBigInteger('upload_bytes')->default(0);
                 $table->unsignedBigInteger('last_in_octets')->nullable();
                 $table->unsignedBigInteger('last_out_octets')->nullable();
                 $table->timestamp('last_sample_at')->nullable();
@@ -598,6 +605,22 @@ final class Schema
             Capsule::schema()->table('mod_dcmanage_server_traffic_sensors', static function (Blueprint $table): void {
                 $table->string('sensor_type', 32)->default('traffic')->after('sensor_id')->index();
             });
+        }
+    }
+
+    private static function migrationV15(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_usage_state')) {
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_usage_state', 'download_bytes')) {
+                Capsule::schema()->table('mod_dcmanage_usage_state', static function (Blueprint $table): void {
+                    $table->unsignedBigInteger('download_bytes')->default(0)->after('used_bytes');
+                });
+            }
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_usage_state', 'upload_bytes')) {
+                Capsule::schema()->table('mod_dcmanage_usage_state', static function (Blueprint $table): void {
+                    $table->unsignedBigInteger('upload_bytes')->default(0)->after('download_bytes');
+                });
+            }
         }
     }
 }
