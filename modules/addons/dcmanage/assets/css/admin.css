@@ -39,9 +39,15 @@
   justify-content: flex-start;
 }
 
-.dcmanage-shell table th,
-.dcmanage-shell table td {
+.dcmanage-shell .table td,
+.dcmanage-shell .table th {
+  padding: 8px 12px;
   vertical-align: middle;
+}
+
+.dcmanage-table-wrap .table td,
+.dcmanage-table-wrap .table th {
+  padding: 8px 10px;
 }
 
 .dcmanage-shell .dcmanage-tabs .nav-link {
@@ -1278,26 +1284,27 @@
 
 .dcmanage-rack-u {
   display: grid;
-  grid-template-columns: 44px minmax(170px, 220px) 8px;
+  grid-template-columns: 36px minmax(170px, 1fr) 8px;
   justify-content: center;
   align-items: center;
-  font-size: 12px;
-  gap: 6px;
-  padding: 2px 3px;
+  font-size: 11px;
+  gap: 4px;
+  padding: 1px 3px;
   border-bottom: 1px dashed #cad8f1;
   cursor: pointer;
-  border-radius: 7px;
+  border-radius: 5px;
+  min-height: 24px;
 }
 
 .dcmanage-rack-u .u-num {
   font-weight: 800;
   color: #2a3d68;
-  font-size: 12px;
+  font-size: 11px;
   text-align: center;
 }
 
 .dcmanage-rack-u .u-slot {
-  height: 22px;
+  height: 20px;
   border-radius: 4px;
   position: relative;
   background: #dde5f5;
@@ -1308,7 +1315,7 @@
 }
 
 .dcmanage-rack-u .u-face {
-  width: 26px;
+  width: 20px;
   height: 100%;
   border-inline-end: 1px solid #8696ba;
   background: repeating-linear-gradient(90deg, #5f7198 0, #5f7198 2px, #6c7ea5 2px, #6c7ea5 4px);
@@ -1599,6 +1606,11 @@
 
 .dcmanage-job-done {
   background: #f0fdf4 !important;
+}
+
+/* Force Left-To-Right visual layout for monitoring mapping even in RTL WHMCS */
+.dcmanage-map-form .form-row {
+  direction: ltr;
 }
 
 /* Traffic KPI card overflow containment */

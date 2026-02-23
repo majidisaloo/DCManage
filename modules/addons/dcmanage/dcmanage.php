@@ -373,7 +373,16 @@ function dcmanage_handle_actions(string $lang): string
             $client = PrtgClient::fromDb($id);
             $result = $client->testConnection();
             $ok = (bool) ($result['ok'] ?? false);
-            return '<div class="alert alert-' . ($ok ? 'success' : 'warning') . '">' . htmlspecialchars($ok ? 'PRTG connection OK' : 'PRTG test returned a non-standard payload') . '</div>';
+            
+            // Set the result message in a session variable to render inside the module instead of top-level breaking
+            $_SESSION['dcmanage_monitoring_test_result'] = [
+                'type' => $ok ? 'success' : 'warning',
+                'msg'  => $ok ? 'PRTG connection OK' : 'PRTG test returned a non-standard payload or failed'
+            ];
+            
+            // Redirect back to monitoring tab to consume session alert and clear the top-level raw return
+            header('Location: addonmodules.php?module=dcmanage&tab=monitoring');
+            exit;
         }
 
         if ($action === 'monitoring_map_create') {
@@ -1578,6 +1587,13 @@ function dcmanage_render_monitoring(string $lang): void
     echo '<button class="btn btn-primary btn-sm" type="button" data-toggle="modal" data-target="#dcmanage-monitoring-add-modal">' . htmlspecialchars(I18n::t('monitoring_add_instance', $lang)) . '</button>';
     echo '</div>';
 
+    // Consume and display localized session test alerts safely inside the module
+    if (isset($_SESSION['dcmanage_monitoring_test_result'])) {
+        $alert = $_SESSION['dcmanage_monitoring_test_result'];
+        echo '<div class="alert alert-' . htmlspecialchars((string) $alert['type']) . ' mb-4">' . htmlspecialchars((string) $alert['msg']) . '</div>';
+        unset($_SESSION['dcmanage_monitoring_test_result']);
+    }
+
     echo '<div id="dcmanage-monitoring-add-modal" class="modal fade dcmanage-modal" tabindex="-1" role="dialog" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('monitoring_add_instance', $lang)) . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
     echo '<form method="post" action="" class="dcmanage-form-card dcmanage-centered-form mt-0">';
     echo '<input type="hidden" name="dcmanage_action" value="prtg_instance_create">';
@@ -1630,10 +1646,10 @@ function dcmanage_render_monitoring(string $lang): void
     echo '</div>';
 
     if ($editInstance !== null) {
-        echo '<div id="dcmanage-monitoring-edit-modal" class="modal fade dcmanage-modal" tabindex="-1" role="dialog" aria-hidden="true">';
-        echo '<div class="modal-dialog modal-lg modal-dialog-scrollable" role="document"><div class="modal-content">';
-        echo '<div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('action_edit', $lang)) . ': ' . htmlspecialchars((string) $editInstance->name) . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
-        echo '<form method="post" action="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '" class="dcmanage-form-card dcmanage-centered-form mt-0">';
+        // Render edit as a prominent card rather than a modal to avoid WHMCS z-index and backdrop stacking conflicts
+        echo '<div class="dcmanage-form-card mb-4" id="dcmanage-monitoring-edit-card">';
+        echo '<h5>' . htmlspecialchars(I18n::t('action_edit', $lang)) . ': ' . htmlspecialchars((string) $editInstance->name) . '</h5>';
+        echo '<form method="post" action="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '" class="dcmanage-centered-form mt-3">';
         echo '<input type="hidden" name="dcmanage_action" value="prtg_instance_update"><input type="hidden" name="prtg_id" value="' . (int) $editInstance->id . '">';
         echo '<div class="form-row">';
         echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . '</label><select name="prtg_type" class="form-control dcmanage-input"><option value="prtg"' . (strtolower((string) $editInstance->type) === 'prtg' ? ' selected' : '') . '>PRTG</option><option value="solarwinds"' . (strtolower((string) $editInstance->type) === 'solarwinds' ? ' selected' : '') . '>SolarWinds</option><option value="cacti"' . (strtolower((string) $editInstance->type) === 'cacti' ? ' selected' : '') . '>Cacti</option></select></div>';
@@ -1648,28 +1664,27 @@ function dcmanage_render_monitoring(string $lang): void
         echo '</div>';
         echo '<div class="dcmanage-form-actions"><button class="btn btn-primary btn-sm" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button><a class="btn btn-outline-secondary btn-sm" href="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</a></div>';
         echo '</form>';
-        echo '</div></div></div></div>';
+        echo '</div>';
+        echo '<script>document.getElementById("dcmanage-monitoring-edit-card").scrollIntoView({behavior:"smooth"});</script>';
     }
 
     if ($viewInstance === null) {
-        if ($editInstanceId > 0) {
-            $script = '(function(){var m=document.getElementById("dcmanage-monitoring-edit-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}})();';
-            echo '<script>' . $script . '</script>';
-        }
         return;
     }
     $instanceType = strtolower((string) ($viewInstance->type ?? 'prtg'));
     if ($instanceType !== 'prtg') {
         $typeLabel = htmlspecialchars(strtoupper((string) ($viewInstance->type ?? '')));
-        echo '<div class="dcmanage-form-card">';
+        // Render View mode also as an inline card for consistency
+        echo '<div class="dcmanage-form-card mb-4" id="dcmanage-monitoring-view-card">';
         echo '<h5>' . htmlspecialchars(I18n::t('action_view', $lang)) . ': ' . htmlspecialchars((string) $viewInstance->name) . '</h5>';
-        echo '<div class="dcmanage-server-details-grid" style="grid-template-columns:repeat(3,1fr)">';
+        echo '<div class="dcmanage-server-details-grid mt-3" style="grid-template-columns:repeat(3,1fr)">';
         echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_type', $lang)) . '</span><strong>' . $typeLabel . '</strong></div>';
         echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_url', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->base_url ?? '—')) . '</strong></div>';
         echo '<div class="dcmanage-view-item"><span>' . htmlspecialchars(I18n::t('monitoring_user', $lang)) . '</span><strong>' . htmlspecialchars((string) ($viewInstance->user ?? '—')) . '</strong></div>';
         echo '</div>';
-        echo '<div class="mt-3"><a href="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '" class="btn btn-sm btn-outline-secondary">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</a></div>';
+        echo '<div class="mt-4"><a href="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '" class="btn btn-sm btn-outline-secondary">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</a></div>';
         echo '</div>';
+        echo '<script>document.getElementById("dcmanage-monitoring-view-card").scrollIntoView({behavior:"smooth"});</script>';
         return;
     }
 
@@ -1705,27 +1720,33 @@ function dcmanage_render_monitoring(string $lang): void
         $mapsByPurpose[$purposeKey][] = $mapRow;
     }
 
-    echo '<div id="dcmanage-monitoring-view-modal" class="modal fade dcmanage-modal" tabindex="-1" role="dialog" aria-labelledby="dcmanageMonitoringViewTitle" aria-hidden="true">';
-    echo '<div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">';
-    echo '<div class="modal-content">';
-    echo '<div class="modal-header">';
-    echo '<h5 class="modal-title" id="dcmanageMonitoringViewTitle">' . htmlspecialchars(I18n::t('action_view', $lang)) . ': ' . htmlspecialchars((string) $viewInstance->name) . '</h5>';
-    echo '<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>';
+    // Render PRTG mapping views as an inline card sequence
+    echo '<div class="dcmanage-form-card mb-4" id="dcmanage-monitoring-view-card">';
+    echo '<div class="d-flex justify-content-between align-items-center mb-4">';
+    echo '<h5 class="mb-0">' . htmlspecialchars(I18n::t('action_view', $lang)) . ': ' . htmlspecialchars((string) $viewInstance->name) . '</h5>';
+    echo '<a href="' . htmlspecialchars($moduleLink . '&tab=monitoring') . '" class="btn btn-sm btn-outline-secondary">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</a>';
     echo '</div>';
-    echo '<div class="modal-body">';
-    echo '<div class="dcmanage-form-card dcmanage-monitoring-view-card mt-0">';
 
     foreach ($purposeOrder as $purpose) {
         $purposeLabel = I18n::t('monitoring_purpose_' . $purpose, $lang);
         $rows = $mapsByPurpose[$purpose] ?? [];
-        echo '<div class="dcmanage-form-card mb-3">';
-        echo '<h6 class="mb-3">' . htmlspecialchars($purposeLabel) . '</h6>';
+        echo '<div class="card bg-light mb-3">';
+        echo '<div class="card-body">';
+        echo '<h6 class="mb-3 font-weight-bold">' . htmlspecialchars($purposeLabel) . '</h6>';
+        
+        // Ensure strictly LTR for form structure rendering
         echo '<form method="post" action="' . htmlspecialchars($monitoringViewAction) . '" class="dcmanage-map-form dcmanage-centered-form" data-prtg-id="' . (int) $viewInstance->id . '">';
         echo '<input type="hidden" name="dcmanage_action" value="monitoring_map_create">';
         echo '<input type="hidden" name="map_prtg_id" value="' . (int) $viewInstance->id . '">';
         echo '<input type="hidden" name="map_purpose" value="' . htmlspecialchars($purpose) . '">';
-        echo '<div class="form-row">';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="map_switch_id" class="form-control dcmanage-input"><option value="">--</option>';
+        
+        // Strict LTR dir wrapper
+        echo '<div dir="ltr">'; 
+        echo '<div class="form-row text-left">';
+        echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</label><select name="map_probe_id" class="form-control form-control-sm dcmanage-input dcmanage-map-probe" disabled><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</label><select name="map_group_id" class="form-control form-control-sm dcmanage-input dcmanage-map-group" disabled><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</label><select name="map_subgroup_id" class="form-control form-control-sm dcmanage-input dcmanage-map-subgroup" disabled><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="map_switch_id" class="form-control form-control-sm dcmanage-input"><option value="">--</option>';
         foreach ($switches as $switch) {
             $swLabel = (string) $switch->name;
             if (trim((string) ($switch->dc_name ?? '')) !== '') {
@@ -1734,42 +1755,38 @@ function dcmanage_render_monitoring(string $lang): void
             echo '<option value="' . (int) $switch->id . '">' . htmlspecialchars($swLabel) . '</option>';
         }
         echo '</select></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</label><select name="map_probe_id" class="form-control dcmanage-input dcmanage-map-probe"><option value="">--</option></select></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</label><select name="map_group_id" class="form-control dcmanage-input dcmanage-map-group"><option value="">--</option></select></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</label><select name="map_subgroup_id" class="form-control dcmanage-input dcmanage-map-subgroup"><option value="">--</option></select></div>';
-        echo '</div>';
-        echo '<div class="form-row align-items-end">';
-        echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select name="map_device_id" class="form-control dcmanage-input dcmanage-map-device"><option value="">--</option></select></div>';
-        echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input class="form-control dcmanage-input" name="map_notes" placeholder="' . htmlspecialchars(I18n::t('monitoring_map_notes_placeholder', $lang)) . '"></div>';
+        echo '</div>'; // form-row
+        
+        echo '<div class="form-row align-items-end text-left">';
+        echo '<div class="form-group col-md-5"><label class="small">' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select name="map_device_id" class="form-control form-control-sm dcmanage-input dcmanage-map-device" disabled><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-5"><label class="small">' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input class="form-control form-control-sm dcmanage-input" name="map_notes" placeholder="' . htmlspecialchars(I18n::t('monitoring_map_notes_placeholder', $lang)) . '"></div>';
         echo '<div class="form-group col-md-2"><button type="submit" class="btn btn-primary btn-sm btn-block">' . htmlspecialchars(I18n::t('monitoring_map_add', $lang)) . '</button></div>';
-        echo '</div>';
-        echo '<div class="small text-muted dcmanage-map-loading">-</div>';
+        echo '</div>'; // form-row
+        echo '<div class="small text-muted dcmanage-map-loading text-left">-</div>';
+        echo '</div>'; // close dir=ltr
         echo '</form>';
 
-        echo '<div class="table-responsive dcmanage-table-wrap mt-2"><table class="table table-sm table-striped">';
-        echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+        echo '<div class="table-responsive dcmanage-table-wrap mt-3"><table class="table table-sm table-striped bg-white border">';
+        echo '<thead class="bg-light"><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th class="text-right">' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
         foreach ($rows as $mapRow) {
             echo '<tr>';
             echo '<td>' . (int) $mapRow->id . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->switch_name ?? '—')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->probe_id ?? '—')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->group_id ?? '—')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->subgroup_id ?? '—')) . '</td>';
-            echo '<td>' . htmlspecialchars((string) ($mapRow->device_id ?? '—')) . '</td>';
-            echo '<td class="dcmanage-action-buttons"><form method="post" action="' . htmlspecialchars($monitoringViewAction) . '" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('action_delete', $lang), ENT_QUOTES, 'UTF-8') . '?\')"><input type="hidden" name="dcmanage_action" value="monitoring_map_delete"><input type="hidden" name="map_id" value="' . (int) $mapRow->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-danger">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td>';
+            echo '<td dir="ltr" class="text-left">' . htmlspecialchars((string) ($mapRow->probe_id ?? '—')) . '</td>';
+            echo '<td dir="ltr" class="text-left">' . htmlspecialchars((string) ($mapRow->group_id ?? '—')) . '</td>';
+            echo '<td dir="ltr" class="text-left">' . htmlspecialchars((string) ($mapRow->subgroup_id ?? '—')) . '</td>';
+            echo '<td dir="ltr" class="text-left">' . htmlspecialchars((string) ($mapRow->device_id ?? '—')) . '</td>';
+            echo '<td dir="ltr" class="text-left font-weight-bold">' . htmlspecialchars((string) ($mapRow->switch_name ?? '—')) . '</td>';
+            echo '<td class="dcmanage-action-buttons text-right"><form method="post" action="' . htmlspecialchars($monitoringViewAction) . '" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('action_delete', $lang), ENT_QUOTES, 'UTF-8') . '?\')"><input type="hidden" name="dcmanage_action" value="monitoring_map_delete"><input type="hidden" name="map_id" value="' . (int) $mapRow->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-danger">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td>';
             echo '</tr>';
         }
         if (count($rows) === 0) {
-            echo '<tr><td colspan="7">-</td></tr>';
+            echo '<tr><td colspan="7" class="text-center text-muted p-2">-</td></tr>';
         }
         echo '</tbody></table></div>';
-        echo '</div>';
+        echo '</div></div>'; // end card body and card
     }
     echo '</div>';
-    echo '</div>';
-    echo '</div>';
-    echo '</div>';
-    echo '</div>';
+    echo '<script>document.getElementById("dcmanage-monitoring-view-card").scrollIntoView({behavior:"smooth"});</script>';
 
     $loadingJson = json_encode(I18n::t('loading', $lang), JSON_UNESCAPED_UNICODE);
     if ($loadingJson === false) {
@@ -2778,13 +2795,13 @@ function dcmanage_vlan_fallback_for_interface(string $ifName, string $ifDesc = '
     }
 
     // Trunk/tagged sub-interface notation: Eth1/1.100, ge-0/0/1.200, etc.
-    if (preg_match('/\.(\d{1,4})$/i', $ifName, $m) === 1) {
+    if (preg_match('/\.(\d{1,4})(?:\s*:|$)/i', $ifName, $m) === 1) {
         $vid = (int) $m[1];
         if ($vid > 0 && $vid <= 4094) {
             return (string) $vid;
         }
     }
-    if ($ifDesc !== '' && preg_match('/\.(\d{1,4})$/i', $ifDesc, $m) === 1) {
+    if ($ifDesc !== '' && preg_match('/\.(\d{1,4})(?:\s*:|$)/i', $ifDesc, $m) === 1) {
         $vid = (int) $m[1];
         if ($vid > 0 && $vid <= 4094) {
             return (string) $vid;
@@ -2808,18 +2825,30 @@ function dcmanage_interface_is_vlan(string $ifName): bool
 function dcmanage_vlan_for_interface(string $ifName, string $vlan, string $ifDesc = ''): string
 {
     $vlan = trim($vlan);
+    $parsedVlan = '';
+    
     if ($vlan !== '') {
         if (preg_match('/^\d{1,4}$/', $vlan)) {
             return $vlan;
         }
-        if (preg_match('/\d{1,4}/', $vlan, $m) === 1) {
-            return (string) ((int) $m[0]);
+        if (preg_match('/\b(?:vlan|vl)\s*[-_\.]?\s*(\d{1,4})\b/i', $vlan, $m) === 1) {
+            $parsedVlan = (string) ((int) $m[1]);
+        } elseif (preg_match('/\b\d{1,4}\b/', $vlan, $m) === 1) {
+            $parsedVlan = (string) ((int) $m[0]);
         }
-        return $vlan;
+        
+        if ($parsedVlan !== '' && $parsedVlan !== '0') {
+            return $parsedVlan;
+        }
     }
 
-    // If no primary VLAN found via SNMP, try extracting from interface name/desc
-    return dcmanage_vlan_fallback_for_interface($ifName, $ifDesc);
+    // Try extracting from interface name/desc as a stronger fallback
+    $fallback = dcmanage_vlan_fallback_for_interface($ifName, $ifDesc);
+    if ($fallback !== '') {
+        return $fallback;
+    }
+
+    return $vlan; // Retain original if everything failed
 }
 
 function dcmanage_snmp_parse_int(string $raw): int

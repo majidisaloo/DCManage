@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.79] - 2026-02-23
+### Fixed
+- Fixed Datacenters Rack/Units styling constraint issues where elements were stretched too tall vertically.
+- Improved fallback VLAN extraction logic on the Switches module when PRTG SNMP values have unexpected characters.
+- Fixed the layout paddings and spacings on the generic main datatable wrappers.
+- Redesigned Monitoring View and Edit modes to display inline via cards, fixing WHMCS backdrop `modal-xl` z-index freezing UI lockups.
+- Enforced safe left-to-right (LTR) cascading flow for Monitoring element assignment configurations regardless of RTL portal display.
+- Relocated PRTG "Test Connection" alerts securely onto the active monitoring canvas instead of absolute page top.
+
 ## [0.1.78] - 2026-02-23
 ### Added
 - Added `.github/workflows/release.yml` for automated GitHub Releases via GitHub Actions.
