@@ -4443,6 +4443,17 @@ function dcmanage_render_logs(string $lang): void
         'task:enforce_queue completed' => 'Enforce Queue Job Executed',
         'task:poll_usage completed' => 'Traffic Usage Sync Completed',
         'task:poll_usage_completed' => 'Traffic Usage Sync Completed',
+        'task:poll_usage completed' => 'Traffic Usage Sync Completed',
+        'task:poll_usage processed' => 'Traffic Usage Sync Processed',
+        'poll_usage processed' => 'Traffic Usage Sync Processed',
+        'task:switch_discovery completed' => 'Switch Port Discovery Completed',
+        'task:switch_discovery executed' => 'Switch Port Discovery Executed',
+        'task:switch_Network Discovery completed' => 'Switch Network Discovery Completed',
+        'switch_Network Discovery completed' => 'Switch Network Discovery Completed',
+        'switch_Network Discovery executed' => 'Switch Network Discovery Executed',
+        'switch_discovery executed' => 'Switch Port Discovery Executed',
+        'dispatcher summary' => 'Dispatcher Summary',
+        'dispatcher_summary' => 'Dispatcher Summary',
         'enforce_queue' => 'Enforce Queue',
         'poll_usage' => 'Traffic Usage Sync',
         'discovery' => 'Network Discovery',
@@ -4539,7 +4550,11 @@ function dcmanage_render_logs(string $lang): void
     echo '<thead><tr><th>ID</th><th>Level</th><th>Source</th><th>Message</th><th>Date</th></tr></thead><tbody>';
     foreach ($logRows as $row) {
         $lv = strtolower((string) $row->level);
-        $badge = $lv === 'error' ? 'danger' : ($lv === 'warning' ? 'warning' : 'info');
+        $badgeStyle = match ($lv) {
+            'error' => 'background:#dc3545;color:#fff;',
+            'warning' => 'background:#ffc107;color:#212529;',
+            default => 'background:#17a2b8;color:#fff;',
+        };
         $rowClass = $lv === 'error' ? ' class="dcmanage-log-error"' : ($lv === 'warning' ? ' class="dcmanage-log-warning"' : ($lv === 'info' ? ' class="dcmanage-log-info"' : ' class="dcmanage-log-debug"'));
         $rawMsg = (string) $row->message;
         $friendlyMsg = $rawMsg;
@@ -4549,7 +4564,7 @@ function dcmanage_render_logs(string $lang): void
                 break;
             }
         }
-        echo '<tr' . $rowClass . '><td>' . (int) $row->id . '</td><td><span class="badge badge-' . $badge . '">' . htmlspecialchars((string) $row->level) . '</span></td><td>' . htmlspecialchars((string) $row->source) . '</td><td>' . htmlspecialchars($friendlyMsg) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
+        echo '<tr' . $rowClass . '><td>' . (int) $row->id . '</td><td><span class="badge" style="' . $badgeStyle . 'padding:.25em .6em;border-radius:.25rem;font-size:85%;">' . htmlspecialchars((string) $row->level) . '</span></td><td>' . htmlspecialchars((string) $row->source) . '</td><td>' . htmlspecialchars($friendlyMsg) . '</td><td>' . htmlspecialchars((string) $row->created_at) . '</td></tr>';
     }
     if (count($logRows) === 0) {
         echo '<tr><td colspan="5">-</td></tr>';
