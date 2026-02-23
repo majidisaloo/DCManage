@@ -1,12 +1,15 @@
 .dcmanage-shell {
-  --dc-primary: #1e5eff;
-  --dc-accent: #12b3c7;
-  --dc-soft: #eef4ff;
-  --dc-text: #173063;
+  --dc-primary: #1f6feb;
+  --dc-accent: #0ea5a4;
+  --dc-soft: #f3f6fb;
+  --dc-text: #1e2a45;
+  --dc-surface: #ffffff;
+  --dc-border: #d7e0ee;
+  --dc-muted: #5d6b84;
   max-width: none;
   width: 100%;
   margin: 0 auto;
-  padding: 0 12px 26px;
+  padding: 0 16px 26px;
 }
 
 .dcmanage-shell.dcmanage-rtl {
@@ -45,8 +48,8 @@
   border: 0;
   border-radius: 12px;
   padding: 9px 14px;
-  color: #20335f;
-  background: #edf1fb;
+  color: #2b3a57;
+  background: #eef2f7;
   font-weight: 700;
   transition: all .2s ease;
   display: inline-flex;
@@ -76,8 +79,8 @@
 }
 
 .dcmanage-shell .dcmanage-tabs .nav-link:hover {
-  background: #dfe8ff;
-  color: #103a90;
+  background: #e2e8f3;
+  color: #153a74;
 }
 
 .dcmanage-shell .dcmanage-tabs .nav-link.active {
@@ -88,8 +91,8 @@
 
 .dcmanage-shell .card {
   border-radius: 16px;
-  border: 1px solid #dbe6ff;
-  box-shadow: 0 8px 24px rgba(19, 54, 124, .08);
+  border: 1px solid var(--dc-border);
+  box-shadow: 0 6px 18px rgba(20, 33, 61, .08);
 }
 
 .dcmanage-shell .dcmanage-page-card {
@@ -97,7 +100,7 @@
 }
 
 .dcmanage-shell .dcmanage-page-body {
-  padding: 18px 18px 22px !important;
+  padding: 20px 20px 24px !important;
 }
 
 .dcmanage-shell .dcmanage-page-card {
@@ -505,8 +508,8 @@
 }
 
 .dcmanage-shell .dcmanage-form-card {
-  border: 1px solid #dde7ff;
-  background: #f9fbff;
+  border: 1px solid var(--dc-border);
+  background: linear-gradient(180deg, #fcfdff 0%, #f6f9fd 100%);
   border-radius: 14px;
   padding: 18px 18px 16px;
   margin-top: 12px;
@@ -577,9 +580,9 @@
 .dcmanage-shell .form-control.dcmanage-input,
 .dcmanage-shell .form-control {
   border-radius: 10px;
-  border: 1px solid #cfdaf3;
+  border: 1px solid #cad5e6;
   background: #fff;
-  box-shadow: inset 0 1px 2px rgba(11, 32, 74, .04);
+  box-shadow: inset 0 1px 2px rgba(16, 29, 53, .04);
 }
 
 .dcmanage-shell .dcmanage-form-actions {
@@ -656,9 +659,9 @@
 }
 
 .dcmanage-shell .table thead th {
-  background: #f1f5ff;
+  background: #eef2f8;
   border-bottom: 0;
-  color: #21386b;
+  color: #25375a;
   font-weight: 800;
 }
 
@@ -687,7 +690,7 @@
 .dcmanage-shell .btn + a.btn,
 .dcmanage-shell a.btn + .btn,
 .dcmanage-shell a.btn + a.btn {
-  margin-inline-start: 8px;
+  margin-inline-start: 0;
 }
 
 .dcmanage-action-buttons {
@@ -760,13 +763,14 @@
 }
 
 .dcmanage-table-wrap {
-  border: 1px solid #d9e3fb;
+  border: 1px solid var(--dc-border);
   border-radius: 14px;
-  background: #fcfdff;
+  background: var(--dc-surface);
   overflow-x: auto;
   overflow-y: visible;
   padding: 0;
   margin-top: 12px;
+  width: 100%;
 }
 
 .dcmanage-shell .table-responsive {
@@ -830,33 +834,33 @@
 }
 
 .dcmanage-btn-soft-primary {
-  color: #0f4fd0;
-  background: #e6efff;
-  border-color: #bfd4ff;
+  color: #1a4fa3;
+  background: #e6eefb;
+  border-color: #c5d7f5;
 }
 
 .dcmanage-btn-soft-info {
-  color: #0f6c8b;
-  background: #e5f6ff;
-  border-color: #b9e8ff;
+  color: #0d6674;
+  background: #e6f5f7;
+  border-color: #bfe3e8;
 }
 
 .dcmanage-btn-soft-warning {
-  color: #8a5700;
-  background: #fff3da;
-  border-color: #ffe0a2;
+  color: #82520a;
+  background: #fff4dc;
+  border-color: #f1ddb0;
 }
 
 .dcmanage-btn-soft-success {
-  color: #176742;
-  background: #e5f9ef;
-  border-color: #c2edd7;
+  color: #146641;
+  background: #e7f8ef;
+  border-color: #c4e8d5;
 }
 
 .dcmanage-btn-soft-danger {
-  color: #8f2631;
-  background: #ffe8eb;
-  border-color: #ffc5ce;
+  color: #8a2935;
+  background: #fdecef;
+  border-color: #efcad1;
 }
 
 .dcmanage-btn-soft-primary:hover,
@@ -873,7 +877,7 @@
 }
 
 .dcmanage-switch-ports-card {
-  background: linear-gradient(180deg, #fdfefe, #f5f9ff);
+  background: linear-gradient(180deg, #ffffff, #f7fafc);
 }
 
 .dcmanage-port-table tbody td {
@@ -882,50 +886,32 @@
 
 .dcmanage-port-table {
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
+  min-width: 1140px;
 }
 
 .dcmanage-port-table th:nth-child(1),
-.dcmanage-port-table td:nth-child(1) {
-  width: 170px;
-}
-
+.dcmanage-port-table td:nth-child(1) { min-width: 150px; }
 .dcmanage-port-table th:nth-child(2),
-.dcmanage-port-table td:nth-child(2) {
-  width: 260px;
-}
-
+.dcmanage-port-table td:nth-child(2) { min-width: 250px; max-width: 340px; }
 .dcmanage-port-table th:nth-child(3),
-.dcmanage-port-table td:nth-child(3) {
-  width: 70px;
-}
-
+.dcmanage-port-table td:nth-child(3) { min-width: 90px; }
 .dcmanage-port-table th:nth-child(4),
-.dcmanage-port-table td:nth-child(4) {
-  width: 70px;
-}
-
+.dcmanage-port-table td:nth-child(4) { min-width: 90px; }
 .dcmanage-port-table th:nth-child(5),
-.dcmanage-port-table td:nth-child(5) {
-  width: 180px;
-}
-
+.dcmanage-port-table td:nth-child(5) { min-width: 160px; }
 .dcmanage-port-table th:nth-child(6),
 .dcmanage-port-table td:nth-child(6),
 .dcmanage-port-table th:nth-child(7),
-.dcmanage-port-table td:nth-child(7) {
-  width: 160px;
-}
-
+.dcmanage-port-table td:nth-child(7) { min-width: 140px; }
 .dcmanage-port-table th:nth-child(8),
-.dcmanage-port-table td:nth-child(8) {
-  width: 300px;
-}
+.dcmanage-port-table td:nth-child(8) { min-width: 280px; }
 
 .dcmanage-port-desc {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 320px;
 }
 
 .dcmanage-switch-port-row.dcmanage-row-loading {
@@ -1047,18 +1033,39 @@
 }
 
 .modal.dcmanage-modal .modal-content {
-  border: 1px solid #cfdcf8;
+  border: 1px solid var(--dc-border);
   border-radius: 16px;
-  box-shadow: 0 18px 32px rgba(14, 40, 97, .18);
+  box-shadow: 0 14px 30px rgba(16, 31, 56, .2);
 }
 
 .modal.dcmanage-modal .modal-header {
-  border-bottom: 1px solid #dee8ff;
-  background: #f6f9ff;
+  border-bottom: 1px solid #e4e9f2;
+  background: #f6f8fc;
 }
 
 .modal.dcmanage-modal .modal-body {
-  background: #f8fbff;
+  background: #f7f9fc;
+  overflow-x: hidden;
+  padding: 16px 18px;
+}
+
+.modal.dcmanage-modal .modal-footer {
+  border-top: 1px solid #e4e9f2;
+  background: #f7f9fc;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal.dcmanage-modal .modal-footer .btn {
+  min-width: 116px;
+}
+
+.dcmanage-modal .dcmanage-form-card,
+.dcmanage-modal .dcmanage-centered-form {
+  max-width: 100%;
+  overflow: hidden;
 }
 
 @keyframes dcmanage-spin {
@@ -1070,11 +1077,12 @@
 }
 
 .dcmanage-server-details-card {
-  margin-top: 16px;
-  border: 1px solid #cfe0ff;
+  margin-top: 8px;
+  border: 1px solid #d4deee;
   border-radius: 16px;
-  background: linear-gradient(180deg, #f7fbff 0%, #f1f7ff 100%);
-  padding: 14px;
+  background: linear-gradient(180deg, #f9fbfd 0%, #f4f7fb 100%);
+  padding: 16px;
+  overflow: hidden;
 }
 
 .dcmanage-server-details-head {
@@ -1093,7 +1101,7 @@
 }
 
 .dcmanage-view-item {
-  border: 1px solid #d5e3ff;
+  border: 1px solid #d5deea;
   border-radius: 12px;
   background: #ffffff;
   padding: 10px 12px;
@@ -1102,23 +1110,23 @@
 .dcmanage-view-item span {
   display: block;
   font-size: 12px;
-  color: #4a6398;
+  color: #5a6a83;
   margin-bottom: 2px;
 }
 
 .dcmanage-view-item strong {
-  color: #1f3568;
+  color: #273755;
   font-size: 18px;
   line-height: 1.2;
 }
 
 .dcmanage-view-line {
-  border: 1px solid #dbe7ff;
+  border: 1px solid #d5deea;
   border-radius: 12px;
   background: #fff;
   padding: 10px 12px;
   margin-bottom: 10px;
-  color: #1f3568;
+  color: #2b3a57;
   font-weight: 600;
 }
 
@@ -1429,6 +1437,14 @@
   .dcmanage-action-buttons .btn {
     font-size: 12px;
     padding: 4px 8px;
+  }
+
+  .dcmanage-port-table {
+    min-width: 920px;
+  }
+
+  .modal.dcmanage-modal .modal-body {
+    padding: 12px;
   }
 }
 

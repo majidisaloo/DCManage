@@ -125,33 +125,38 @@ function dcmanage_output(array $vars): void
 
     echo '<div class="card mt-3 border-0 shadow-sm dcmanage-page-card"><div class="card-body dcmanage-page-body">';
 
-    if ($activeTab === 'dashboard') {
-        echo '<div id="dcmanage-dashboard" data-module-link="' . $moduleLink . '" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
-        echo '<div id="dcmanage-version" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
-        echo '<div id="dcmanage-cron" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
-    } elseif ($activeTab === 'traffic_mgmt') {
-        dcmanage_render_traffic_management($lang);
-    } elseif ($activeTab === 'traffic') {
-        echo '<div id="dcmanage-traffic" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
-        echo '<div style="height:340px"><canvas id="dcmanage-traffic-chart" height="120"></canvas></div>';
-    } elseif ($activeTab === 'settings') {
-        dcmanage_render_settings_form($lang);
-    } elseif ($activeTab === 'queue') {
-        dcmanage_render_queue($lang);
-    } elseif ($activeTab === 'datacenters') {
-        dcmanage_render_datacenters($lang);
-    } elseif ($activeTab === 'switches') {
-        dcmanage_render_switches($lang);
-    } elseif ($activeTab === 'servers') {
-        dcmanage_render_servers($lang);
-    } elseif ($activeTab === 'logs') {
-        dcmanage_render_logs($lang);
-    } elseif ($activeTab === 'monitoring') {
-        dcmanage_render_monitoring($lang);
-    } else {
-        echo '<div class="alert alert-secondary mb-0">';
-        echo htmlspecialchars(I18n::t('crud_placeholder_prefix', $lang)) . ' <strong>' . htmlspecialchars($tabs[$activeTab] ?? I18n::t('section', $lang)) . '</strong> ' . htmlspecialchars(I18n::t('crud_placeholder_suffix', $lang));
-        echo '</div>';
+    try {
+        if ($activeTab === 'dashboard') {
+            echo '<div id="dcmanage-dashboard" data-module-link="' . $moduleLink . '" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
+            echo '<div id="dcmanage-version" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
+            echo '<div id="dcmanage-cron" class="mt-3" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
+        } elseif ($activeTab === 'traffic_mgmt') {
+            dcmanage_render_traffic_management($lang);
+        } elseif ($activeTab === 'traffic') {
+            echo '<div id="dcmanage-traffic" data-api-base="' . $moduleLink . '&dcmanage_api=1"></div>';
+            echo '<div style="height:340px"><canvas id="dcmanage-traffic-chart" height="120"></canvas></div>';
+        } elseif ($activeTab === 'settings') {
+            dcmanage_render_settings_form($lang);
+        } elseif ($activeTab === 'queue') {
+            dcmanage_render_queue($lang);
+        } elseif ($activeTab === 'datacenters') {
+            dcmanage_render_datacenters($lang);
+        } elseif ($activeTab === 'switches') {
+            dcmanage_render_switches($lang);
+        } elseif ($activeTab === 'servers') {
+            dcmanage_render_servers($lang);
+        } elseif ($activeTab === 'logs') {
+            dcmanage_render_logs($lang);
+        } elseif ($activeTab === 'monitoring') {
+            dcmanage_render_monitoring($lang);
+        } else {
+            echo '<div class="alert alert-secondary mb-0">';
+            echo htmlspecialchars(I18n::t('crud_placeholder_prefix', $lang)) . ' <strong>' . htmlspecialchars($tabs[$activeTab] ?? I18n::t('section', $lang)) . '</strong> ' . htmlspecialchars(I18n::t('crud_placeholder_suffix', $lang));
+            echo '</div>';
+        }
+    } catch (Throwable $e) {
+        dcmanage_log('error', 'ui', 'tab:' . $activeTab . ' render failed: ' . $e->getMessage());
+        echo '<div class="alert alert-danger">Render failed: ' . htmlspecialchars($e->getMessage()) . '</div>';
     }
 
     echo '</div></div>';
@@ -1756,7 +1761,10 @@ function dcmanage_render_monitoring(string $lang): void
     echo '</div>';
     echo '</div>';
 
-    $loadingText = addslashes(I18n::t('loading', $lang));
+    $loadingJson = json_encode(I18n::t('loading', $lang), JSON_UNESCAPED_UNICODE);
+    if ($loadingJson === false) {
+        $loadingJson = '"Loading..."';
+    }
     $script = <<<'JS'
 (function(){
   function togglePrtgOnly(){
@@ -1850,7 +1858,7 @@ function dcmanage_render_monitoring(string $lang): void
       if(prtgId===""){return;}
       requestId++;
       var id=requestId;
-      setLoading(true,"__LOADING__");
+      setLoading(true,__LOADING_JSON__);
       fetchJson("prtg/probes",{prtg_id:prtgId}).then(function(data){
         safeDone(id,function(){
           fillSelect(probe,(data.items||[]));
@@ -1876,7 +1884,7 @@ function dcmanage_render_monitoring(string $lang): void
       }
       requestId++;
       var id=requestId;
-      setLoading(true,"__LOADING__");
+      setLoading(true,__LOADING_JSON__);
       return fetchJson("prtg/groups",{prtg_id:prtgId,parent_id:parentId}).then(function(data){
         safeDone(id,function(){
           fillSelect(target,(data.items||[]));
@@ -1896,7 +1904,7 @@ function dcmanage_render_monitoring(string $lang): void
       }
       requestId++;
       var id=requestId;
-      setLoading(true,"__LOADING__");
+      setLoading(true,__LOADING_JSON__);
       fetchJson("prtg/devices",{prtg_id:prtgId,parent_id:parentId}).then(function(data){
         safeDone(id,function(){
           fillSelect(device,(data.items||[]));
@@ -1950,12 +1958,12 @@ function dcmanage_render_monitoring(string $lang): void
   }
 })();
 JS;
-    $script = str_replace('__LOADING__', $loadingText, $script);
+    $script = str_replace('__LOADING_JSON__', $loadingJson, $script);
     if ($viewInstanceId > 0) {
-        $script .= '(function(){var m=document.getElementById("dcmanage-monitoring-view-modal");if(!m){return;}if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=' . json_encode($moduleLink . '&tab=monitoring') . ';});}})();';
+        $script .= '(function(){var m=document.getElementById("dcmanage-monitoring-view-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}})();';
     }
     if ($editInstanceId > 0) {
-        $script .= '(function(){var m=document.getElementById("dcmanage-monitoring-edit-modal");if(!m){return;}if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=' . json_encode($moduleLink . '&tab=monitoring') . ';});}})();';
+        $script .= '(function(){var m=document.getElementById("dcmanage-monitoring-edit-modal");if(!m){return;}var back=' . json_encode($moduleLink . '&tab=monitoring') . ';var bindClose=function(){var items=m.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(m).modal("show");jQuery(m).on("hidden.bs.modal",function(){window.location.href=back;});}else{m.style.display="block";m.classList.add("show");m.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}})();';
     }
     echo '<script>' . $script . '</script>';
 }
@@ -2736,18 +2744,21 @@ function dcmanage_vlan_fallback_for_interface(string $ifName, string $ifDesc = '
     $ifDesc = trim($ifDesc);
 
     // Common SVI naming: Vlan10 / vlan10 / Vlanif10 / Vl10
-    if (preg_match('/^(?:vlan|vlanif)\s*[-_\/]?\s*(\d{1,4})$/i', $ifName, $m) === 1) {
+    if (preg_match('/^(?:vlan|vlanif)\s*[-_\/\.]?\s*(\d{1,4})$/i', $ifName, $m) === 1) {
         return (string) ((int) $m[1]);
     }
-    if (preg_match('/^vl\s*[-_\/]?\s*(\d{1,4})$/i', $ifName, $m) === 1) {
+    if (preg_match('/^vl\s*[-_\/\.]?\s*(\d{1,4})$/i', $ifName, $m) === 1) {
         return (string) ((int) $m[1]);
     }
-    if (preg_match('/\bvlan\s*[-_\/]?\s*(\d{1,4})\b/i', $ifName, $m) === 1) {
+    if (preg_match('/\bvlan(?:if)?\s*[-_\/\.]?\s*(\d{1,4})\b/i', $ifName, $m) === 1) {
+        return (string) ((int) $m[1]);
+    }
+    if (preg_match('/\b(?:interface[-_ ]?)?vlan(?:if)?[-_\/\.]?\s*(\d{1,4})\b/i', $ifName, $m) === 1) {
         return (string) ((int) $m[1]);
     }
 
     // Secondary fallback from description if it explicitly includes VLAN id.
-    if (preg_match('/\bvlan\s*[-_\/]?\s*(\d{1,4})\b/i', $ifDesc, $m) === 1) {
+    if (preg_match('/\bvlan(?:if)?\s*[-_\/\.]?\s*(\d{1,4})\b/i', $ifDesc, $m) === 1) {
         return (string) ((int) $m[1]);
     }
 
@@ -2761,7 +2772,8 @@ function dcmanage_interface_is_vlan(string $ifName): bool
         return false;
     }
 
-    return preg_match('/^(?:vlan|vlanif|vl)\s*[-_\/]?\s*\d+/i', $ifName) === 1;
+    return preg_match('/^(?:vlan|vlanif|vl)\s*[-_\/\.]?\s*\d+/i', $ifName) === 1
+        || preg_match('/\b(?:interface[-_ ]?)?vlan(?:if)?[-_\/\.]?\s*\d+\b/i', $ifName) === 1;
 }
 
 function dcmanage_vlan_for_interface(string $ifName, string $vlan, string $ifDesc = ''): string
@@ -3395,6 +3407,7 @@ function dcmanage_render_switches(string $lang): void
 
     echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped dcmanage-dc-table dcmanage-switch-table">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</th><th>SNMP</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+    $switchEditModals = '';
     foreach ($rows as $row) {
         $snmp = dcmanage_switch_snmp_state((int) $row->id);
         $snmpStatus = !$snmp['tested'] ? 'unknown' : ($snmp['ok'] ? 'up' : 'down');
@@ -3407,48 +3420,50 @@ function dcmanage_render_switches(string $lang): void
         echo '<td>' . dcmanage_render_switch_status_pill($snmpStatus, $lang, (bool) $snmp['tested']) . '<br><small class="text-muted">' . htmlspecialchars((string) $snmp['message']) . '</small></td>';
         echo '<td><div class="dcmanage-action-buttons">';
         echo '<button class="btn btn-sm dcmanage-btn-soft-info" type="button" data-toggle="collapse" data-target="#sw-ports-' . (int) $row->id . '">Ports</button>';
-        echo '<button class="btn btn-sm dcmanage-btn-soft-warning" type="button" data-toggle="collapse" data-target="#sw-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
+        echo '<button class="btn btn-sm dcmanage-btn-soft-warning" type="button" data-toggle="modal" data-target="#sw-edit-' . (int) $row->id . '">' . htmlspecialchars(I18n::t('action_edit', $lang)) . '</button>';
         echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_snmp_test"><input type="hidden" name="switch_id" value="' . (int) $row->id . '"><button class="btn btn-sm dcmanage-btn-soft-success" type="submit" name="dcmanage_action_btn" value="switch_snmp_test">' . htmlspecialchars(I18n::t('switch_snmp_test', $lang)) . '</button></form>';
         echo '<form method="post" style="display:inline"><input type="hidden" name="dcmanage_action" value="switch_ports_discover"><input type="hidden" name="switch_id" value="' . (int) $row->id . '"><button class="btn btn-sm dcmanage-btn-soft-primary" type="submit" name="dcmanage_action_btn" value="switch_ports_discover">' . htmlspecialchars(I18n::t('switch_discover_ports', $lang)) . '</button></form>';
         echo '<form method="post" style="display:inline" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('delete_confirm_switch', $lang), ENT_QUOTES, 'UTF-8') . '\')"><input type="hidden" name="dcmanage_action" value="switch_delete"><input type="hidden" name="switch_id" value="' . (int) $row->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_delete">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form>';
         echo '</div></td>';
         echo '</tr>';
 
-        echo '<tr class="collapse" id="sw-edit-' . (int) $row->id . '"><td colspan="7">';
-        echo '<form method="post" class="dcmanage-form-card dcmanage-switch-edit-form">';
-        echo '<input type="hidden" name="dcmanage_action" value="switch_update"><input type="hidden" name="switch_id" value="' . (int) $row->id . '">';
-        echo '<div class="form-row">';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" class="form-control dcmanage-input dcmanage-switch-edit-dc">';
+        $switchEditModals .= '<div class="modal fade dcmanage-modal" id="sw-edit-' . (int) $row->id . '" tabindex="-1" role="dialog" aria-hidden="true">';
+        $switchEditModals .= '<div class="modal-dialog modal-xl modal-dialog-scrollable" role="document"><div class="modal-content">';
+        $switchEditModals .= '<div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('action_edit', $lang)) . ' #' . (int) $row->id . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
+        $switchEditModals .= '<form method="post" class="dcmanage-form-card dcmanage-switch-edit-form mt-0">';
+        $switchEditModals .= '<input type="hidden" name="dcmanage_action" value="switch_update"><input type="hidden" name="switch_id" value="' . (int) $row->id . '">';
+        $switchEditModals .= '<div class="form-row">';
+        $switchEditModals .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" class="form-control dcmanage-input dcmanage-switch-edit-dc">';
         foreach ($dcs as $dc) {
             $sel = (int) $row->dc_id === (int) $dc->id ? ' selected' : '';
-            echo '<option value="' . (int) $dc->id . '"' . $sel . '>' . htmlspecialchars((string) $dc->name) . '</option>';
+            $switchEditModals .= '<option value="' . (int) $dc->id . '"' . $sel . '>' . htmlspecialchars((string) $dc->name) . '</option>';
         }
-        echo '</select></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" class="form-control dcmanage-input dcmanage-switch-edit-rack"><option value="">--</option>';
+        $switchEditModals .= '</select></div>';
+        $switchEditModals .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_rack', $lang)) . '</label><select name="rack_id" class="form-control dcmanage-input dcmanage-switch-edit-rack"><option value="">--</option>';
         foreach ($racks as $rack) {
             $sel = (int) $row->rack_id === (int) $rack->id ? ' selected' : '';
-            echo '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '"' . $sel . '>' . htmlspecialchars((string) $rack->name) . '</option>';
+            $switchEditModals .= '<option data-dc-id="' . (int) $rack->dc_id . '" value="' . (int) $rack->id . '"' . $sel . '>' . htmlspecialchars((string) $rack->name) . '</option>';
         }
-        echo '</select></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</label><input name="name" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</label><select name="vendor" class="form-control dcmanage-input">';
+        $switchEditModals .= '</select></div>';
+        $switchEditModals .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_name', $lang)) . '</label><input name="name" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->name) . '"></div>';
+        $switchEditModals .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_vendor', $lang)) . '</label><select name="vendor" class="form-control dcmanage-input">';
         foreach (['Cisco', 'Nexus', 'MikroTik'] as $v) {
             $sel = strcasecmp((string) $row->vendor, $v) === 0 ? ' selected' : '';
-            echo '<option' . $sel . '>' . htmlspecialchars($v) . '</option>';
+            $switchEditModals .= '<option' . $sel . '>' . htmlspecialchars($v) . '</option>';
         }
-        echo '</select></div>';
-        echo '</div>';
-        echo '<div class="form-row">';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_model', $lang)) . '</label><input name="model" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->model) . '"></div>';
-        echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</label><input name="mgmt_ip" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->mgmt_ip) . '"></div>';
-        echo '<div class="form-group col-md-2"><label>SNMP Port</label><input type="number" min="1" name="snmp_port" class="form-control dcmanage-input" value="' . (int) ($row->snmp_port ?? 161) . '"></div>';
-        echo '<div class="form-group col-md-2"><label>SNMP Version</label><select name="snmp_version" class="form-control dcmanage-input"><option value="2c"' . ((string) $row->snmp_version === '2c' ? ' selected' : '') . '>2c</option><option value="3"' . ((string) $row->snmp_version === '3' ? ' selected' : '') . '>3</option></select></div>';
-        echo '<div class="form-group col-md-2"><label>Community</label><input name="snmp_community" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->snmp_community) . '"></div>';
-        echo '</div>';
-        echo '<div class="form-row"><div class="form-group col-md-2"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_start ?? '')) . '"></div><div class="form-group col-md-2"><label>U Height</label><input type="number" min="1" name="u_height" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_height ?? 1)) . '"></div></div>';
-        echo '<button class="btn btn-primary btn-sm" type="submit" name="dcmanage_action_btn" value="switch_update">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
-        echo '</form>';
-        echo '</td></tr>';
+        $switchEditModals .= '</select></div>';
+        $switchEditModals .= '</div>';
+        $switchEditModals .= '<div class="form-row">';
+        $switchEditModals .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_model', $lang)) . '</label><input name="model" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->model) . '"></div>';
+        $switchEditModals .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('switch_mgmt_ip', $lang)) . '</label><input name="mgmt_ip" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->mgmt_ip) . '"></div>';
+        $switchEditModals .= '<div class="form-group col-md-2"><label>SNMP Port</label><input type="number" min="1" name="snmp_port" class="form-control dcmanage-input" value="' . (int) ($row->snmp_port ?? 161) . '"></div>';
+        $switchEditModals .= '<div class="form-group col-md-2"><label>SNMP Version</label><select name="snmp_version" class="form-control dcmanage-input"><option value="2c"' . ((string) $row->snmp_version === '2c' ? ' selected' : '') . '>2c</option><option value="3"' . ((string) $row->snmp_version === '3' ? ' selected' : '') . '>3</option></select></div>';
+        $switchEditModals .= '<div class="form-group col-md-2"><label>Community</label><input name="snmp_community" class="form-control dcmanage-input" value="' . htmlspecialchars((string) $row->snmp_community) . '"></div>';
+        $switchEditModals .= '</div>';
+        $switchEditModals .= '<div class="form-row"><div class="form-group col-md-2"><label>U Start</label><input type="number" min="0" name="u_start" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_start ?? '')) . '"></div><div class="form-group col-md-2"><label>U Height</label><input type="number" min="1" name="u_height" class="form-control dcmanage-input" value="' . htmlspecialchars((string) ($row->u_height ?? 1)) . '"></div></div>';
+        $switchEditModals .= '<div class="dcmanage-form-actions"><button class="btn btn-primary btn-sm" type="submit" name="dcmanage_action_btn" value="switch_update">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button><button type="button" class="btn btn-outline-secondary btn-sm" data-dismiss="modal">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</button></div>';
+        $switchEditModals .= '</form>';
+        $switchEditModals .= '</div></div></div></div>';
 
         $ports = Capsule::table('mod_dcmanage_switch_ports as p')
             ->leftJoin('mod_dcmanage_server_ports as sp', function ($join): void {
@@ -3510,6 +3525,28 @@ function dcmanage_render_switches(string $lang): void
         echo '</td></tr>';
     }
     echo '</tbody></table></div>';
+    echo $switchEditModals;
+
+    $jsPortConnected = json_encode(I18n::t('port_link_connected', $lang), JSON_UNESCAPED_UNICODE);
+    $jsPortNotConnected = json_encode(I18n::t('port_link_not_connected', $lang), JSON_UNESCAPED_UNICODE);
+    $jsPortAbsent = json_encode(I18n::t('port_link_absent', $lang), JSON_UNESCAPED_UNICODE);
+    $jsPortUnknown = json_encode(I18n::t('switch_status_unknown', $lang), JSON_UNESCAPED_UNICODE);
+    $jsSelectSwitchPort = json_encode(I18n::t('select_switch_port', $lang), JSON_UNESCAPED_UNICODE);
+    if ($jsPortConnected === false) {
+        $jsPortConnected = '"Connected"';
+    }
+    if ($jsPortNotConnected === false) {
+        $jsPortNotConnected = '"Not Connected"';
+    }
+    if ($jsPortAbsent === false) {
+        $jsPortAbsent = '"SFP Absent"';
+    }
+    if ($jsPortUnknown === false) {
+        $jsPortUnknown = '"Unknown"';
+    }
+    if ($jsSelectSwitchPort === false) {
+        $jsSelectSwitchPort = '"Select Port"';
+    }
 
     echo '<script>';
     echo '(function(){var dc=document.getElementById("dcmanage-switch-dc");var rack=document.getElementById("dcmanage-switch-rack");';
@@ -3548,6 +3585,26 @@ function dcmanage_render_servers(string $lang): void
         })
         ->orderBy('name')
         ->get(['id', 'name']);
+    $jsPortConnected = json_encode(I18n::t('port_link_connected', $lang), JSON_UNESCAPED_UNICODE);
+    $jsPortNotConnected = json_encode(I18n::t('port_link_not_connected', $lang), JSON_UNESCAPED_UNICODE);
+    $jsPortAbsent = json_encode(I18n::t('port_link_absent', $lang), JSON_UNESCAPED_UNICODE);
+    $jsPortUnknown = json_encode(I18n::t('switch_status_unknown', $lang), JSON_UNESCAPED_UNICODE);
+    $jsSelectSwitchPort = json_encode(I18n::t('select_switch_port', $lang), JSON_UNESCAPED_UNICODE);
+    if ($jsPortConnected === false) {
+        $jsPortConnected = '"Connected"';
+    }
+    if ($jsPortNotConnected === false) {
+        $jsPortNotConnected = '"Not Connected"';
+    }
+    if ($jsPortAbsent === false) {
+        $jsPortAbsent = '"SFP Absent"';
+    }
+    if ($jsPortUnknown === false) {
+        $jsPortUnknown = '"Unknown"';
+    }
+    if ($jsSelectSwitchPort === false) {
+        $jsSelectSwitchPort = '"Select Port"';
+    }
 
     $serverColumns = [
         's.id', 's.dc_id', 's.rack_id', 's.hostname', 's.asset_tag', 's.serial', 's.u_start', 's.u_height', 's.notes', 's.ilo_id',
@@ -3840,8 +3897,8 @@ function dcmanage_render_servers(string $lang): void
         $selectedId = (int) $selectedServer->id;
         $modeIsEdit = $viewMode === 'edit';
         $trafficRows = $serverTrafficDefaults[$selectedId] ?? [];
-        $controlSwitchId = (int) ($selectedServer->action_switch_id ?? 0);
-        $controlPortId = (int) ($selectedServer->action_port_id ?? 0);
+        $controlSwitchId = $hasActionSwitch ? (int) ($selectedServer->action_switch_id ?? 0) : 0;
+        $controlPortId = $hasActionPort ? (int) ($selectedServer->action_port_id ?? 0) : 0;
         if ($controlSwitchId <= 0 || $controlPortId <= 0) {
             $firstTraffic = $trafficRows[0] ?? null;
             if (is_array($firstTraffic)) {
@@ -4050,7 +4107,7 @@ function dcmanage_render_servers(string $lang): void
                     $monitorSensorId = (string) ($monitorRow['sensor_id'] ?? '');
                     $monitorAction = (string) ($monitorRow['alert_action'] ?? 'none');
                     echo '<div class="dcmanage-monitor-row form-row align-items-end" data-sensor-type="' . htmlspecialchars($type) . '">';
-                    echo '<input type="hidden" name="monitor_sensor_type[]" value="' . htmlspecialchars($type) . '">';
+                    echo '<input type="hidden" name="monitor_sensor_type[]" class="dcmanage-monitor-sensor-type" value="' . htmlspecialchars($type) . '">';
                     echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</label><select name="monitor_prtg_id[]" class="form-control dcmanage-input dcmanage-monitor-prtg">';
                     echo '<option value="">' . htmlspecialchars(I18n::t('select_prtg_instance', $lang)) . '</option>';
                     foreach ($prtgInstances as $instance) {
@@ -4112,22 +4169,22 @@ function dcmanage_render_servers(string $lang): void
     echo 'function apiUrl(endpoint,params){var u="addonmodules.php?module=dcmanage&dcmanage_api=1&endpoint="+encodeURIComponent(endpoint);if(params){for(var k in params){if(Object.prototype.hasOwnProperty.call(params,k)){u+="&"+encodeURIComponent(k)+"="+encodeURIComponent(params[k]);}}}return u;}';
     echo 'function ensureSelectDataset(select){if(!select){return;}if(select._dcItems){return;}var items=[];for(var i=0;i<select.options.length;i++){var o=select.options[i];items.push({value:String(o.value||""),label:String(o.textContent||""),dc:String(o.getAttribute("data-dc-id")||"")});}select._dcItems=items;}';
     echo 'function filterByDc(select,v){if(!select){return;}ensureSelectDataset(select);var current=String(select.value||"");var out=[];for(var i=0;i<select._dcItems.length;i++){var it=select._dcItems[i];if(it.value===""){out.push(it);continue;}if(v!==""&&it.dc===v){out.push(it);}}select.innerHTML="";for(var x=0;x<out.length;x++){var o=document.createElement("option");o.value=out[x].value;o.textContent=out[x].label;if(out[x].dc!==""){o.setAttribute("data-dc-id",out[x].dc);}if(current!==""&&current===out[x].value){o.selected=true;}select.appendChild(o);}if(v===""){select.selectedIndex=0;}if(select.options.length<=1){select.selectedIndex=0;}}';
-    echo 'function portOperLabel(status){var s=String(status||"").toLowerCase();if(s==="up"){return "' . addslashes(I18n::t('port_link_connected', $lang)) . '";}if(s==="down"){return "' . addslashes(I18n::t('port_link_not_connected', $lang)) . '";}if(s==="absent"){return "' . addslashes(I18n::t('port_link_absent', $lang)) . '";}return "' . addslashes(I18n::t('switch_status_unknown', $lang)) . '";}';
-    echo 'function clearSwitchPorts(selectEl){if(!selectEl){return;}selectEl.innerHTML="";var first=document.createElement("option");first.value="";first.textContent="' . addslashes(I18n::t('select_switch_port', $lang)) . '";selectEl.appendChild(first);selectEl.disabled=true;}';
+    echo 'function portOperLabel(status){var s=String(status||"").toLowerCase();if(s==="up"){return ' . $jsPortConnected . ';}if(s==="down"){return ' . $jsPortNotConnected . ';}if(s==="absent"){return ' . $jsPortAbsent . ';}return ' . $jsPortUnknown . ';}';
+    echo 'function clearSwitchPorts(selectEl){if(!selectEl){return;}selectEl.innerHTML="";var first=document.createElement("option");first.value="";first.textContent=' . $jsSelectSwitchPort . ';selectEl.appendChild(first);selectEl.disabled=true;}';
     echo 'function filterSelectByQuery(selectEl,q){if(!selectEl){return;}for(var i=0;i<selectEl.options.length;i++){var o=selectEl.options[i];if(!o.value){o.hidden=false;continue;}var hay=normalizeSearchText(o.getAttribute("data-search")||o.textContent||"");o.hidden=(q!==""&&hay.indexOf(q)===-1);}if(selectEl.selectedIndex>0&&selectEl.options[selectEl.selectedIndex].hidden){selectEl.selectedIndex=0;}}';
     echo 'function loadSwitchPorts(selectEl,switchId,dcId,selectedId){clearSwitchPorts(selectEl);if(!selectEl||!switchId||!dcId){return Promise.resolve();}return fetch(apiUrl("switch/ports",{switch_id:switchId,dc_id:dcId}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var items=(res.data&&res.data.items)?res.data.items:[];for(var i=0;i<items.length;i++){var it=items[i]||{};var opt=document.createElement("option");opt.value=String(it.id||"");var label=String(it.if_name||"-");if(String(it.if_desc||"").trim()!==""){label+=" | "+String(it.if_desc);}if(String(it.vlan||"").trim()!==""){label+=" | VLAN:"+String(it.vlan);}label+=" | "+portOperLabel(it.oper_status||"");opt.textContent=label;opt.setAttribute("data-search",label);if(String(selectedId||"")!==""&&String(selectedId)===String(opt.value)){opt.selected=true;}selectEl.appendChild(opt);}selectEl.disabled=false;}).catch(function(){clearSwitchPorts(selectEl);});}';
     echo 'function loadSensorsForRow(row){var prtgSel=row.querySelector(".dcmanage-monitor-prtg");var sensorSel=row.querySelector(".dcmanage-monitor-sensor");var search=row.querySelector(".dcmanage-monitor-sensor-search");if(!prtgSel||!sensorSel){return;}var prtgId=prtgSel.value;if(!prtgId){sensorSel.innerHTML="<option value=\"\">--</option>";return;}fetch(apiUrl("prtg/sensors",{prtg_id:prtgId,q:(search?search.value:""),limit:250}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var selected=sensorSel.value;var items=(res.data&&res.data.items)?res.data.items:[];sensorSel.innerHTML="<option value=\"\">--</option>";for(var i=0;i<items.length;i++){var it=items[i]||{};var id=String(it.id||"");if(id===""){continue;}var opt=document.createElement("option");opt.value=id;opt.textContent=id+" | "+String(it.name||"");if(selected!==""&&selected===id){opt.selected=true;}sensorSel.appendChild(opt);}}).catch(function(){});}';
     echo 'function initTrafficRow(row,dcSelect){if(!row){return;}var sw=row.querySelector(".dcmanage-traffic-switch");var port=row.querySelector(".dcmanage-traffic-port");var search=row.querySelector(".dcmanage-port-select-search");if(!sw||!port){return;}function refresh(selectedId){var dcId=dcSelect?String(dcSelect.value||""):"";sw.disabled=(dcId==="");if(dcId===""){sw.value="";clearSwitchPorts(port);return;}filterByDc(sw,dcId);if(String(sw.value||"")===""){clearSwitchPorts(port);return;}loadSwitchPorts(port,sw.value,dcId,selectedId||port.getAttribute("data-selected")||"").then(function(){if(search){filterSelectByQuery(port,normalizeSearchText(search.value||""));}});}sw.addEventListener("change",function(){port.setAttribute("data-selected","");refresh("");});if(search){search.addEventListener("input",function(){filterSelectByQuery(port,normalizeSearchText(this.value||""));});}row._dcRefresh=refresh;refresh();}';
     echo 'function initMonitorRow(row){if(!row){return;}var load=row.querySelector(".dcmanage-monitor-load");var search=row.querySelector(".dcmanage-monitor-sensor-search");var prtg=row.querySelector(".dcmanage-monitor-prtg");if(load){load.addEventListener("click",function(){loadSensorsForRow(row);});}if(prtg){prtg.addEventListener("change",function(){loadSensorsForRow(row);});}if(search){search.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();loadSensorsForRow(row);}});} }';
-    echo 'function cloneRow(container,rowSelector){var first=container.querySelector(rowSelector);if(!first){return null;}var clone=first.cloneNode(true);var els=clone.querySelectorAll("input,select,textarea");for(var i=0;i<els.length;i++){var el=els[i];if(el.tagName==="SELECT"){el.selectedIndex=0;if(el.classList.contains("dcmanage-traffic-port")){el.innerHTML="<option value=\"\">' . addslashes(I18n::t('select_switch_port', $lang)) . '</option>";el.disabled=true;} }else{el.value="";}}return clone;}';
+    echo 'function cloneRow(container,rowSelector){var first=container.querySelector(rowSelector);if(!first){return null;}var clone=first.cloneNode(true);var els=clone.querySelectorAll("input,select,textarea");for(var i=0;i<els.length;i++){var el=els[i];if(el.tagName==="SELECT"){el.selectedIndex=0;if(el.classList.contains("dcmanage-traffic-port")){clearSwitchPorts(el);} }else{el.value="";}}return clone;}';
     echo 'function initControlPort(form,dc){if(!form){return;}var sw=form.querySelector(".dcmanage-control-switch");var port=form.querySelector(".dcmanage-control-port");if(!sw||!port){return;}function refresh(){var dcId=dc?String(dc.value||""):"";sw.disabled=(dcId==="");if(dcId===""){sw.value="";clearSwitchPorts(port);return;}filterByDc(sw,dcId);if(String(sw.value||"")===""){clearSwitchPorts(port);return;}loadSwitchPorts(port,sw.value,dcId,port.getAttribute("data-selected")||"");}sw.addEventListener("change",function(){port.setAttribute("data-selected","");refresh();});form._controlRefresh=refresh;refresh();}';
-    echo 'function initServerForm(form){if(!form){return;}var dc=form.querySelector(".dcmanage-map-dc")||form.querySelector("#dcmanage-server-dc");var rack=form.querySelector(".dcmanage-map-rack")||form.querySelector("#dcmanage-server-rack");var trafficWrap=form.querySelector(".dcmanage-traffic-rows");var addTraffic=form.querySelector(".dcmanage-add-traffic-row");function syncDc(){var dcId=dc?String(dc.value||""):"";if(rack){rack.disabled=(dcId==="");filterByDc(rack,dcId);}if(typeof form._controlRefresh==="function"){form._controlRefresh();}if(trafficWrap){var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var i=0;i<rows.length;i++){if(typeof rows[i]._dcRefresh==="function"){rows[i]._dcRefresh();}}}}if(dc){dc.addEventListener("change",syncDc);}if(trafficWrap){var trafficRows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var t=0;t<trafficRows.length;t++){initTrafficRow(trafficRows[t],dc);}trafficWrap.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-traffic-row");if(!rm){return;}var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");if(rows.length<=1){return;}rm.closest(".dcmanage-traffic-row").remove();});}if(addTraffic&&trafficWrap){addTraffic.addEventListener("click",function(){var row=cloneRow(trafficWrap,".dcmanage-traffic-row");if(!row){return;}trafficWrap.appendChild(row);initTrafficRow(row,dc);});}var addMonitors=form.querySelectorAll(".dcmanage-add-monitor-row");for(var ami=0;ami<addMonitors.length;ami++){(function(btn){btn.addEventListener("click",function(){var sel=btn.getAttribute("data-target")||"";var wrap=form.querySelector(sel);if(!wrap){return;}var row=cloneRow(wrap,".dcmanage-monitor-row");if(!row){return;}var type=(row.getAttribute("data-sensor-type")||"traffic");var hidden=row.querySelector("input[name=\"monitor_sensor_type[]\"]");if(hidden){hidden.value=type;}wrap.appendChild(row);initMonitorRow(row);});})(addMonitors[ami]);}var monitorRows=form.querySelectorAll(".dcmanage-monitor-row");for(var m=0;m<monitorRows.length;m++){initMonitorRow(monitorRows[m]);}form.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-monitor-row");if(!rm){return;}var wrap=rm.closest(".dcmanage-monitor-rows");if(!wrap){return;}var rows=wrap.querySelectorAll(".dcmanage-monitor-row");if(rows.length<=1){return;}rm.closest(".dcmanage-monitor-row").remove();});initControlPort(form,dc);syncDc();}';
+    echo 'function initServerForm(form){if(!form){return;}var dc=form.querySelector(".dcmanage-map-dc")||form.querySelector("#dcmanage-server-dc");var rack=form.querySelector(".dcmanage-map-rack")||form.querySelector("#dcmanage-server-rack");var trafficWrap=form.querySelector(".dcmanage-traffic-rows");var addTraffic=form.querySelector(".dcmanage-add-traffic-row");function syncDc(){var dcId=dc?String(dc.value||""):"";if(rack){rack.disabled=(dcId==="");filterByDc(rack,dcId);}if(typeof form._controlRefresh==="function"){form._controlRefresh();}if(trafficWrap){var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var i=0;i<rows.length;i++){if(typeof rows[i]._dcRefresh==="function"){rows[i]._dcRefresh();}}}}if(dc){dc.addEventListener("change",syncDc);}if(trafficWrap){var trafficRows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");for(var t=0;t<trafficRows.length;t++){initTrafficRow(trafficRows[t],dc);}trafficWrap.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-traffic-row");if(!rm){return;}var rows=trafficWrap.querySelectorAll(".dcmanage-traffic-row");if(rows.length<=1){return;}rm.closest(".dcmanage-traffic-row").remove();});}if(addTraffic&&trafficWrap){addTraffic.addEventListener("click",function(){var row=cloneRow(trafficWrap,".dcmanage-traffic-row");if(!row){return;}trafficWrap.appendChild(row);initTrafficRow(row,dc);});}var addMonitors=form.querySelectorAll(".dcmanage-add-monitor-row");for(var ami=0;ami<addMonitors.length;ami++){(function(btn){btn.addEventListener("click",function(){var sel=btn.getAttribute("data-target")||"";var wrap=form.querySelector(sel);if(!wrap){return;}var row=cloneRow(wrap,".dcmanage-monitor-row");if(!row){return;}var type=(row.getAttribute("data-sensor-type")||"traffic");var hidden=row.querySelector(".dcmanage-monitor-sensor-type");if(hidden){hidden.value=type;}wrap.appendChild(row);initMonitorRow(row);});})(addMonitors[ami]);}var monitorRows=form.querySelectorAll(".dcmanage-monitor-row");for(var m=0;m<monitorRows.length;m++){initMonitorRow(monitorRows[m]);}form.addEventListener("click",function(e){var rm=e.target.closest(".dcmanage-remove-monitor-row");if(!rm){return;}var wrap=rm.closest(".dcmanage-monitor-rows");if(!wrap){return;}var rows=wrap.querySelectorAll(".dcmanage-monitor-row");if(rows.length<=1){return;}rm.closest(".dcmanage-monitor-row").remove();});initControlPort(form,dc);syncDc();}';
     echo 'function applyServerPager(){var table=document.getElementById("dcmanage-server-table");var pager=document.getElementById("dcmanage-server-table-pager");if(!table||!pager){return;}var sizeSel=pager.querySelector(".dcmanage-page-size");var pageSize=parseInt((sizeSel?sizeSel.value:pager.getAttribute("data-page-size"))||"15",10);if(!pageSize||pageSize<1){pageSize=15;}pager.setAttribute("data-page-size",String(pageSize));if(!pager._page){pager._page=1;}var rows=Array.prototype.slice.call(table.querySelectorAll("tbody tr.dcmanage-server-item"));var visible=[];for(var i=0;i<rows.length;i++){if(rows[i].dataset&&rows[i].dataset.filtered==="1"){continue;}visible.push(rows[i]);}var pages=Math.max(1,Math.ceil(visible.length/pageSize));if(pager._page>pages){pager._page=pages;}if(pager._page<1){pager._page=1;}for(var r=0;r<rows.length;r++){rows[r].style.display=(rows[r].dataset&&rows[r].dataset.filtered==="1")?"none":"";}var start=(pager._page-1)*pageSize;var end=start+pageSize;for(var x=0;x<visible.length;x++){visible[x].style.display=(x>=start&&x<end)?"":"none";}var info=pager.querySelector(".dcmanage-page-info");if(info){info.textContent=String(pager._page)+"/"+String(pages);}var prev=pager.querySelector(".dcmanage-page-prev");var next=pager.querySelector(".dcmanage-page-next");if(prev){prev.disabled=pager._page<=1;}if(next){next.disabled=pager._page>=pages;}}';
     echo 'var serverSearch=document.getElementById("dcmanage-server-table-search");if(serverSearch){serverSearch.addEventListener("input",function(){var q=normalizeSearchText(this.value||"");var rows=document.querySelectorAll("#dcmanage-server-table tbody tr.dcmanage-server-item");for(var i=0;i<rows.length;i++){var hay=normalizeSearchText(rows[i].getAttribute("data-search")||"");rows[i].dataset.filtered=(q!==""&&hay.indexOf(q)===-1)?"1":"0";}var pager=document.getElementById("dcmanage-server-table-pager");if(pager){pager._page=1;}applyServerPager();});}';
     echo 'var serverPager=document.getElementById("dcmanage-server-table-pager");if(serverPager){var p=serverPager.querySelector(".dcmanage-page-prev");var n=serverPager.querySelector(".dcmanage-page-next");var sz=serverPager.querySelector(".dcmanage-page-size");if(p){p.addEventListener("click",function(){serverPager._page=(serverPager._page||1)-1;applyServerPager();});}if(n){n.addEventListener("click",function(){serverPager._page=(serverPager._page||1)+1;applyServerPager();});}if(sz){sz.addEventListener("change",function(){serverPager._page=1;applyServerPager();});}}';
     echo 'function initServerDiscovery(scope){if(!scope){return;}var host=scope.querySelector(".dcmanage-server-discovery-host");var ports=scope.querySelector(".dcmanage-server-discovery-ports");var run=scope.querySelector(".dcmanage-server-discovery-run");var out=scope.querySelector(".dcmanage-server-discovery-result");if(!run){return;}run.addEventListener("click",function(){var target=host?String(host.value||"").trim():"";if(target===""){if(out){out.textContent="Target IP / Host is required";}return;}if(out){out.textContent="Running...";}fetch(apiUrl("monitoring/discover",{host:target,ports:(ports?ports.value:"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}var data=res.data||{};var rows=data.ports||[];if(!out){return;}if(rows.length===0){out.textContent="No results";return;}var txt=[];for(var i=0;i<rows.length;i++){var it=rows[i]||{};txt.push(String(it.port)+": "+(it.open?"open":"closed")+" ("+String(it.latency_ms||0)+"ms)");}out.textContent="Resolved IP: "+String(data.resolved_ip||"-")+" | "+txt.join(" | ");}).catch(function(err){if(out){out.textContent=String(err&&err.message?err.message:"error");}});});}';
     echo 'var createForm=document.querySelector("#dcmanage-server-add-modal form");if(createForm){initServerForm(createForm);}var editForm=document.querySelector("#dcmanage-server-details-modal form.dcmanage-server-map");if(editForm){initServerForm(editForm);}var discoveryWraps=document.querySelectorAll(".dcmanage-server-discovery-wrap");for(var dw=0;dw<discoveryWraps.length;dw++){initServerDiscovery(discoveryWraps[dw]);}';
-    echo 'var detailsModal=document.getElementById("dcmanage-server-details-modal");if(detailsModal&&window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(detailsModal).modal("show");jQuery(detailsModal).on("hidden.bs.modal",function(){window.location.href=' . json_encode($moduleLink) . ';});}';
+    echo 'var detailsModal=document.getElementById("dcmanage-server-details-modal");if(detailsModal){var back=' . json_encode($moduleLink) . ';var bindClose=function(){var items=detailsModal.querySelectorAll("[data-dismiss=modal],.close");for(var i=0;i<items.length;i++){items[i].addEventListener("click",function(){window.location.href=back;});}};if(window.jQuery&&jQuery.fn&&jQuery.fn.modal){jQuery(detailsModal).modal("show");jQuery(detailsModal).on("hidden.bs.modal",function(){window.location.href=back;});}else{detailsModal.style.display="block";detailsModal.classList.add("show");detailsModal.removeAttribute("aria-hidden");document.body.classList.add("modal-open");bindClose();}}';
     echo 'var iloBtns=document.querySelectorAll(".dcmanage-ilo-test-btn");for(var ib=0;ib<iloBtns.length;ib++){iloBtns[ib].addEventListener("click",function(){var form=this.closest("form");if(!form){return;}var host=form.querySelector("input[name=ilo_host]");var user=form.querySelector("input[name=ilo_user]");var pass=form.querySelector("input[name=ilo_pass]");var out=form.querySelector(".dcmanage-ilo-test-result");if(out){out.textContent="Testing...";}fetch(apiUrl("ilo/test",{server_id:this.getAttribute("data-server-id")||"",host:(host?host.value:""),user:(user?user.value:""),pass:(pass?pass.value:"")}),{credentials:"same-origin"}).then(function(r){return r.text();}).then(function(raw){var res=parsePayload(raw);if(!res.ok){throw new Error(res.error||"API error");}if(out){var d=res.data||{};out.textContent=String(d.power_status||"ok")+" | host: "+String(d.host||"-");}}).catch(function(err){if(out){out.textContent=String(err&&err.message?err.message:"error");}});});}';
     echo 'applyServerPager();';
     echo '})();';
@@ -4366,7 +4423,7 @@ function dcmanage_render_packages(string $lang): void
     echo '</div>';
 
     echo '<div id="dcmanage-package-add-modal" class="modal fade dcmanage-modal" tabindex="-1" role="dialog" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('package_add', $lang)) . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
-    echo '<form method="post" action="" class="dcmanage-form-card dcmanage-centered-form mt-0">';
+    echo '<form id="dcmanage-package-add-form" method="post" action="" class="dcmanage-form-card dcmanage-centered-form mt-0">';
     echo '<input type="hidden" name="dcmanage_action" value="package_create">';
     echo '<div class="form-row">';
     echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" required class="form-control dcmanage-input"><option value="">--</option>';
@@ -4382,9 +4439,8 @@ function dcmanage_render_packages(string $lang): void
     echo '<div class="form-row">';
     echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</label><select name="active" class="form-control dcmanage-input"><option value="1">' . htmlspecialchars(I18n::t('status_active', $lang)) . '</option><option value="0">' . htmlspecialchars(I18n::t('status_inactive', $lang)) . '</option></select></div>';
     echo '</div>';
-    echo '<button class="btn btn-primary" type="submit" name="dcmanage_action_btn" value="package_create">' . htmlspecialchars(I18n::t('package_create', $lang)) . '</button>';
     echo '</form>';
-    echo '</div></div></div></div>';
+    echo '</div><div class="modal-footer"><button class="btn btn-outline-secondary btn-sm" type="button" data-dismiss="modal">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</button><button class="btn btn-primary btn-sm" type="submit" form="dcmanage-package-add-form" name="dcmanage_action_btn" value="package_create">' . htmlspecialchars(I18n::t('package_create', $lang)) . '</button></div></div></div></div>';
 
     echo '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped dcmanage-dc-table">';
     echo '<thead><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('tab_datacenters', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_size_gb', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_price', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
@@ -4411,7 +4467,7 @@ function dcmanage_render_packages(string $lang): void
         echo '</tr>';
 
         $modalsHtml .= '<div class="modal fade dcmanage-modal" id="pkg-edit-' . (int) $row->id . '" tabindex="-1" role="dialog" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">' . htmlspecialchars(I18n::t('action_edit', $lang)) . ' #' . (int) $row->id . '</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body">';
-        $modalsHtml .= '<form method="post" class="dcmanage-form-card dcmanage-centered-form mt-0">';
+        $modalsHtml .= '<form id="dcmanage-package-edit-form-' . (int) $row->id . '" method="post" class="dcmanage-form-card dcmanage-centered-form mt-0">';
         $modalsHtml .= '<input type="hidden" name="dcmanage_action" value="package_update"><input type="hidden" name="package_id" value="' . (int) $row->id . '">';
         $modalsHtml .= '<div class="form-row">';
         $modalsHtml .= '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('select_datacenter', $lang)) . '</label><select name="dc_id" required class="form-control dcmanage-input">';
@@ -4428,8 +4484,7 @@ function dcmanage_render_packages(string $lang): void
         $modalsHtml .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('package_taxed', $lang)) . '</label><select name="taxed" class="form-control dcmanage-input"><option value="1"' . ((int) $row->taxed === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('yes', $lang)) . '</option><option value="0"' . ((int) $row->taxed === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('no', $lang)) . '</option></select></div>';
         $modalsHtml .= '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('package_active', $lang)) . '</label><select name="active" class="form-control dcmanage-input"><option value="1"' . ((int) $row->active === 1 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_active', $lang)) . '</option><option value="0"' . ((int) $row->active === 0 ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('status_inactive', $lang)) . '</option></select></div>';
         $modalsHtml .= '</div>';
-        $modalsHtml .= '<div class="dcmanage-form-actions"><button class="btn btn-primary btn-sm" type="submit" name="dcmanage_action_btn" value="package_update">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></div>';
-        $modalsHtml .= '</form></div></div></div></div>';
+        $modalsHtml .= '</form></div><div class="modal-footer"><button class="btn btn-outline-secondary btn-sm" type="button" data-dismiss="modal">' . htmlspecialchars(I18n::t('action_cancel', $lang)) . '</button><button class="btn btn-primary btn-sm" type="submit" form="dcmanage-package-edit-form-' . (int) $row->id . '" name="dcmanage_action_btn" value="package_update">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button></div></div></div></div>';
     }
 
     if (count($rows) === 0) {

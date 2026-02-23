@@ -74,6 +74,9 @@
     ports: 'پورت',
     breaches: 'تخلف',
     queue: 'صف',
+    testMode: 'حالت تست',
+    testModeOn: 'فعال',
+    testModeOff: 'غیرفعال',
     cronHealth: 'وضعیت کرون',
     ok: 'سالم',
     warn: 'هشدار',
@@ -109,6 +112,9 @@
     ports: 'Ports',
     breaches: 'Breaches',
     queue: 'Queue',
+    testMode: 'Test Mode',
+    testModeOn: 'ON',
+    testModeOff: 'OFF',
     cronHealth: 'Cron Health',
     ok: 'OK',
     warn: 'Warning',
@@ -219,6 +225,7 @@
         { key: 'usage_breaches_today', label: T.breaches, tab: 'traffic' },
         { key: 'jobs_pending', label: T.queue, tab: 'queue' }
       ];
+      var testMode = !!((res.data.flags || {}).test_mode);
 
       var html = '<div class="dcmanage-hero-band">' +
         '<div class="dcmanage-hero-title">' + safeText(isFa ? 'نمای کلی زیرساخت' : 'Infrastructure Snapshot') + '</div>' +
@@ -246,6 +253,9 @@
           '</a>' +
           '</div>';
       });
+      html += '</div>';
+      html += '<div class="dcmanage-dashboard-flags">';
+      html += '<span class="dcmanage-flag-pill ' + (testMode ? 'is-warning' : 'is-success') + '">' + safeText(T.testMode + ': ' + (testMode ? T.testModeOn : T.testModeOff)) + '</span>';
       html += '</div>';
       dashboard.innerHTML = html;
     }).catch(function (e) {
@@ -538,7 +548,7 @@
         html += '<div class="dcmanage-form-card mb-3"><div class="form-row align-items-end">' +
           '<div class="form-group col-md-4 mb-2"><label>Status Filter</label><select id="dcmanage-traffic-filter" class="form-control dcmanage-input"><option value="all">All</option><option value="blocked">Blocked</option><option value="overused">Overused</option><option value="normal">Normal</option></select></div>' +
           '<div class="form-group col-md-4 mb-2"><label>Search Service</label><input id="dcmanage-traffic-search" class="form-control dcmanage-input" placeholder="service id / status"></div>' +
-          '<div class="form-group col-md-4 mb-2"><label>Sort By</label><select id="dcmanage-traffic-sort" class="form-control dcmanage-input"><option value="service_asc">Service (Oldest First)</option><option value="remaining_asc">Remaining (Low to High)</option><option value="remaining_desc">Remaining (High to Low)</option></select></div>' +
+          '<div class="form-group col-md-4 mb-2"><label>Sort By</label><select id="dcmanage-traffic-sort" class="form-control dcmanage-input"><option value="service_asc">Service name A→Z</option><option value="remaining_asc">Remaining low→high</option><option value="remaining_desc">Remaining high→low</option></select></div>' +
           '</div></div>';
         html += '<div class="table-responsive dcmanage-table-wrap"><table class="table table-sm table-striped" id="dcmanage-traffic-table">' +
           '<thead><tr><th>Service</th><th>Domain</th><th>Status</th><th>Used (GB)</th><th>Allowed (GB)</th><th>Remaining (GB)</th><th>Cycle End</th><th>Last Sample</th></tr></thead><tbody>';

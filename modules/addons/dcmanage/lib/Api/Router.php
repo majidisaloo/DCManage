@@ -106,6 +106,10 @@ final class Router
 
     private static function dashboardHealth(): array
     {
+        $testMode = (string) (Capsule::table('mod_dcmanage_meta')
+            ->where('meta_key', 'settings.enforcement_test_mode')
+            ->value('meta_value') ?? '0');
+
         return [
             'counts' => [
                 'datacenters' => Capsule::table('mod_dcmanage_datacenters')->count(),
@@ -119,6 +123,9 @@ final class Router
             'integration_health' => [
                 'prtg_instances' => Capsule::table('mod_dcmanage_prtg_instances')->count(),
                 'ilos' => Capsule::table('mod_dcmanage_ilos')->count(),
+            ],
+            'flags' => [
+                'test_mode' => $testMode === '1',
             ],
             'last_cron_runs' => self::lastCronRuns(),
         ];
