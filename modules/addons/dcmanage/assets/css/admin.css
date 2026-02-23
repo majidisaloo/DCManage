@@ -622,8 +622,9 @@
 }
 
 .dcmanage-shell .dcmanage-all-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 10px;
   margin: 0 0 16px;
@@ -637,6 +638,7 @@
   font-weight: 500;
   border-radius: 6px;
   line-height: 1.4;
+  white-space: nowrap;
   transition: background .15s, box-shadow .15s;
 }
 
@@ -659,7 +661,8 @@
 
 .dcmanage-shell .dcmanage-all-actions form {
   margin: 0 !important;
-  display: inline;
+  display: inline-flex !important;
+  flex-shrink: 0;
 }
 
 .dcmanage-table-pager {

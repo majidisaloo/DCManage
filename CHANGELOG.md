@@ -3,6 +3,10 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.85] - 2026-02-23
+### Fixed
+- Forced horizontal flex layout for action buttons row (flex-direction row, nowrap, inline-flex forms).
+
 ## [0.1.84] - 2026-02-23
 ### Fixed
 - All 5 action buttons (Apply Filter, Reset, Clear System, Clear Purchase, Clear All) now in one row below filter fields.
