@@ -3,6 +3,11 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.84] - 2026-02-23
+### Fixed
+- All 5 action buttons (Apply Filter, Reset, Clear System, Clear Purchase, Clear All) now in one row below filter fields.
+- Fixed Clear All Logs confirm dialog (moved from onsubmit to onclick for reliability).
+
 ## [0.1.83] - 2026-02-23
 ### Fixed
 - Moved Apply Filter and Reset buttons into the Date row so they no longer appear below the Sort dropdown.
