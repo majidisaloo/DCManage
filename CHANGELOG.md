@@ -3,6 +3,19 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.95] - 2026-02-25
+### Added
+- Replaced multiple PRTG selection dropdowns (Group, Subgroup, Device, Sensor) in Server Edit -> Monitoring with single Select2 AJAX search for exact sensor.
+- Applied searchable Select2 interface to 1st-level Traffic switch/port mapping.
+- Added "Used / Total" visual readout for Server View traffic cards (sums Download/Upload + maps Datacenter base/extra quota).
+
+### Fixed
+- Fixed ReferenceError `Can't find variable: buttons` blocking Traffic Graph custom date selections.
+- Re-architected UsageEngine polling to strictly respect the new `start_date` bounds (prevents fetching historical usage prior to server activation).
+- Enforced target host/IP selection inside monitoring Network Discovery to prefer `dedicatedip` over `hostname`.
+- Stabilized dynamic Form Action alignments/padding within Server Edit overlays.
+- Standardized all generated 'Remove' action buttons to Bootstrap Danger styling (`btn-danger`) and auto-hide logic for initial single rows.
+
 ## [0.1.85] - 2026-02-23
 ### Fixed
 - Forced horizontal flex layout for action buttons row (flex-direction row, nowrap, inline-flex forms).
