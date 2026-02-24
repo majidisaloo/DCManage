@@ -929,6 +929,12 @@
   background: #fff;
 }
 
+.dcmanage-switch-table>tbody>tr.collapse>td {
+  padding: 0;
+}
+
+
+
 .dcmanage-switch-ports-card {
   background: linear-gradient(180deg, #ffffff, #f7fafc);
   width: 100%;
@@ -945,7 +951,7 @@
 
 .dcmanage-port-table {
   width: 100%;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .dcmanage-port-table thead th {
@@ -962,15 +968,55 @@
   word-wrap: break-word;
 }
 
-.dcmanage-port-table th:nth-child(2),
-.dcmanage-port-table td:nth-child(2) {
-  min-width: 160px;
+/* Fixed column widths for consistent layout across pages */
+.dcmanage-port-table th:nth-child(1),
+.dcmanage-port-table td:nth-child(1) {
+  width: 12%;
 }
 
+/* Interface */
+.dcmanage-port-table th:nth-child(2),
+.dcmanage-port-table td:nth-child(2) {
+  width: 18%;
+}
+
+/* Description */
+.dcmanage-port-table th:nth-child(3),
+.dcmanage-port-table td:nth-child(3) {
+  width: 7%;
+}
+
+/* VLAN */
+.dcmanage-port-table th:nth-child(4),
+.dcmanage-port-table td:nth-child(4) {
+  width: 7%;
+}
+
+/* Speed */
+.dcmanage-port-table th:nth-child(5),
+.dcmanage-port-table td:nth-child(5) {
+  width: 10%;
+}
+
+/* Server */
+.dcmanage-port-table th:nth-child(6),
+.dcmanage-port-table td:nth-child(6) {
+  width: 14%;
+}
+
+/* Active/Suspended */
+.dcmanage-port-table th:nth-child(7),
+.dcmanage-port-table td:nth-child(7) {
+  width: 12%;
+}
+
+/* Link Status */
 .dcmanage-port-table th:nth-child(8),
 .dcmanage-port-table td:nth-child(8) {
-  min-width: 160px;
+  width: 20%;
 }
+
+/* Actions */
 
 .dcmanage-port-desc {
   white-space: nowrap;

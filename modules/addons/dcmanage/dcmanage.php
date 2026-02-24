@@ -3073,6 +3073,11 @@ function dcmanage_probe_single_switch_port(string $host, string $community, int 
     if ($vlan === '') {
         $vlan = dcmanage_snmp_resolve_vlan_by_ifindex($target, $community, $ifIndex, $timeout, $retries);
     }
+    // Cisco vmVlan fallback (CISCO-VLAN-MEMBERSHIP-MIB)
+    if ($vlan === '') {
+        $vmVlanRaw = (string) dcmanage_snmp_get($target, $community, '.1.3.6.1.4.1.9.9.68.1.2.2.1.2.' . $ifIndex, $timeout, $retries);
+        $vlan = dcmanage_snmp_parse_vlan($vmVlanRaw);
+    }
 
     $ifName = dcmanage_normalize_if_name(dcmanage_snmp_parse_typed_value($ifNameRaw));
     $ifDesc = dcmanage_snmp_parse_typed_value($ifDescRaw);
@@ -3196,6 +3201,21 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
             }
         }
 
+        // Cisco vmVlan fallback (CISCO-VLAN-MEMBERSHIP-MIB) — works on NX-OS / IOS.
+        // OID .1.3.6.1.4.1.9.9.68.1.2.2.1.2 is indexed by ifIndex directly.
+        if (count($pvidByIfIndex) < count($ifNameMap)) {
+            $vmVlanMap = dcmanage_snmp_walk_to_index_map(dcmanage_snmp_real_walk_any($target, $community, '.1.3.6.1.4.1.9.9.68.1.2.2.1.2', $timeoutMicros, $retries));
+            foreach ($vmVlanMap as $ifIdx => $vlanRaw) {
+                if (isset($pvidByIfIndex[(int) $ifIdx])) {
+                    continue; // Already have VLAN from dot1qPvid
+                }
+                $vlan = dcmanage_snmp_parse_vlan($vlanRaw);
+                if ($vlan !== '') {
+                    $pvidByIfIndex[(int) $ifIdx] = $vlan;
+                }
+            }
+        }
+
         foreach ($ifNameMap as $index => $rawName) {
             if ($index <= 0) {
                 continue;
@@ -3266,6 +3286,21 @@ function dcmanage_discover_switch_ports(string $host, string $community, int $po
                 $pvidByIfIndex[$bridgeToIfIndex[$bridgePort]] = $vlan;
             } else {
                 $pvidByIfIndex[$bridgePort] = $vlan;
+            }
+        }
+
+        // Cisco vmVlan fallback (CISCO-VLAN-MEMBERSHIP-MIB) — works on NX-OS / IOS.
+        if (count($pvidByIfIndex) < count($ifNameList)) {
+            $vmVlanList = dcmanage_snmp_walk_list_any($target, $community, '.1.3.6.1.4.1.9.9.68.1.2.2.1.2', $timeoutMicros, $retries);
+            foreach ($vmVlanList as $vi => $vlanRaw) {
+                $viIdx = $vi + 1;
+                if (isset($pvidByIfIndex[$viIdx])) {
+                    continue;
+                }
+                $vlan = dcmanage_snmp_parse_vlan((string) $vlanRaw);
+                if ($vlan !== '') {
+                    $pvidByIfIndex[$viIdx] = $vlan;
+                }
             }
         }
 
