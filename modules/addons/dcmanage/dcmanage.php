@@ -785,6 +785,25 @@ function dcmanage_handle_actions(string $lang): string
                 throw new RuntimeException('Invalid port');
             }
 
+            // Test mode guard
+            $testMode = (string) (Capsule::table('mod_dcmanage_meta')
+                ->where('meta_key', 'settings.enforcement_test_mode')
+                ->value('meta_value') ?? '0');
+
+            $portRow = Capsule::table('mod_dcmanage_switch_ports')->where('id', $id)->first(['if_name']);
+            $ifLabel = $portRow ? (string) ($portRow->if_name ?? '') : '#' . $id;
+
+            if ($testMode === '1') {
+                $actionLabel = $action === 'switch_port_shut' ? 'Suspend' : 'Activate';
+                Capsule::table('mod_dcmanage_logs')->insert([
+                    'event_type' => 'system',
+                    'message' => '[TEST MODE] Port ' . $actionLabel . ' blocked for ' . $ifLabel . ' (port #' . $id . ') — test mode is enabled',
+                    'data' => json_encode(['port_id' => $id, 'action' => $action, 'blocked' => true]),
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
+                return '<div class="alert alert-warning">' . htmlspecialchars($actionLabel . ' is disabled in Test Mode. Disable test mode in Settings to manage port state.') . '</div>';
+            }
+
             $adminStatus = $action === 'switch_port_shut' ? 'down' : 'up';
             $operStatus = $action === 'switch_port_shut' ? 'down' : 'unknown';
 
@@ -795,6 +814,15 @@ function dcmanage_handle_actions(string $lang): string
                     'oper_status' => $operStatus,
                     'last_seen' => date('Y-m-d H:i:s'),
                 ]);
+
+            // Log the action
+            $actionLabel = $action === 'switch_port_shut' ? 'suspended' : 'activated';
+            Capsule::table('mod_dcmanage_logs')->insert([
+                'event_type' => 'system',
+                'message' => 'Port ' . $actionLabel . ': ' . $ifLabel . ' (port #' . $id . ')',
+                'data' => json_encode(['port_id' => $id, 'action' => $action]),
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
 
             return '<div class="alert alert-success">' . htmlspecialchars(I18n::t('switch_port_updated', $lang)) . '</div>';
         }

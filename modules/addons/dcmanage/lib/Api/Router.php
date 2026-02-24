@@ -410,44 +410,71 @@ final class Router
     }
 
     private static function switchPortAction(): array
-    {
-        $portId = (int) ($_GET['port_id'] ?? 0);
-        $action = strtolower(trim((string) ($_GET['action'] ?? 'check')));
-        if ($portId <= 0) {
-            throw new \InvalidArgumentException('port_id is required');
-        }
-        if (!in_array($action, ['check', 'shut', 'noshut'], true)) {
-            throw new \InvalidArgumentException('Invalid action');
+{
+    $portId = (int) ($_GET['port_id'] ?? 0);
+    $action = strtolower(trim((string) ($_GET['action'] ?? 'check')));
+    if ($portId <= 0) {
+        throw new \InvalidArgumentException('port_id is required');
+    }
+    if (!in_array($action, ['check', 'shut', 'noshut'], true)) {
+        throw new \InvalidArgumentException('Invalid action');
+    }
+
+    $port = Capsule::table('mod_dcmanage_switch_ports as p')
+        ->leftJoin('mod_dcmanage_switches as s', 's.id', '=', 'p.switch_id')
+        ->where('p.id', $portId)
+        ->first([
+            'p.id', 'p.switch_id', 'p.if_index', 'p.if_name',
+            'p.admin_status', 'p.oper_status',
+            's.mgmt_ip', 's.snmp_community', 's.snmp_port',
+        ]);
+    if ($port === null) {
+        throw new \RuntimeException('Port not found');
+    }
+
+    // Test mode guard: block shut/noshut in test mode
+    if ($action === 'shut' || $action === 'noshut') {
+        $testMode = (string) (Capsule::table('mod_dcmanage_meta')
+            ->where('meta_key', 'settings.enforcement_test_mode')
+            ->value('meta_value') ?? '0');
+        if ($testMode === '1') {
+            // Log the blocked action
+            Capsule::table('mod_dcmanage_logs')->insert([
+                'event_type' => 'system',
+                'message' => '[TEST MODE] Port ' . ($action === 'shut' ? 'suspend' : 'activate') . ' blocked for ' . (string) ($port->if_name ?? '') . ' (port #' . $portId . ') — test mode is enabled',
+                'data' => json_encode(['port_id' => $portId, 'action' => $action, 'blocked' => true]),
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            throw new \RuntimeException('Suspend/Activate actions are disabled in Test Mode. Disable test mode in Settings to manage port state.');
         }
 
-        $port = Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->first();
-        if ($port === null) {
-            throw new \RuntimeException('Port not found');
-        }
-
+        // In production mode: update DB status (actual SNMP set to be implemented)
         $payload = [];
-        if ($action === 'check') {
-            $payload = [
-                'oper_status' => strtolower(trim((string) ($port->oper_status ?? 'unknown'))) === 'up' ? 'up' : 'down',
-                'last_seen' => date('Y-m-d H:i:s'),
-            ];
-        } elseif ($action === 'shut') {
+        if ($action === 'shut') {
             $payload = [
                 'admin_status' => 'down',
                 'oper_status' => 'down',
                 'last_seen' => date('Y-m-d H:i:s'),
             ];
-        } elseif ($action === 'noshut') {
+        } else {
             $payload = [
                 'admin_status' => 'up',
-                'oper_status' => strtolower(trim((string) ($port->oper_status ?? ''))) === 'down' ? 'unknown' : (string) ($port->oper_status ?? 'unknown'),
+                'oper_status' => 'unknown',
                 'last_seen' => date('Y-m-d H:i:s'),
             ];
         }
 
         Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->update($payload);
-        $updated = Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->first(['id', 'admin_status', 'oper_status', 'last_seen']);
 
+        // Log the action
+        Capsule::table('mod_dcmanage_logs')->insert([
+            'event_type' => 'system',
+            'message' => 'Port ' . ($action === 'shut' ? 'suspended' : 'activated') . ': ' . (string) ($port->if_name ?? '') . ' (port #' . $portId . ')',
+            'data' => json_encode(['port_id' => $portId, 'action' => $action]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $updated = Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->first(['id', 'admin_status', 'oper_status', 'last_seen']);
         return [
             'id' => (int) $updated->id,
             'admin_status' => (string) ($updated->admin_status ?? 'unknown'),
@@ -456,6 +483,59 @@ final class Router
             'action' => $action,
         ];
     }
+
+    // Check: do real SNMP probe
+    $ifIndex = (int) ($port->if_index ?? 0);
+    if ($ifIndex <= 0) {
+        $ifIndex = dcmanage_resolve_ifindex_by_name(
+            (string) ($port->mgmt_ip ?? ''),
+            (string) ($port->snmp_community ?? 'public'),
+            (int) ($port->snmp_port ?? 161),
+            (string) ($port->if_name ?? '')
+        );
+    }
+
+    if ($ifIndex > 0 && !empty($port->mgmt_ip)) {
+        $probe = dcmanage_probe_single_switch_port(
+            (string) $port->mgmt_ip,
+            (string) ($port->snmp_community ?? 'public'),
+            (int) ($port->snmp_port ?? 161),
+            $ifIndex
+        );
+
+        if (!empty($probe['ok'])) {
+            $payload = [
+                'if_index' => $ifIndex,
+                'if_name' => dcmanage_normalize_if_name((string) ($probe['if_name'] ?? (string) $port->if_name)),
+                'if_desc' => trim((string) ($probe['if_desc'] ?? '')) ?: null,
+                'vlan' => trim((string) ($probe['vlan'] ?? '')),
+                'speed_mbps' => isset($probe['speed_mbps']) && (int) $probe['speed_mbps'] > 0 ? (int) $probe['speed_mbps'] : null,
+                'speed_mode' => trim((string) ($probe['speed_mode'] ?? '')) ?: null,
+                'admin_status' => trim((string) ($probe['admin_status'] ?? 'unknown')),
+                'oper_status' => trim((string) ($probe['oper_status'] ?? 'unknown')),
+                'last_seen' => date('Y-m-d H:i:s'),
+            ];
+            Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->update($payload);
+
+            return [
+                'id' => $portId,
+                'admin_status' => $payload['admin_status'],
+                'oper_status' => $payload['oper_status'],
+                'last_seen' => $payload['last_seen'],
+                'action' => 'check',
+            ];
+        }
+    }
+
+    // Fallback: return current DB values
+    return [
+        'id' => $portId,
+        'admin_status' => (string) ($port->admin_status ?? 'unknown'),
+        'oper_status' => (string) ($port->oper_status ?? 'unknown'),
+        'last_seen' => date('Y-m-d H:i:s'),
+        'action' => 'check',
+    ];
+}
 
     private static function iloTest(): array
     {
