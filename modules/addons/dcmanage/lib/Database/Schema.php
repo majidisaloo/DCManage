@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 
 final class Schema
 {
-    private const SCHEMA_VERSION = 15;
+    private const SCHEMA_VERSION = 16;
 
     public static function migrate(): void
     {
@@ -89,6 +89,11 @@ final class Schema
         if ($current < 15) {
             self::migrationV15();
             self::setCurrentVersion(15);
+        }
+
+        if ($current < 16) {
+            self::migrationV16();
+            self::setCurrentVersion(16);
         }
     }
 
@@ -619,6 +624,38 @@ final class Schema
             if (!Capsule::schema()->hasColumn('mod_dcmanage_usage_state', 'upload_bytes')) {
                 Capsule::schema()->table('mod_dcmanage_usage_state', static function (Blueprint $table): void {
                     $table->unsignedBigInteger('upload_bytes')->default(0)->after('download_bytes');
+                });
+            }
+        }
+    }
+
+    private static function migrationV16(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_servers') && !Capsule::schema()->hasColumn('mod_dcmanage_servers', 'start_date')) {
+            Capsule::schema()->table('mod_dcmanage_servers', static function (Blueprint $table): void {
+                $table->date('start_date')->nullable()->after('notes')->index();
+            });
+        }
+
+        if (Capsule::schema()->hasTable('mod_dcmanage_monitoring_group_map')) {
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_monitoring_group_map', 'probe_name')) {
+                Capsule::schema()->table('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
+                    $table->string('probe_name', 191)->nullable()->after('probe_id');
+                });
+            }
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_monitoring_group_map', 'group_name')) {
+                Capsule::schema()->table('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
+                    $table->string('group_name', 191)->nullable()->after('group_id');
+                });
+            }
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_monitoring_group_map', 'subgroup_name')) {
+                Capsule::schema()->table('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
+                    $table->string('subgroup_name', 191)->nullable()->after('subgroup_id');
+                });
+            }
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_monitoring_group_map', 'device_name')) {
+                Capsule::schema()->table('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
+                    $table->string('device_name', 191)->nullable()->after('device_id');
                 });
             }
         }

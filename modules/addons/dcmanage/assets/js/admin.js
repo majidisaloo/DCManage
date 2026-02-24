@@ -755,24 +755,88 @@
     btnsContainers.forEach(function (container) {
       var serverId = container.getAttribute('data-server-id');
       var canvasId = 'dcmanage-server-graph-' + serverId;
-      var buttons = container.querySelectorAll('.dcmanage-graph-range');
+      var customToggle = container.querySelector('.dcmanage-graph-custom-toggle');
+      var customRange = container.closest('.dcmanage-form-card').querySelector('.dcmanage-graph-custom-range');
+      var fromInput = customRange ? customRange.querySelector('.dcmanage-graph-from') : null;
+      var toInput = customRange ? customRange.querySelector('.dcmanage-graph-to') : null;
+      var applyBtn = customRange ? customRange.querySelector('.dcmanage-graph-apply') : null;
 
       buttons.forEach(function (btn) {
         btn.addEventListener('click', function () {
           buttons.forEach(function (b) { b.classList.remove('active'); });
+          if (customToggle) customToggle.classList.remove('active');
           this.classList.add('active');
+          if (customRange) customRange.style.display = 'none';
           var range = this.getAttribute('data-range');
           renderServerGraph(serverId, canvasId, range);
         });
       });
 
+      if (customToggle && customRange && fromInput && toInput && applyBtn) {
+        customToggle.addEventListener('click', function () {
+          buttons.forEach(function (b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          customRange.style.display = 'block';
+        });
+
+        applyBtn.addEventListener('click', function () {
+          var fromVal = fromInput.value;
+          var toVal = toInput.value;
+          if (!fromVal) return;
+          if (!toVal) toVal = 'now';
+          else toVal = toVal + ' 23:59:59';
+
+          renderServerGraph(serverId, canvasId, fromVal, toVal);
+        });
+      }
+
       // Init first active
-      var activeBtn = container.querySelector('.active') || buttons[0];
+      var activeBtn = container.querySelector('.dcmanage-graph-range.active') || buttons[0];
       if (activeBtn) {
-        renderServerGraph(serverId, canvasId, activeBtn.getAttribute('data-range'));
+        renderServerGraph(serverId, canvasId, activeBtn.getAttribute('data-range') || '-2h');
+      }
+    });
+  })();
+
+  // --- Map Select2 to dcmanage-server-map ---
+  (function initServerMapSelect2() {
+    var serverMaps = document.querySelectorAll('.dcmanage-server-map');
+    serverMaps.forEach(function (form) {
+      if (window.jQuery && jQuery.fn && jQuery.fn.select2) {
+        // Find existing selects and apply Select2
+        var prtgSelects = form.querySelectorAll('.dcmanage-monitor-prtg');
+        var sensorSelects = form.querySelectorAll('.dcmanage-monitor-sensor');
+
+        prtgSelects.forEach(function (sel) {
+          jQuery(sel).select2({ theme: 'bootstrap4', width: '100%' });
+          jQuery(sel).on('select2:select', function () { sel.dispatchEvent(new Event('change')); });
+        });
+
+        sensorSelects.forEach(function (sel) {
+          jQuery(sel).select2({ theme: 'bootstrap4', width: '100%' });
+          jQuery(sel).on('select2:select', function () { sel.dispatchEvent(new Event('change')); });
+        });
+      }
+    });
+
+    // Handle dynamically added rows for Select2
+    document.addEventListener('dcmanage:rowAdded', function (e) {
+      if (window.jQuery && jQuery.fn && jQuery.fn.select2 && e.detail && e.detail.row) {
+        var row = e.detail.row;
+        var prtgs = row.querySelectorAll('.dcmanage-monitor-prtg');
+        var sensors = row.querySelectorAll('.dcmanage-monitor-sensor');
+
+        prtgs.forEach(function (sel) {
+          jQuery(sel).select2({ theme: 'bootstrap4', width: '100%' });
+          jQuery(sel).on('select2:select', function () { sel.dispatchEvent(new Event('change')); });
+        });
+
+        sensors.forEach(function (sel) {
+          jQuery(sel).select2({ theme: 'bootstrap4', width: '100%' });
+          jQuery(sel).on('select2:select', function () { sel.dispatchEvent(new Event('change')); });
+        });
       }
     });
   })();
 
 })();
-

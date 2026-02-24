@@ -234,22 +234,63 @@ final class Router
 
     private static function graphGet(): array
     {
-        $serviceId = (int) ($_GET['service_id'] ?? 0);
-        if ($serviceId <= 0) {
-            throw new \InvalidArgumentException('service_id is required');
+        $serverId = (int) ($_GET['server_id'] ?? 0);
+        if ($serverId <= 0) {
+            // Also accept legacy service_id for backward compatibility if present
+            $serviceId = (int) ($_GET['service_id'] ?? 0);
+            if ($serviceId > 0) {
+                $link = Capsule::table('mod_dcmanage_service_link')->where('whmcs_serviceid', $serviceId)->first(['server_id']);
+                if ($link !== null) {
+                    $serverId = (int) $link->server_id;
+                }
+            }
+        }
+        
+        if ($serverId <= 0) {
+            throw new \InvalidArgumentException('server_id is required');
         }
 
         $from = (string) ($_GET['from'] ?? '-7d');
         $to = (string) ($_GET['to'] ?? 'now');
         $avg = (string) ($_GET['avg'] ?? '300');
 
-        $link = Capsule::table('mod_dcmanage_service_link')->where('whmcs_serviceid', $serviceId)->first();
-        if ($link === null || empty($link->prtg_id) || empty($link->prtg_sensor_id)) {
-            throw new \RuntimeException('Service has no PRTG mapping');
+        $sensorMap = Capsule::table('mod_dcmanage_server_traffic_sensors')
+            ->where('server_id', $serverId)
+            ->where('sensor_type', 'traffic')
+            ->first();
+
+        if ($sensorMap === null || empty($sensorMap->prtg_id) || empty($sensorMap->sensor_id)) {
+            throw new \RuntimeException('Server has no PRTG traffic sensor mapped');
         }
 
-        $client = PrtgClient::fromDb((int) $link->prtg_id);
-        $payload = $client->getHistoricData((string) $link->prtg_sensor_id, $avg, $from, $to);
+        $server = Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->first(['start_date']);
+        $startDate = $server ? (string) ($server->start_date ?? '') : '';
+        if ($startDate !== '') {
+            $fromTs = 0;
+            if ($from === 'now' || $from === '0') {
+                $fromTs = time();
+            } elseif (preg_match('/^-(\d+)([hdwmy])$/', $from, $m) === 1) {
+                $amt = (int) $m[1];
+                $unit = $m[2];
+                $mult = 3600;
+                if ($unit === 'd') $mult = 86400;
+                elseif ($unit === 'w') $mult = 604800;
+                elseif ($unit === 'm') $mult = 2592000;
+                elseif ($unit === 'y') $mult = 31536000;
+                $fromTs = time() - ($amt * $mult);
+            } else {
+                $fromTs = strtotime($from) ?: 0;
+            }
+
+            $startTs = strtotime($startDate . ' 00:00:00') ?: 0;
+            if ($startTs > 0 && $fromTs > 0 && $fromTs < $startTs) {
+                // Limit the 'from' date to the start_date
+                $from = date('Y-m-d 00:00:00', $startTs);
+            }
+        }
+
+        $client = PrtgClient::fromDb((int) $sensorMap->prtg_id);
+        $payload = $client->getHistoricData((string) $sensorMap->sensor_id, $avg, $from, $to);
 
         return [
             'cached' => false,
