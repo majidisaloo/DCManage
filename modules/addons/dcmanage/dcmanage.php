@@ -162,6 +162,8 @@ function dcmanage_output(array $vars): void
     echo '</div></div>';
     echo '</div>';
 
+    echo '<div id="dcmanage-api-base" data-url="' . htmlspecialchars($moduleLink . '&dcmanage_api=1') . '" style="display:none;"></div>';
+
     echo '<link rel="stylesheet" href="../modules/addons/dcmanage/assets/css/admin.css?v=' . rawurlencode(DCManage\Version::CURRENT) . '">';
     echo '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>';
     echo '<script src="../modules/addons/dcmanage/assets/js/admin.js?v=' . rawurlencode(DCManage\Version::CURRENT) . '"></script>';
