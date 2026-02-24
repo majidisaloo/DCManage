@@ -550,7 +550,7 @@
   background: linear-gradient(180deg, #fcfdff 0%, #f6f9fd 100%);
   border-radius: 14px;
   padding: 18px 18px 16px;
-  margin-top: 12px;
+  margin-top: 18px;
 }
 
 .dcmanage-centered-form {
@@ -1253,7 +1253,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 10px;
-  margin: 10px 0;
+  margin: 20px 0;
 }
 
 .dcmanage-server-item td {
