@@ -694,7 +694,7 @@ final class Schema
         if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports')) {
             if (!Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'is_locked')) {
                 Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
-                    $table->boolean('is_locked')->default(0)->after('notes');
+                    $table->boolean('is_locked')->default(0);
                 });
             }
         }

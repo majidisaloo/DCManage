@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.100] - 2024-05-31
+### Fixed
+- Hotfix: Removed undefined `notes` dependency in `mod_dcmanage_switch_ports` during migrationV18 that halted the upgrade process.
+
 ## [0.1.99] - 2024-05-31
 ### Added
 - Implemented Port Locking feature with UI toggle and backend enforcement.
