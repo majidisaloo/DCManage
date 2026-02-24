@@ -3,7 +3,14 @@
 ## [Unreleased]
 - No pending entries.
 
-## [0.1.96] - 2026-02-25
+## [v0.1.97] - 2024-05-30
+### Fixed
+- Fixed PRTG sensor drop-downs inside the Server Edit modal showing "ID" instead of "Name" for previously-saved sensor IDs
+- Upgraded the Switch Ports and Servers table JS pagers to show interactive `[1] [2] [3]` windowed page numbers instead of bare `1/X`
+- Reverted the card bottom margin for KPI dashboard cards to improve spacing on larger screens
+- Fixed table headers disappearing on pagination pages 2+
+
+## [v0.1.96] - 2024-05-29
 ### Fixed
 - Fixed fatal error `Call to undefined function dcmanage_log()` in `dcmanage.php` that blocked the Servers tab rendering.
 - Fixed dashboard KPI cards vertical spacing to avoid collapse/sticking between rows on smaller viewports.
