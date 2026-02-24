@@ -440,9 +440,10 @@ final class Router
         if ($testMode === '1') {
             // Log the blocked action
             Capsule::table('mod_dcmanage_logs')->insert([
-                'event_type' => 'system',
+                'level' => 'warning',
+                'source' => 'switch',
                 'message' => '[TEST MODE] Port ' . ($action === 'shut' ? 'suspend' : 'activate') . ' blocked for ' . (string) ($port->if_name ?? '') . ' (port #' . $portId . ') — test mode is enabled',
-                'data' => json_encode(['port_id' => $portId, 'action' => $action, 'blocked' => true]),
+                'context_json' => json_encode(['port_id' => $portId, 'action' => $action, 'blocked' => true]),
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
             throw new \RuntimeException('Suspend/Activate actions are disabled in Test Mode. Disable test mode in Settings to manage port state.');
@@ -468,9 +469,10 @@ final class Router
 
         // Log the action
         Capsule::table('mod_dcmanage_logs')->insert([
-            'event_type' => 'system',
+            'level' => 'info',
+            'source' => 'switch',
             'message' => 'Port ' . ($action === 'shut' ? 'suspended' : 'activated') . ': ' . (string) ($port->if_name ?? '') . ' (port #' . $portId . ')',
-            'data' => json_encode(['port_id' => $portId, 'action' => $action]),
+            'context_json' => json_encode(['port_id' => $portId, 'action' => $action]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 

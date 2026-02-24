@@ -796,9 +796,10 @@ function dcmanage_handle_actions(string $lang): string
             if ($testMode === '1') {
                 $actionLabel = $action === 'switch_port_shut' ? 'Suspend' : 'Activate';
                 Capsule::table('mod_dcmanage_logs')->insert([
-                    'event_type' => 'system',
+                    'level' => 'warning',
+                    'source' => 'switch',
                     'message' => '[TEST MODE] Port ' . $actionLabel . ' blocked for ' . $ifLabel . ' (port #' . $id . ') — test mode is enabled',
-                    'data' => json_encode(['port_id' => $id, 'action' => $action, 'blocked' => true]),
+                    'context_json' => json_encode(['port_id' => $id, 'action' => $action, 'blocked' => true]),
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
                 return '<div class="alert alert-warning">' . htmlspecialchars($actionLabel . ' is disabled in Test Mode. Disable test mode in Settings to manage port state.') . '</div>';
@@ -818,9 +819,10 @@ function dcmanage_handle_actions(string $lang): string
             // Log the action
             $actionLabel = $action === 'switch_port_shut' ? 'suspended' : 'activated';
             Capsule::table('mod_dcmanage_logs')->insert([
-                'event_type' => 'system',
+                'level' => 'info',
+                'source' => 'switch',
                 'message' => 'Port ' . $actionLabel . ': ' . $ifLabel . ' (port #' . $id . ')',
-                'data' => json_encode(['port_id' => $id, 'action' => $action]),
+                'context_json' => json_encode(['port_id' => $id, 'action' => $action]),
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
 
