@@ -931,6 +931,12 @@
 
 .dcmanage-switch-ports-card {
   background: linear-gradient(180deg, #ffffff, #f7fafc);
+  width: 100%;
+}
+
+.dcmanage-switch-ports-card .table-responsive {
+  width: 100%;
+  overflow-x: auto;
 }
 
 .dcmanage-port-table tbody td {
@@ -940,6 +946,15 @@
 .dcmanage-port-table {
   width: 100%;
   table-layout: auto;
+}
+
+.dcmanage-port-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eef3fb;
+  border-bottom: 2px solid #d4dfef;
+  white-space: nowrap;
 }
 
 .dcmanage-port-table th,
