@@ -18,6 +18,7 @@ final class UsageEngine
         $rows = Capsule::table('mod_dcmanage_service_link as sl')
             ->join('tblhosting as h', 'h.id', '=', 'sl.whmcs_serviceid')
             ->leftJoin('mod_dcmanage_usage_state as us', 'us.whmcs_serviceid', '=', 'sl.whmcs_serviceid')
+            ->leftJoin('mod_dcmanage_servers as sr', 'sr.id', '=', 'sl.server_id')
             ->select([
                 'sl.whmcs_serviceid',
                 'sl.dc_id',
@@ -38,6 +39,7 @@ final class UsageEngine
                 'us.last_out_octets',
                 'us.cycle_start',
                 'us.cycle_end',
+                'sr.start_date'
             ])
             ->where('h.domainstatus', 'Active')
             ->get();
@@ -47,6 +49,13 @@ final class UsageEngine
         foreach ($rows as $row) {
             if (empty($row->prtg_id) || empty($row->prtg_sensor_id)) {
                 continue;
+            }
+            $startDate = trim((string) ($row->start_date ?? ''));
+            if ($startDate !== '') {
+                $startTs = strtotime($startDate . ' 00:00:00');
+                if ($startTs !== false && time() < $startTs) {
+                    continue;
+                }
             }
             $this->pollService((array) $row);
             $processed++;

@@ -701,7 +701,8 @@
 
     var currentChart = null;
 
-    function renderServerGraph(serverId, canvasId, range) {
+    function renderServerGraph(serverId, canvasId, fromRange, toRange) {
+      toRange = toRange || 'now';
       var canvas = document.getElementById(canvasId);
       var loader = canvas ? canvas.nextElementSibling : null;
       if (!canvas) { return; }
@@ -709,7 +710,7 @@
       if (loader) { loader.style.display = 'block'; }
       if (currentChart) { currentChart.destroy(); }
 
-      getJson(apiUrl(baseApi, 'graphs/get', { service_id: serverId, from: range, to: 'now', avg: 300 })).then(function (res) {
+      getJson(apiUrl(baseApi, 'graphs/get', { service_id: serverId, from: fromRange, to: toRange, avg: 300 })).then(function (res) {
         if (loader) { loader.style.display = 'none'; }
         if (!res.ok) { return; }
 
@@ -755,6 +756,7 @@
     btnsContainers.forEach(function (container) {
       var serverId = container.getAttribute('data-server-id');
       var canvasId = 'dcmanage-server-graph-' + serverId;
+      var buttons = container.querySelectorAll('.dcmanage-graph-range');
       var customToggle = container.querySelector('.dcmanage-graph-custom-toggle');
       var customRange = container.closest('.dcmanage-form-card').querySelector('.dcmanage-graph-custom-range');
       var fromInput = customRange ? customRange.querySelector('.dcmanage-graph-from') : null;
