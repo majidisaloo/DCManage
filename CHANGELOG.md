@@ -3,6 +3,15 @@
 ## [Unreleased]
 - No pending entries.
 
+## [0.1.96] - 2026-02-25
+### Fixed
+- Fixed fatal error `Call to undefined function dcmanage_log()` in `dcmanage.php` that blocked the Servers tab rendering.
+- Fixed dashboard KPI cards vertical spacing to avoid collapse/sticking between rows on smaller viewports.
+- Enhanced table responsiveness (`width: 100%; table-layout: fixed;` with word-wrap) to prevent wide fields like "Free space" / "Descriptions" from causing horizontal overflow.
+- Prevented Datatables from hiding `thead` row headers on pages 2+ by enforcing `display: table-header-group !important`.
+- Restyled global `Select2` dropdown elements with modern UI metrics (rounded borders, generous padding, focus rings) to fix the legacy WHMCS UI dropdown appearance.
+- Delayed the initial Cron Health dashboard API request by 250ms to ensure the visual KPI cards render and layout first without jumping.
+
 ## [0.1.95] - 2026-02-25
 ### Added
 - Replaced multiple PRTG selection dropdowns (Group, Subgroup, Device, Sensor) in Server Edit -> Monitoring with single Select2 AJAX search for exact sensor.

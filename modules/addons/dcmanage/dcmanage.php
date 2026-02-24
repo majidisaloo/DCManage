@@ -155,7 +155,7 @@ function dcmanage_output(array $vars): void
             echo '</div>';
         }
     } catch (Throwable $e) {
-        dcmanage_log('error', 'ui', 'tab:' . $activeTab . ' render failed: ' . $e->getMessage());
+        \DCManage\Support\Logger::error('ui', 'tab:' . $activeTab . ' render failed', ['error' => $e->getMessage()]);
         echo '<div class="alert alert-danger">Render failed: ' . htmlspecialchars($e->getMessage()) . '</div>';
     }
 

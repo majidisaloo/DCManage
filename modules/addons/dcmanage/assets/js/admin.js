@@ -524,7 +524,11 @@
       var moduleLink = dashboard.getAttribute('data-module-link') || 'addonmodules.php?module=dcmanage';
       renderDashboard(base, moduleLink);
       renderVersion(base);
-      renderCron(base, moduleLink);
+
+      // Delay cron health slightly so dashboard metrics render first without jumping
+      setTimeout(function () {
+        renderCron(base, moduleLink);
+      }, 250);
     }
 
     var traffic = document.getElementById('dcmanage-traffic');
