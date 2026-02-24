@@ -100,6 +100,16 @@ final class Schema
             self::migrationV17();
             self::setCurrentVersion(17);
         }
+
+        if ($current < 18) {
+            self::migrationV18();
+            self::setCurrentVersion(18);
+        }
+
+        if ($current < 19) {
+            self::migrationV19();
+            self::setCurrentVersion(19);
+        }
     }
 
     private static function ensureMeta(): void
@@ -227,6 +237,7 @@ final class Schema
                 $table->unsignedSmallInteger('u_start')->nullable();
                 $table->unsignedSmallInteger('u_height')->default(1);
                 $table->unsignedInteger('ilo_id')->nullable()->index();
+                $table->string('ilo_host', 191)->nullable();
                 $table->text('notes')->nullable();
                 $table->timestamp('created_at')->nullable();
             });
@@ -673,6 +684,27 @@ final class Schema
                 Capsule::schema()->table('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
                     $table->string('subgroup2_id', 64)->nullable()->after('subgroup_name');
                     $table->string('subgroup2_name', 191)->nullable()->after('subgroup2_id');
+                });
+            }
+        }
+    }
+
+    private static function migrationV18(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_switch_ports')) {
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_switch_ports', 'is_locked')) {
+                Capsule::schema()->table('mod_dcmanage_switch_ports', static function (Blueprint $table): void {
+                    $table->boolean('is_locked')->default(0)->after('notes');
+                });
+            }
+        }
+    }
+    private static function migrationV19(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_servers')) {
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_servers', 'ilo_host')) {
+                Capsule::schema()->table('mod_dcmanage_servers', static function (Blueprint $table): void {
+                    $table->string('ilo_host', 191)->nullable()->after('ilo_id');
                 });
             }
         }

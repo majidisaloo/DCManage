@@ -1,7 +1,19 @@
 # Changelog
 
+## [0.1.99] - 2024-05-31
+### Added
+- Implemented Port Locking feature with UI toggle and backend enforcement.
+- Added Edit functionality for Datacenter PRTG Mappings.
+- Schema Migration V19 for fixing missing `ilo_host` column in mod_dcmanage_servers.
+
+### Changed
+- Increased column spacing in Switch Ports table for better readability.
+- Improved UI parity between Server Edit PRTG mapping and Datacenter PRTG mapping forms.
+
+### Fixed
+- Fixed Traffic Graph 400 Bad Request error by passing `server_id` instead of `service_id`.
+
 ## [Unreleased]
-- Ongoing refinements
 
 ## [0.1.98] - 2024-05-30
 ### Added

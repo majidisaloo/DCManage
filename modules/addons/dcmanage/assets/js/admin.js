@@ -653,7 +653,7 @@
       return;
     }
 
-    getJson(apiUrl(baseApi, 'graphs/get', { service_id: serviceId, from: '-24h', to: 'now', avg: 300 })).then(function (res) {
+    getJson(apiUrl(baseApi, 'graphs/get', { server_id: serviceId, from: '-24h', to: 'now', avg: 300 })).then(function (res) {
       if (!res.ok) {
         return;
       }
@@ -714,7 +714,7 @@
       if (loader) { loader.style.display = 'block'; }
       if (currentChart) { currentChart.destroy(); }
 
-      getJson(apiUrl(baseApi, 'graphs/get', { service_id: serverId, from: fromRange, to: toRange, avg: 300 })).then(function (res) {
+      getJson(apiUrl(baseApi, 'graphs/get', { server_id: serverId, from: fromRange, to: toRange, avg: 300 })).then(function (res) {
         if (loader) { loader.style.display = 'none'; }
         if (!res.ok) { return; }
 

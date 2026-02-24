@@ -86,6 +86,12 @@ final class Router
                 case 'switch/port-action':
                     $data = self::switchPortAction();
                     break;
+                case 'switch/port/lock':
+                    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                        throw new \RuntimeException('Method not allowed');
+                    }
+                    $data = self::switchPortLock();
+                    break;
                 default:
                     throw new \RuntimeException('Endpoint not found: ' . $endpoint);
             }
@@ -463,6 +469,30 @@ final class Router
         ];
     }
 
+    private static function switchPortLock(): array
+    {
+        $portId = (int) ($_POST['port_id'] ?? 0);
+        $state = (int) ($_POST['state'] ?? 0) === 1 ? 1 : 0;
+        
+        if ($portId <= 0) {
+            throw new \InvalidArgumentException('port_id is required');
+        }
+
+        $port = Capsule::table('mod_dcmanage_switch_ports')->where('id', $portId)->first(['id', 'if_name']);
+        if ($port === null) {
+            throw new \RuntimeException('Port not found');
+        }
+
+        Capsule::table('mod_dcmanage_switch_ports')
+            ->where('id', $portId)
+            ->update(['is_locked' => $state]);
+
+        return [
+            'locked' => $state === 1,
+            'message' => 'Port ' . $port->if_name . ($state === 1 ? ' locked.' : ' unlocked.'),
+        ];
+    }
+
     private static function switchPortAction(): array
 {
     $portId = (int) ($_GET['port_id'] ?? 0);
@@ -479,11 +509,15 @@ final class Router
         ->where('p.id', $portId)
         ->first([
             'p.id', 'p.switch_id', 'p.if_index', 'p.if_name',
-            'p.admin_status', 'p.oper_status',
+            'p.admin_status', 'p.oper_status', 'p.is_locked',
             's.mgmt_ip', 's.snmp_community', 's.snmp_port',
         ]);
     if ($port === null) {
         throw new \RuntimeException('Port not found');
+    }
+
+    if (($action === 'shut' || $action === 'noshut') && (int) ($port->is_locked ?? 0) === 1) {
+        throw new \RuntimeException('This port is locked and cannot be modified. Unlock it first.');
     }
 
     // Test mode guard: block shut/noshut in test mode
