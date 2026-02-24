@@ -263,30 +263,43 @@ final class Router
             throw new \RuntimeException('Server has no PRTG traffic sensor mapped');
         }
 
+        $fromTs = 0;
+        if ($from === 'now' || $from === '0') {
+            $fromTs = time();
+        } elseif (preg_match('/^-(\d+)([hdwmy])$/', $from, $m) === 1) {
+            $amt = (int) $m[1];
+            $unit = $m[2];
+            $mult = 3600;
+            if ($unit === 'd') $mult = 86400;
+            elseif ($unit === 'w') $mult = 604800;
+            elseif ($unit === 'm') $mult = 2592000;
+            elseif ($unit === 'y') $mult = 31536000;
+            $fromTs = time() - ($amt * $mult);
+        } else {
+            $fromTs = strtotime($from) ?: 0;
+        }
+
+        $toTs = 0;
+        if ($to === 'now' || $to === '0') {
+            $toTs = time();
+        } else {
+            $toTs = strtotime($to) ?: time();
+        }
+
         $server = Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->first(['start_date']);
         $startDate = $server ? (string) ($server->start_date ?? '') : '';
         if ($startDate !== '') {
-            $fromTs = 0;
-            if ($from === 'now' || $from === '0') {
-                $fromTs = time();
-            } elseif (preg_match('/^-(\d+)([hdwmy])$/', $from, $m) === 1) {
-                $amt = (int) $m[1];
-                $unit = $m[2];
-                $mult = 3600;
-                if ($unit === 'd') $mult = 86400;
-                elseif ($unit === 'w') $mult = 604800;
-                elseif ($unit === 'm') $mult = 2592000;
-                elseif ($unit === 'y') $mult = 31536000;
-                $fromTs = time() - ($amt * $mult);
-            } else {
-                $fromTs = strtotime($from) ?: 0;
-            }
-
             $startTs = strtotime($startDate . ' 00:00:00') ?: 0;
             if ($startTs > 0 && $fromTs > 0 && $fromTs < $startTs) {
-                // Limit the 'from' date to the start_date
-                $from = date('Y-m-d 00:00:00', $startTs);
+                $fromTs = $startTs;
             }
+        }
+
+        if ($fromTs > 0) {
+            $from = date('Y-m-d-H-i-s', $fromTs);
+        }
+        if ($toTs > 0) {
+            $to = date('Y-m-d-H-i-s', $toTs);
         }
 
         $client = PrtgClient::fromDb((int) $sensorMap->prtg_id);

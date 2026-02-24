@@ -1,7 +1,22 @@
 # Changelog
 
 ## [Unreleased]
-- No pending entries.
+- Ongoing refinements
+
+## [0.1.98] - 2024-05-30
+### Added
+- Schema Migration V17
+- Added Subgroup 2 to PRTG Group mapping UI for nested monitoring.
+- Added native WHMCS iframe proxy view for iLO HTML5 Consoles.
+
+### Changed
+- Converted the Traffic Graph Date picker to a robust, inline single row using modern `datetime-local` elements.
+- Optimized Table Layouts globally by dropping restrictive fixed CSS column widths.
+
+### Fixed
+- Fixed bug preventing PRTG Sensors deep in subgroups from returning in Server Edit searches by adopting `filter_name` / `filter_objid`.
+- Fixed Traffic Graph fatal issue where the date parsing output invalid characters that crashed the PRTG API query.
+- Ensured JS Pagination properly hides unselected table rows by removing overlapping `thead tr` CSS styles.
 
 ## [v0.1.97] - 2024-05-30
 ### Fixed

@@ -95,6 +95,11 @@ final class Schema
             self::migrationV16();
             self::setCurrentVersion(16);
         }
+
+        if ($current < 17) {
+            self::migrationV17();
+            self::setCurrentVersion(17);
+        }
     }
 
     private static function ensureMeta(): void
@@ -656,6 +661,18 @@ final class Schema
             if (!Capsule::schema()->hasColumn('mod_dcmanage_monitoring_group_map', 'device_name')) {
                 Capsule::schema()->table('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
                     $table->string('device_name', 191)->nullable()->after('device_id');
+                });
+            }
+        }
+    }
+
+    private static function migrationV17(): void
+    {
+        if (Capsule::schema()->hasTable('mod_dcmanage_monitoring_group_map')) {
+            if (!Capsule::schema()->hasColumn('mod_dcmanage_monitoring_group_map', 'subgroup2_id')) {
+                Capsule::schema()->table('mod_dcmanage_monitoring_group_map', static function (Blueprint $table): void {
+                    $table->string('subgroup2_id', 64)->nullable()->after('subgroup_name');
+                    $table->string('subgroup2_name', 191)->nullable()->after('subgroup2_id');
                 });
             }
         }

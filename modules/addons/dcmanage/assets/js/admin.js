@@ -782,16 +782,27 @@
         customToggle.addEventListener('click', function () {
           buttons.forEach(function (b) { b.classList.remove('active'); });
           this.classList.add('active');
-          customRange.style.display = 'block';
+          customRange.style.display = 'flex';
         });
+
+        var nowBtn = customRange.querySelector('.dcmanage-graph-now');
+        if (nowBtn) {
+          nowBtn.addEventListener('click', function () {
+            var now = new Date();
+            var tzOff = now.getTimezoneOffset() * 60000;
+            var localISOTime = (new Date(now - tzOff)).toISOString().slice(0, 16);
+            toInput.value = localISOTime;
+          });
+        }
 
         applyBtn.addEventListener('click', function () {
           var fromVal = fromInput.value;
           var toVal = toInput.value;
           if (!fromVal) return;
           if (!toVal) toVal = 'now';
-          else toVal = toVal + ' 23:59:59';
+          else toVal = toVal.replace('T', ' '); // Make it look nicer for PHP strtotime
 
+          fromVal = fromVal.replace('T', ' ');
           renderServerGraph(serverId, canvasId, fromVal, toVal);
         });
       }

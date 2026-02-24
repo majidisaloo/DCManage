@@ -66,6 +66,30 @@ function dcmanage_upgrade(array $vars): void
 
 function dcmanage_output(array $vars): void
 {
+    $action = (string) ($_GET['action'] ?? '');
+    if ($action === 'ilo_console') {
+        Schema::migrate();
+        $serverId = (int) ($_GET['server_id'] ?? 0);
+        $server = Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->first(['id', 'ilo_host']);
+        if (!$server || trim((string) $server->ilo_host) === '') {
+            echo '<div class="alert alert-danger" style="margin: 20px;">iLO Host is not configured for this server.</div>';
+            return;
+        }
+        $iloUrl = 'https://' . htmlspecialchars(trim((string) $server->ilo_host)) . '/';
+        $backLink = 'addonmodules.php?module=dcmanage&tab=servers';
+        
+        echo '<div style="margin: 20px;">';
+        echo '  <div class="d-flex align-items-center justify-content-between mb-3">';
+        echo '    <h4 class="mb-0">iLO HTML5 Console</h4>';
+        echo '    <a href="' . htmlspecialchars($backLink) . '" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left mr-1"></i> Back to Servers</a>';
+        echo '  </div>';
+        echo '  <div style="width: 100%; height: 80vh; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;">';
+        echo '    <iframe src="' . $iloUrl . '" style="width: 100%; height: 100%; border: none;"></iframe>';
+        echo '  </div>';
+        echo '</div>';
+        return;
+    }
+
     if ((int) ($_GET['dcmanage_api'] ?? 0) === 1) {
         Router::dispatch($_GET['endpoint'] ?? 'dashboard/health');
         return;
@@ -394,10 +418,12 @@ function dcmanage_handle_actions(string $lang): string
             $probeId = trim((string) ($_POST['map_probe_id'] ?? ''));
             $groupId = trim((string) ($_POST['map_group_id'] ?? ''));
             $subgroupId = trim((string) ($_POST['map_subgroup_id'] ?? ''));
+            $subgroup2Id = trim((string) ($_POST['map_subgroup2_id'] ?? ''));
             $deviceId = trim((string) ($_POST['map_device_id'] ?? ''));
             $probeName = trim((string) ($_POST['map_probe_name'] ?? ''));
             $groupName = trim((string) ($_POST['map_group_name'] ?? ''));
             $subgroupName = trim((string) ($_POST['map_subgroup_name'] ?? ''));
+            $subgroup2Name = trim((string) ($_POST['map_subgroup2_name'] ?? ''));
             $deviceName = trim((string) ($_POST['map_device_name'] ?? ''));
             $notes = trim((string) ($_POST['map_notes'] ?? ''));
             if (!in_array($purpose, ['traffic', 'hardware', 'public', 'client_discovery'], true)) {
@@ -413,7 +439,7 @@ function dcmanage_handle_actions(string $lang): string
             if ($switchId <= 0) {
                 $switchId = null;
             }
-            if ($groupId === '' && $subgroupId === '' && $deviceId === '') {
+            if ($groupId === '' && $subgroupId === '' && $subgroup2Id === '' && $deviceId === '') {
                 throw new RuntimeException('Group/Sub Group/Device is required');
             }
 
@@ -424,10 +450,12 @@ function dcmanage_handle_actions(string $lang): string
                 'probe_id' => $probeId !== '' ? $probeId : null,
                 'group_id' => $groupId !== '' ? $groupId : null,
                 'subgroup_id' => $subgroupId !== '' ? $subgroupId : null,
+                'subgroup2_id' => $subgroup2Id !== '' ? $subgroup2Id : null,
                 'device_id' => $deviceId !== '' ? $deviceId : null,
                 'probe_name' => $probeName !== '' ? $probeName : null,
                 'group_name' => $groupName !== '' ? $groupName : null,
                 'subgroup_name' => $subgroupName !== '' ? $subgroupName : null,
+                'subgroup2_name' => $subgroup2Name !== '' ? $subgroup2Name : null,
                 'device_name' => $deviceName !== '' ? $deviceName : null,
                 'notes' => $notes !== '' ? $notes : null,
                 'created_at' => date('Y-m-d H:i:s'),
@@ -1743,6 +1771,8 @@ function dcmanage_render_monitoring(string $lang): void
             'm.group_name',
             'm.subgroup_id',
             'm.subgroup_name',
+            'm.subgroup2_id',
+            'm.subgroup2_name',
             'm.device_id',
             'm.device_name',
             'm.notes',
@@ -1790,6 +1820,10 @@ function dcmanage_render_monitoring(string $lang): void
         echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</label><select name="map_probe_id" class="form-control form-control-sm dcmanage-input dcmanage-map-probe" disabled><option value="">--</option></select></div>';
         echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</label><select name="map_group_id" class="form-control form-control-sm dcmanage-input dcmanage-map-group" disabled><option value="">--</option></select></div>';
         echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</label><select name="map_subgroup_id" class="form-control form-control-sm dcmanage-input dcmanage-map-subgroup" disabled><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . ' 2</label><select name="map_subgroup2_id" class="form-control form-control-sm dcmanage-input dcmanage-map-subgroup2" disabled><option value="">--</option></select></div>';
+        echo '</div>'; // form-row
+        
+        echo '<div class="form-row align-items-end text-left">';
         echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</label><select name="map_switch_id" class="form-control form-control-sm dcmanage-input"><option value="">--</option>';
         foreach ($switches as $switch) {
             $swLabel = (string) $switch->name;
@@ -1799,31 +1833,30 @@ function dcmanage_render_monitoring(string $lang): void
             echo '<option value="' . (int) $switch->id . '">' . htmlspecialchars($swLabel) . '</option>';
         }
         echo '</select></div>';
-        echo '</div>'; // form-row
-        
-        echo '<div class="form-row align-items-end text-left">';
-        echo '<div class="form-group col-md-5"><label class="small">' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select name="map_device_id" class="form-control form-control-sm dcmanage-input dcmanage-map-device" disabled><option value="">--</option></select></div>';
-        echo '<div class="form-group col-md-5"><label class="small">' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input class="form-control form-control-sm dcmanage-input" name="map_notes" placeholder="' . htmlspecialchars(I18n::t('monitoring_notes', $lang)) . '"></div>';
+        echo '<div class="form-group col-md-3"><label class="small">' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</label><select name="map_device_id" class="form-control form-control-sm dcmanage-input dcmanage-map-device" disabled><option value="">--</option></select></div>';
+        echo '<div class="form-group col-md-4"><label class="small">' . htmlspecialchars(I18n::t('label_notes', $lang)) . '</label><input class="form-control form-control-sm dcmanage-input" name="map_notes" placeholder="' . htmlspecialchars(I18n::t('monitoring_notes', $lang)) . '"></div>';
         echo '<div class="form-group col-md-2"><button type="submit" class="btn btn-primary btn-sm btn-block">' . htmlspecialchars(I18n::t('monitoring_map_add', $lang)) . '</button></div>';
         echo '<input type="hidden" name="map_probe_name" class="dcmanage-map-probe-name">';
         echo '<input type="hidden" name="map_group_name" class="dcmanage-map-group-name">';
         echo '<input type="hidden" name="map_subgroup_name" class="dcmanage-map-subgroup-name">';
-        echo '<input type="hidden" name="map_device_name" class="dcmanage-map-device-name">';
+        echo '<input type="hidden" name="map_subgroup2_name" class="dcmanage-map-subgroup2-name">';
         echo '</div>'; // form-row
         echo '<div class="small text-muted dcmanage-map-loading text-left">-</div>';
         echo '</div>'; // close dir=ltr
         echo '</form>';
 
         echo '<div class="table-responsive dcmanage-table-wrap mt-3"><table class="table table-sm table-striped bg-white border">';
-        echo '<thead class="bg-light"><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th class="text-right">' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
+        echo '<thead class="bg-light"><tr><th>ID</th><th>' . htmlspecialchars(I18n::t('monitoring_probe', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_group', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('monitoring_subgroup', $lang)) . ' 2</th><th>' . htmlspecialchars(I18n::t('monitoring_device', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('select_switch', $lang)) . '</th><th class="text-right">' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
         foreach ($rows as $mapRow) {
             $pName = (string) ($mapRow->probe_name ?? '');
             $gName = (string) ($mapRow->group_name ?? '');
             $sName = (string) ($mapRow->subgroup_name ?? '');
+            $s2Name = (string) ($mapRow->subgroup2_name ?? '');
             $dName = (string) ($mapRow->device_name ?? '');
             $pDisplay = $pName !== '' ? $pName : (string) ($mapRow->probe_id ?? '—');
             $gDisplay = $gName !== '' ? $gName : (string) ($mapRow->group_id ?? '—');
             $sDisplay = $sName !== '' ? $sName : (string) ($mapRow->subgroup_id ?? '—');
+            $s2Display = $s2Name !== '' ? $s2Name : (string) ($mapRow->subgroup2_id ?? '—');
             $dDisplay = $dName !== '' ? $dName : (string) ($mapRow->device_id ?? '—');
 
             echo '<tr>';
@@ -1831,6 +1864,7 @@ function dcmanage_render_monitoring(string $lang): void
             echo '<td dir="ltr" class="text-left">' . htmlspecialchars($pDisplay) . '</td>';
             echo '<td dir="ltr" class="text-left">' . htmlspecialchars($gDisplay) . '</td>';
             echo '<td dir="ltr" class="text-left">' . htmlspecialchars($sDisplay) . '</td>';
+            echo '<td dir="ltr" class="text-left">' . htmlspecialchars($s2Display) . '</td>';
             echo '<td dir="ltr" class="text-left">' . htmlspecialchars($dDisplay) . '</td>';
             echo '<td dir="ltr" class="text-left font-weight-bold">' . htmlspecialchars((string) ($mapRow->switch_name ?? '—')) . '</td>';
             echo '<td class="dcmanage-action-buttons text-right"><form method="post" action="' . htmlspecialchars($monitoringViewAction) . '" onsubmit="return confirm(\'' . htmlspecialchars(I18n::t('action_delete', $lang), ENT_QUOTES, 'UTF-8') . '?\')"><input type="hidden" name="dcmanage_action" value="monitoring_map_delete"><input type="hidden" name="map_id" value="' . (int) $mapRow->id . '"><button type="submit" class="btn btn-sm dcmanage-btn-soft-danger">' . htmlspecialchars(I18n::t('action_delete', $lang)) . '</button></form></td>';
@@ -1923,17 +1957,20 @@ function dcmanage_render_monitoring(string $lang): void
     var probe=form.querySelector(".dcmanage-map-probe");
     var group=form.querySelector(".dcmanage-map-group");
     var subgroup=form.querySelector(".dcmanage-map-subgroup");
+    var subgroup2=form.querySelector(".dcmanage-map-subgroup2");
     var device=form.querySelector(".dcmanage-map-device");
     
     if (window.jQuery && jQuery.fn && jQuery.fn.select2) {
         jQuery(probe).select2({theme: 'bootstrap4', width: '100%'});
         jQuery(group).select2({theme: 'bootstrap4', width: '100%'});
         jQuery(subgroup).select2({theme: 'bootstrap4', width: '100%'});
+        jQuery(subgroup2).select2({theme: 'bootstrap4', width: '100%'});
         jQuery(device).select2({theme: 'bootstrap4', width: '100%'});
         // Listen to select2:select to trigger native change for chaining
         jQuery(probe).on('select2:select', function(){ probe.dispatchEvent(new Event('change')); });
         jQuery(group).on('select2:select', function(){ group.dispatchEvent(new Event('change')); });
         jQuery(subgroup).on('select2:select', function(){ subgroup.dispatchEvent(new Event('change')); });
+        jQuery(subgroup2).on('select2:select', function(){ subgroup2.dispatchEvent(new Event('change')); });
         // Note: Native disabled prop works with select2, but needs .prop('disabled', val) for full refresh if changed dynamically.
     }
 
@@ -1947,11 +1984,13 @@ function dcmanage_render_monitoring(string $lang): void
           if(probe) jQuery(probe).prop("disabled", state);
           if(group) jQuery(group).prop("disabled", state);
           if(subgroup) jQuery(subgroup).prop("disabled", state);
+          if(subgroup2) jQuery(subgroup2).prop("disabled", state);
           if(device) jQuery(device).prop("disabled", state);
       } else {
           if(probe){probe.disabled=state;}
           if(group){group.disabled=state;}
           if(subgroup){subgroup.disabled=state;}
+          if(subgroup2){subgroup2.disabled=state;}
           if(device){device.disabled=state;}
       }
     }
@@ -1969,6 +2008,7 @@ function dcmanage_render_monitoring(string $lang): void
           fillSelect(probe,(data.items||[]));
           fillSelect(group,[]);
           fillSelect(subgroup,[]);
+          fillSelect(subgroup2,[]);
           fillSelect(device,[]);
           setLoading(false,"");
         });
@@ -1977,6 +2017,7 @@ function dcmanage_render_monitoring(string $lang): void
           fillSelect(probe,[]);
           fillSelect(group,[]);
           fillSelect(subgroup,[]);
+          fillSelect(subgroup2,[]);
           fillSelect(device,[]);
           setLoading(false,String(err&&err.message?err.message:"error"));
         });
@@ -2027,6 +2068,7 @@ function dcmanage_render_monitoring(string $lang): void
         var pid=String(probe.value||"");
         fillSelect(group,[]);
         fillSelect(subgroup,[]);
+        fillSelect(subgroup2,[]);
         fillSelect(device,[]);
         if(pid===""){return;}
         loadGroups(pid,group).then(function(){loadDevices(pid);});
@@ -2036,6 +2078,7 @@ function dcmanage_render_monitoring(string $lang): void
       group.addEventListener("change",function(){
         var gid=String(group.value||"");
         fillSelect(subgroup,[]);
+        fillSelect(subgroup2,[]);
         if(gid===""){
           var pid=probe?String(probe.value||""):"";
           if(pid!==""){loadDevices(pid);} else {fillSelect(device,[]);}
@@ -2047,7 +2090,21 @@ function dcmanage_render_monitoring(string $lang): void
     if(subgroup){
       subgroup.addEventListener("change",function(){
         var sid=String(subgroup.value||"");
-        var parent=sid!==""?sid:(group?String(group.value||""):"");
+        fillSelect(subgroup2,[]);
+        if(sid===""){
+          var parent=(group?String(group.value||""):"");
+          if(parent===""){parent=probe?String(probe.value||""):"";}
+          if(parent!==""){loadDevices(parent);} else {fillSelect(device,[]);}
+          return;
+        }
+        loadGroups(sid,subgroup2).then(function(){loadDevices(sid);});
+      });
+    }
+    if(subgroup2){
+      subgroup2.addEventListener("change",function(){
+        var s2id=String(subgroup2.value||"");
+        var parent=s2id!==""?s2id:(subgroup?String(subgroup.value||""):"");
+        if(parent===""){parent=group?String(group.value||""):"";}
         if(parent===""){parent=probe?String(probe.value||""):"";}
         loadDevices(parent);
       });
@@ -2057,10 +2114,12 @@ function dcmanage_render_monitoring(string $lang): void
         var pName = form.querySelector(".dcmanage-map-probe-name");
         var gName = form.querySelector(".dcmanage-map-group-name");
         var sName = form.querySelector(".dcmanage-map-subgroup-name");
+        var s2Name = form.querySelector(".dcmanage-map-subgroup2-name");
         var dName = form.querySelector(".dcmanage-map-device-name");
         if(pName && probe && probe.options.length > 0 && probe.selectedIndex >= 0) pName.value = probe.options[probe.selectedIndex].text;
         if(gName && group && group.options.length > 0 && group.selectedIndex >= 0) gName.value = group.options[group.selectedIndex].text;
         if(sName && subgroup && subgroup.options.length > 0 && subgroup.selectedIndex >= 0) sName.value = subgroup.options[subgroup.selectedIndex].text;
+        if(s2Name && subgroup2 && subgroup2.options.length > 0 && subgroup2.selectedIndex >= 0) s2Name.value = subgroup2.options[subgroup2.selectedIndex].text;
         if(dName && device && device.options.length > 0 && device.selectedIndex >= 0) dName.value = device.options[device.selectedIndex].text;
     });
 
@@ -4252,25 +4311,27 @@ function dcmanage_render_servers(string $lang): void
                 echo '<div class="dcmanage-form-card mb-3">';
                 echo '<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">';
                 echo '<h6 class="mb-0">' . htmlspecialchars(I18n::t('tab_traffic', $lang)) . ' Graph</h6>';
-                echo '<div class="d-flex align-items-center gap-2">';
+                
+                echo '<div class="d-flex align-items-center flex-wrap gap-2">';
                 echo '<div class="btn-group btn-group-sm dcmanage-graph-range-btns" data-server-id="' . $selectedId . '">';
-                echo '<button type="button" class="btn btn-outline-secondary active dcmanage-graph-range" data-range="-2h">2h</button>';
-                echo '<button type="button" class="btn btn-outline-secondary dcmanage-graph-range" data-range="-2d">2d</button>';
-                echo '<button type="button" class="btn btn-outline-secondary dcmanage-graph-range" data-range="-7d">7d</button>';
-                echo '<button type="button" class="btn btn-outline-secondary dcmanage-graph-range" data-range="-30d">30d</button>';
-                echo '<button type="button" class="btn btn-outline-secondary dcmanage-graph-range" data-range="-365d">1Y</button>';
-                echo '<button type="button" class="btn btn-outline-secondary dcmanage-graph-custom-toggle">' . htmlspecialchars(I18n::t('custom', $lang)) . '</button>';
+                echo '<button type="button" class="btn btn-outline-primary active dcmanage-graph-range" data-range="-2h">2h</button>';
+                echo '<button type="button" class="btn btn-outline-primary dcmanage-graph-range" data-range="-2d">2d</button>';
+                echo '<button type="button" class="btn btn-outline-primary dcmanage-graph-range" data-range="-7d">7d</button>';
+                echo '<button type="button" class="btn btn-outline-primary dcmanage-graph-range" data-range="-30d">30d</button>';
+                echo '<button type="button" class="btn btn-outline-primary dcmanage-graph-range" data-range="-365d">1Y</button>';
+                echo '<button type="button" class="btn btn-outline-primary dcmanage-graph-custom-toggle">' . htmlspecialchars(I18n::t('custom', $lang)) . '</button>';
                 echo '</div>';
-                echo '</div>';
-                echo '</div>';
-                // Custom date picker range (hidden initially)
-                echo '<div class="dcmanage-graph-custom-range mb-3 p-2 bg-light border rounded" style="display:none;">';
-                echo '<div class="d-flex align-items-end gap-2">';
-                echo '<div class="form-group mb-0"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('date_from', $lang)) . '</label><input type="date" class="form-control form-control-sm dcmanage-input dcmanage-graph-from"></div>';
-                echo '<div class="form-group mb-0"><label class="small text-muted mb-1">' . htmlspecialchars(I18n::t('date_to', $lang)) . '</label><input type="date" class="form-control form-control-sm dcmanage-input dcmanage-graph-to"></div>';
-                echo '<button type="button" class="btn btn-sm btn-primary dcmanage-graph-apply">' . htmlspecialchars(I18n::t('apply', $lang)) . '</button>';
-                echo '</div>';
-                echo '</div>';
+                
+                echo '<div class="dcmanage-graph-custom-range d-flex align-items-center gap-1" style="display:none;">';
+                echo '<input type="datetime-local" class="form-control form-control-sm dcmanage-input dcmanage-graph-from" title="' . htmlspecialchars(I18n::t('date_from', $lang)) . '">';
+                echo '<span class="text-muted px-1">-</span>';
+                echo '<input type="datetime-local" class="form-control form-control-sm dcmanage-input dcmanage-graph-to" title="' . htmlspecialchars(I18n::t('date_to', $lang)) . '">';
+                echo '<button type="button" class="btn btn-sm btn-outline-secondary dcmanage-graph-now px-2">Now</button>';
+                echo '<button type="button" class="btn btn-sm btn-primary dcmanage-graph-apply ml-1">' . htmlspecialchars(I18n::t('apply', $lang)) . '</button>';
+                echo '</div>'; // custom range
+                echo '</div>'; // parent flex
+                
+                echo '</div>'; // header area
 
                 echo '<div class="dcmanage-graph-container" style="position: relative; height: 300px; width: 100%;">';
                 echo '<canvas id="dcmanage-server-graph-' . $selectedId . '"></canvas>';
@@ -4291,11 +4352,9 @@ function dcmanage_render_servers(string $lang): void
                 echo '<button type="button" class="btn btn-sm btn-warning dcmanage-ilo-action-btn text-dark" data-server-id="' . $selectedId . '" data-action="ForceRestart"><i class="fas fa-bolt mr-1"></i> Force Restart</button>';
                 echo '<button type="button" class="btn btn-sm btn-danger dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="ForceOff"><i class="fas fa-power-off mr-1"></i> Power Off</button>';
                 
-                // HTML5 Console. Need global settings for proxy if used, but for now just link to https://ilo-ip/
-                $iloProxyHttp = trim((string) Capsule::table('mod_dcmanage_meta')->where('meta_key', 'settings.ilo_proxy_host')->value('meta_value')) !== '' ? true : false;
-                // If direct:
-                $consoleHref = 'https://' . htmlspecialchars((string) $selectedServer->ilo_host) . '/';
-                echo '<a href="' . $consoleHref . '" class="btn btn-sm btn-primary dcmanage-ilo-console-btn" target="_blank">HTML5 Console <i class="fas fa-external-link-alt"></i></a>';
+                // HTML5 Console via WHMCS iframe
+                $consoleHref = $moduleLink . '&action=ilo_console&server_id=' . $selectedId;
+                echo '<a href="' . htmlspecialchars($consoleHref) . '" class="btn btn-sm btn-primary dcmanage-ilo-console-btn" target="_blank">HTML5 Console <i class="fas fa-external-link-alt"></i></a>';
                 echo '</div>';
                 echo '</div>';
                 echo '<div class="small text-muted mt-3 dcmanage-ilo-action-result"></div>';

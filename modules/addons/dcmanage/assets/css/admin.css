@@ -218,9 +218,7 @@
   width: 100% !important;
   max-width: 100%;
   margin-bottom: 0;
-  white-space: normal;
-  table-layout: fixed;
-  /* Force text to wrap instead of pushing columns wide */
+  white-space: nowrap;
 }
 
 /* Force headers to remain visible during DataTables responsive repaints */
@@ -234,14 +232,54 @@
   display: table-header-group !important;
 }
 
-.dcmanage-shell tr {
+.dcmanage-shell thead tr {
   display: table-row !important;
 }
 
 .dcmanage-shell table[class*="table"] th,
 .dcmanage-shell table[class*="table"] td {
+  white-space: nowrap;
+}
+
+/* Allow hostname/notes columns to wrap if necessary */
+.dcmanage-shell table[class*="table"] .text-wrap {
   white-space: normal !important;
   word-wrap: break-word;
+}
+
+#dcmanage-server-table th:nth-child(1) {
+  width: 50px;
+}
+
+#dcmanage-server-table th:nth-child(8) {
+  width: 60px;
+}
+
+#dcmanage-server-table th:nth-child(9) {
+  width: 15%;
+  min-width: 160px;
+}
+
+table.dcmanage-port-table th:nth-child(1) {
+  width: 120px;
+}
+
+table.dcmanage-port-table th:nth-child(3) {
+  width: 80px;
+}
+
+table.dcmanage-port-table th:nth-child(4) {
+  width: 110px;
+}
+
+table.dcmanage-port-table th:nth-child(6),
+table.dcmanage-port-table th:nth-child(7) {
+  width: 110px;
+}
+
+table.dcmanage-port-table th:nth-child(8) {
+  width: 22%;
+  min-width: 220px;
 }
 
 .dcmanage-hero-band {
@@ -1747,6 +1785,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 /* -------------------------------
    Improved Select2 Styling 
    ------------------------------- */

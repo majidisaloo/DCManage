@@ -85,19 +85,30 @@ final class PrtgClient
     public function listSensors(int $limit = 200, string $query = ''): array
     {
         $limit = max(20, min(1000, $limit));
-        $json = $this->get('/api/table.json', [
+        $params = [
             'content' => 'sensors',
             'output' => 'json',
             'columns' => 'objid,sensor,device,group,status,lastvalue',
             'count' => $limit,
-        ]);
+        ];
+
+        $q = trim($query);
+        $qLower = strtolower($q);
+        if ($q !== '') {
+            if (preg_match('/^\d+$/', $q)) {
+                $params['filter_objid'] = $q;
+            } else {
+                $params['filter_name'] = '@sub(' . $q . ')';
+            }
+        }
+
+        $json = $this->get('/api/table.json', $params);
 
         $rows = $json['sensors'] ?? [];
         if (!is_array($rows)) {
             return [];
         }
 
-        $q = strtolower(trim($query));
         $items = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -115,9 +126,9 @@ final class PrtgClient
             $status = trim((string) ($row['status'] ?? ''));
             $lastValue = trim((string) ($row['lastvalue'] ?? ''));
 
-            if ($q !== '') {
+            if ($qLower !== '') {
                 $haystack = strtolower($id . ' ' . $name . ' ' . $device . ' ' . $group . ' ' . $status);
-                if (strpos($haystack, $q) === false) {
+                if (strpos($haystack, $qLower) === false) {
                     continue;
                 }
             }
