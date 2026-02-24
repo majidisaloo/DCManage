@@ -1249,10 +1249,12 @@ function dcmanage_handle_actions(string $lang): string
                     throw new RuntimeException('Rack must belong to selected datacenter');
                 }
             }
+            $startDate = trim((string) ($_POST['start_date'] ?? ''));
             Capsule::table('mod_dcmanage_servers')->where('id', $serverId)->update([
                 'dc_id' => $dcId,
                 'rack_id' => $rackId > 0 ? $rackId : null,
                 'hostname' => $hostname,
+                'start_date' => $startDate !== '' ? $startDate : null,
                 'u_start' => (int) ($_POST['u_start'] ?? 0) ?: null,
                 'u_height' => max(1, (int) ($_POST['u_height'] ?? 1)),
                 'notes' => trim((string) ($_POST['notes'] ?? '')),
@@ -3899,6 +3901,16 @@ function dcmanage_render_switches(string $lang): void
         echo '<tr class="collapse" id="sw-ports-' . (int) $row->id . '"><td colspan="7">';
         echo '<div class="dcmanage-form-card dcmanage-switch-ports-card">';
         echo '<h6 class="mb-2">' . htmlspecialchars(I18n::t('switch_ports_vlans', $lang)) . '</h6>';
+        
+        echo '<div class="dcmanage-port-filters" data-target-table="dcmanage-port-table-' . (int) $row->id . '">';
+        echo '<button type="button" class="btn btn-outline-primary dcmanage-filter-btn" data-filter="all">All</button>';
+        echo '<button type="button" class="btn btn-outline-primary dcmanage-filter-btn active" data-filter="suspended">Suspended</button>';
+        echo '<button type="button" class="btn btn-outline-primary dcmanage-filter-btn active" data-filter="active">Active</button>';
+        echo '<button type="button" class="btn btn-outline-primary dcmanage-filter-btn" data-filter="lock">Lock</button>';
+        echo '<button type="button" class="btn btn-outline-primary dcmanage-filter-btn active" data-filter="unlock">Unlock</button>';
+        echo '<button type="button" class="btn btn-outline-primary dcmanage-filter-btn" data-filter="without-server">Without Server</button>';
+        echo '</div>';
+
         echo '<div class="form-group mb-2"><input type="text" class="form-control form-control-sm dcmanage-input dcmanage-port-search" data-target-table="dcmanage-port-table-' . (int) $row->id . '" placeholder="' . htmlspecialchars(I18n::t('switch_port_search_placeholder', $lang)) . '"></div>';
         echo '<div class="table-responsive"><table id="dcmanage-port-table-' . (int) $row->id . '" class="table table-sm dcmanage-port-table"><thead><tr><th>' . htmlspecialchars(I18n::t('switch_if_name', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_if_desc', $lang)) . '</th><th>VLAN</th><th>' . htmlspecialchars(I18n::t('switch_if_speed', $lang)) . '</th><th>Server</th><th>' . htmlspecialchars(I18n::t('switch_admin_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('switch_oper_status', $lang)) . '</th><th>' . htmlspecialchars(I18n::t('label_actions', $lang)) . '</th></tr></thead><tbody>';
         foreach ($ports as $p) {
@@ -3916,8 +3928,9 @@ function dcmanage_render_switches(string $lang): void
             
             $rowOpacity = $isLocked ? ' opacity: 0.6;' : '';
             $lockIcon = $isLocked ? ' <i class="fas fa-lock text-danger ml-1" title="Locked"></i>' : '';
+            $serverVal = $serverName !== '' ? '1' : '0';
             
-            echo '<tr class="dcmanage-switch-port-row" style="' . $rowOpacity . '" data-port-id="' . (int) $p->id . '" data-search="' . htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') . '"><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . $lockIcon . '</td><td class="dcmanage-port-desc" title="' . htmlspecialchars($ifDesc, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($ifDesc) . '</td><td>' . htmlspecialchars($vlanView) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . htmlspecialchars($serverName !== '' ? $serverName : '-') . '</td><td class="dcmanage-admin-status-cell">' . dcmanage_render_port_admin_pill((string) $p->admin_status, $lang) . '</td><td class="dcmanage-oper-status-cell">' . dcmanage_render_port_oper_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
+            echo '<tr class="dcmanage-switch-port-row" style="' . $rowOpacity . '" data-port-id="' . (int) $p->id . '" data-admin-status="' . htmlspecialchars($adminStatus) . '" data-locked="' . ($isLocked ? '1' : '0') . '" data-server="' . $serverVal . '" data-search="' . htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') . '"><td class="font-weight-bold">' . htmlspecialchars((string) $p->if_name) . $lockIcon . '</td><td class="dcmanage-port-desc" title="' . htmlspecialchars($ifDesc, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($ifDesc) . '</td><td>' . htmlspecialchars($vlanView) . '</td><td>' . htmlspecialchars($speedLabel) . '</td><td>' . htmlspecialchars($serverName !== '' ? $serverName : '-') . '</td><td class="dcmanage-admin-status-cell">' . dcmanage_render_port_admin_pill((string) $p->admin_status, $lang) . '</td><td class="dcmanage-oper-status-cell">' . dcmanage_render_port_oper_pill((string) $p->oper_status, $lang) . '</td><td class="dcmanage-action-buttons">';
             echo '<form method="post" class="dcmanage-port-async-form" data-port-action="check"><input type="hidden" name="dcmanage_action" value="switch_port_check"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-info" type="submit" name="dcmanage_action_btn" value="switch_port_check">' . htmlspecialchars(I18n::t('switch_port_check', $lang)) . '</button></form>';
             echo '<form method="post" class="dcmanage-port-async-form" data-port-action="shut"><input type="hidden" name="dcmanage_action" value="switch_port_shut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-danger" type="submit" name="dcmanage_action_btn" value="switch_port_shut"' . ($canShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_shut', $lang)) . '</button></form>';
             echo '<form method="post" class="dcmanage-port-async-form" data-port-action="noshut"><input type="hidden" name="dcmanage_action" value="switch_port_noshut"><input type="hidden" name="port_id" value="' . (int) $p->id . '"><button class="btn btn-sm dcmanage-btn-soft-success" type="submit" name="dcmanage_action_btn" value="switch_port_noshut"' . ($canNoShut ? '' : ' disabled') . '>' . htmlspecialchars(I18n::t('switch_no_shut', $lang)) . '</button></form>';
@@ -4512,25 +4525,22 @@ function dcmanage_render_servers(string $lang): void
             }
 
             // Section 3: iLO Management
-            echo '<div class="dcmanage-form-card mb-3">';
-            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_ilo', $lang)) . ' Management</h6>';
+            echo '<div class="dcmanage-form-card mb-3 text-center">';
+            echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_ilo', $lang)) . ' Management <span class="text-muted small ml-2">(' . htmlspecialchars((string) $selectedServer->ilo_host) . ')</span></h6>';
             if (trim((string) ($selectedServer->ilo_host ?? '')) !== '') {
-                echo '<div class="d-flex align-items-center justify-content-between flex-wrap gap-3">';
-                echo '<div><strong>Host:</strong> ' . htmlspecialchars((string) $selectedServer->ilo_host) . '</div>';
-                echo '<div class="dcmanage-action-buttons">';
-                echo '<button type="button" class="btn btn-sm btn-success dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="On"><i class="fas fa-power-off mr-1"></i> Power On</button>';
-                echo '<button type="button" class="btn btn-sm btn-secondary dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="GracefulRestart"><i class="fas fa-sync mr-1"></i> Graceful Restart</button>';
-                echo '<button type="button" class="btn btn-sm btn-warning dcmanage-ilo-action-btn text-dark" data-server-id="' . $selectedId . '" data-action="ForceRestart"><i class="fas fa-bolt mr-1"></i> Force Restart</button>';
-                echo '<button type="button" class="btn btn-sm btn-danger dcmanage-ilo-action-btn" data-server-id="' . $selectedId . '" data-action="ForceOff"><i class="fas fa-power-off mr-1"></i> Power Off</button>';
+                echo '<div class="dcmanage-action-buttons mt-3 d-flex justify-content-center flex-wrap gap-2">';
+                echo '<button type="button" class="btn btn-sm btn-success dcmanage-ilo-action-btn m-1" data-server-id="' . $selectedId . '" data-action="On"><i class="fas fa-power-off mr-2"></i> Power On</button>';
+                echo '<button type="button" class="btn btn-sm btn-secondary dcmanage-ilo-action-btn m-1" data-server-id="' . $selectedId . '" data-action="GracefulRestart"><i class="fas fa-sync mr-2"></i> Graceful Restart</button>';
+                echo '<button type="button" class="btn btn-sm btn-warning dcmanage-ilo-action-btn text-dark m-1" data-server-id="' . $selectedId . '" data-action="ForceRestart"><i class="fas fa-bolt mr-2"></i> Force Restart</button>';
+                echo '<button type="button" class="btn btn-sm btn-danger dcmanage-ilo-action-btn m-1" data-server-id="' . $selectedId . '" data-action="ForceOff"><i class="fas fa-power-off mr-2"></i> Power Off</button>';
                 
                 // HTML5 Console via WHMCS iframe
                 $consoleHref = $moduleLink . '&action=ilo_console&server_id=' . $selectedId;
-                echo '<a href="' . htmlspecialchars($consoleHref) . '" class="btn btn-sm btn-primary dcmanage-ilo-console-btn" target="_blank">HTML5 Console <i class="fas fa-external-link-alt"></i></a>';
+                echo '<a href="' . htmlspecialchars($consoleHref) . '" class="btn btn-sm btn-primary dcmanage-ilo-console-btn m-1" target="_blank"><i class="fas fa-desktop mr-2"></i> HTML5 Console</a>';
                 echo '</div>';
-                echo '</div>';
-                echo '<div class="small text-muted mt-3 dcmanage-ilo-action-result"></div>';
+                echo '<div class="small text-muted mt-3 dcmanage-ilo-action-result text-center"></div>';
             } else {
-                echo '<div class="text-muted small">No iLO interface configured for this server.</div>';
+                echo '<div class="text-muted small text-center">No iLO interface configured for this server.</div>';
             }
             echo '</div>';
 
@@ -4926,8 +4936,8 @@ function dcmanage_render_logs(string $lang): void
     echo '<div class="form-group col-md-4"><label>' . htmlspecialchars(I18n::t('logs_search', $lang)) . '</label><input type="text" class="form-control dcmanage-input" name="log_q" value="' . htmlspecialchars($q) . '"></div>';
     echo '</div>';
     echo '<div class="form-row mt-2">';
-    echo '<div class="form-group col-md-3"><label>Date From</label><input type="date" class="form-control dcmanage-input" name="log_date_from" value="' . htmlspecialchars($dateFrom) . '"></div>';
-    echo '<div class="form-group col-md-3"><label>Date To</label><input type="date" class="form-control dcmanage-input" name="log_date_to" value="' . htmlspecialchars($dateTo) . '"></div>';
+    echo '<div class="form-group col-md-3"><label>Date From</label><input type="datetime-local" class="form-control dcmanage-input" name="log_date_from" value="' . htmlspecialchars($dateFrom) . '"></div>';
+    echo '<div class="form-group col-md-3"><label>Date To</label><input type="datetime-local" class="form-control dcmanage-input" name="log_date_to" value="' . htmlspecialchars($dateTo) . '"></div>';
     echo '</div>';
     echo '</form>';
     echo '<div class="dcmanage-all-actions">';

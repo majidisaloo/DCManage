@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1] - 2024-05-31
+### Added
+- Added Advanced Filters bar to the Switch Ports table (All, Active, Suspended, Lock, Unlock, Without Server) for real-time visibility control.
+
+### Changed
+- Improved the alignment of the "Server" column in the Switch Ports table to be centered.
+- Switched the Traffic Graph Date pickers to include Time selections (`datetime-local`) for better precision.
+- Centered the iLO Management view and actions on the server details modal to improve UI/UX spacing.
+
+### Fixed
+- Fixed a bug where saving a server from the "Edit Server" modal did not persist its `start_date`, causing missing tracking metrics.
+
 ## [0.1.100] - 2024-05-31
 ### Fixed
 - Hotfix: Removed undefined `notes` dependency in `mod_dcmanage_switch_ports` during migrationV18 that halted the upgrade process.

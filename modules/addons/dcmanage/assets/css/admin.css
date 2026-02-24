@@ -282,6 +282,23 @@ table.dcmanage-port-table th:nth-child(8) {
   min-width: 220px;
 }
 
+table.dcmanage-port-table td:nth-child(5) {
+  text-align: center;
+}
+
+.dcmanage-port-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dcmanage-port-filters .btn {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
 .dcmanage-hero-band {
   margin-bottom: 12px;
   border: 1px solid #d7e4ff;

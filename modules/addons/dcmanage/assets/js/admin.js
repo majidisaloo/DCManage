@@ -856,4 +856,110 @@
     });
   })();
 
+  // --- Switch Port Filters ---
+  (function initSwitchPortFilters() {
+    function applyPortFilters(containerId) {
+      var container = document.getElementById(containerId);
+      if (!container) return;
+
+      var filterDiv = document.querySelector('.dcmanage-port-filters[data-target-table="' + containerId + '"]');
+      if (!filterDiv) return;
+
+      var activeFilters = [];
+      var filterBtns = filterDiv.querySelectorAll('.dcmanage-filter-btn');
+      filterBtns.forEach(function (btn) {
+        if (btn.classList.contains('active')) {
+          activeFilters.push(btn.getAttribute('data-filter'));
+        }
+      });
+
+      var rows = container.querySelectorAll('tbody tr.dcmanage-switch-port-row');
+      rows.forEach(function (row) {
+        // Skip filtering if search input has value (let existing search handle it)
+        var searchInput = document.querySelector('.dcmanage-port-search[data-target-table="' + containerId + '"]');
+        if (searchInput && searchInput.value.trim() !== '') {
+          return;
+        }
+
+        var st = String(row.getAttribute('data-admin-status') || '').toLowerCase();
+        var isLocked = String(row.getAttribute('data-locked') || '0') === '1';
+        var hasServer = String(row.getAttribute('data-server') || '0') === '1';
+
+        var vis = false;
+        if (activeFilters.indexOf('all') !== -1) {
+          vis = true;
+        } else {
+          // Check states against active filters
+          if (activeFilters.indexOf('active') !== -1 && st === 'up') vis = true;
+          if (activeFilters.indexOf('suspended') !== -1 && st === 'down') vis = true;
+
+          // Lock overrides
+          if (isLocked && activeFilters.indexOf('lock') === -1) vis = false;
+          if (!isLocked && !vis && activeFilters.indexOf('unlock') !== -1 && (st === 'up' || st === 'down')) vis = true; // Fallback for unlock implicitly showing up/down if not explicitly checked but unlock is
+
+          // Without server isolation
+          if (activeFilters.indexOf('without-server') !== -1 && !hasServer) vis = true;
+
+          // Strict logic for combination
+          var allowedByStatus = (activeFilters.indexOf('active') !== -1 && st === 'up') || (activeFilters.indexOf('suspended') !== -1 && st === 'down') || (activeFilters.indexOf('active') === -1 && activeFilters.indexOf('suspended') === -1);
+          var allowedByLock = (activeFilters.indexOf('lock') !== -1 && isLocked) || (activeFilters.indexOf('unlock') !== -1 && !isLocked) || (activeFilters.indexOf('lock') === -1 && activeFilters.indexOf('unlock') === -1);
+          var allowedByServer = (activeFilters.indexOf('without-server') !== -1 && !hasServer) || (activeFilters.indexOf('without-server') === -1);
+
+          if (activeFilters.length > 0) {
+            vis = allowedByStatus && allowedByLock && allowedByServer;
+            // If only 'without-server' is checked, bypass status/lock requirements if they are empty
+            if (activeFilters.length === 1 && activeFilters[0] === 'without-server') {
+              vis = !hasServer;
+            }
+          }
+        }
+
+        row.style.display = vis ? '' : 'none';
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (e.target && e.target.classList && e.target.classList.contains('dcmanage-filter-btn')) {
+        var btn = e.target;
+        var filterVal = btn.getAttribute('data-filter');
+        var group = btn.closest('.dcmanage-port-filters');
+
+        if (filterVal === 'all') {
+          // If All is clicked, deselect everything else and select All
+          var siblingBtns = group.querySelectorAll('.dcmanage-filter-btn');
+          siblingBtns.forEach(function (sib) {
+            if (sib !== btn) sib.classList.remove('active');
+          });
+          btn.classList.add('active');
+        } else {
+          // If a specific filter is clicked, toggle it
+          btn.classList.toggle('active');
+
+          // De-select All if it was selected
+          var allBtn = group.querySelector('.dcmanage-filter-btn[data-filter="all"]');
+          if (allBtn && allBtn.classList.contains('active')) {
+            allBtn.classList.remove('active');
+          }
+
+          // If nothing is selected, re-select All implicitly
+          var activeCount = group.querySelectorAll('.dcmanage-filter-btn.active').length;
+          if (activeCount === 0 && allBtn) {
+            allBtn.classList.add('active');
+          }
+        }
+
+        var tableId = group.getAttribute('data-target-table');
+        applyPortFilters(tableId);
+      }
+    });
+
+    // Run initial filter on load for all groups
+    setTimeout(function () {
+      var groups = document.querySelectorAll('.dcmanage-port-filters');
+      groups.forEach(function (g) {
+        applyPortFilters(g.getAttribute('data-target-table'));
+      });
+    }, 200);
+  })();
+
 })();
