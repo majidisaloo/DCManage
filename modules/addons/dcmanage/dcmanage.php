@@ -4332,8 +4332,8 @@ function dcmanage_render_servers(string $lang): void
                     echo '<option data-dc-id="' . (int) $switch->dc_id . '" value="' . (int) $switch->id . '"' . $selectedSwitch . '>' . htmlspecialchars((string) $switch->name) . '</option>';
                 }
                 echo '</select></div>';
-                echo '<div class="form-group col-md-7"><label>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-port-select-search mb-2" placeholder="' . htmlspecialchars(I18n::t('switch_port_search_placeholder', $lang)) . '"><select name="traffic_port_id[]" class="form-control dcmanage-input dcmanage-traffic-port" data-selected="' . (int) ($trafficRow['switch_port_id'] ?? 0) . '"><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
-                echo '<div class="form-group col-md-1"><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-traffic-row">&times;</button></div>';
+                echo '<div class="form-group col-md-6"><label>' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</label><input type="text" class="form-control dcmanage-input dcmanage-port-select-search mb-2" placeholder="' . htmlspecialchars(I18n::t('switch_port_search_placeholder', $lang)) . '"><select name="traffic_port_id[]" class="form-control dcmanage-input dcmanage-traffic-port" data-selected="' . (int) ($trafficRow['switch_port_id'] ?? 0) . '"><option value="">' . htmlspecialchars(I18n::t('select_switch_port', $lang)) . '</option></select></div>';
+                echo '<div class="form-group col-md-2"><label class="d-none d-md-block">&nbsp;</label><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-traffic-row w-100">&times; Remove</button></div>';
                 echo '</div>';
             }
             echo '</div>';
@@ -4373,13 +4373,13 @@ function dcmanage_render_servers(string $lang): void
                         echo '<option value="' . (int) $instance->id . '"' . $selectedPrtg . '>' . htmlspecialchars((string) $instance->name) . '</option>';
                     }
                     echo '</select></div>';
-                    echo '<div class="form-group col-md-5"><label>' . htmlspecialchars($title) . '</label><input type="text" class="form-control dcmanage-input dcmanage-monitor-sensor-search mb-2" placeholder="sensor name / id"><select name="monitor_sensor_id[]" class="form-control dcmanage-input dcmanage-monitor-sensor"><option value="">--</option>';
+                    echo '<div class="form-group col-md-4"><label>' . htmlspecialchars($title) . '</label><input type="text" class="form-control dcmanage-input dcmanage-monitor-sensor-search mb-2" placeholder="sensor name / id"><select name="monitor_sensor_id[]" class="form-control dcmanage-input dcmanage-monitor-sensor"><option value="">--</option>';
                     if ($monitorSensorId !== '') {
                         echo '<option selected value="' . htmlspecialchars($monitorSensorId) . '">' . htmlspecialchars($monitorSensorId) . '</option>';
                     }
                     echo '</select></div>';
-                    echo '<div class="form-group col-md-3"><label>' . htmlspecialchars(I18n::t('server_monitor_action', $lang)) . '</label><select name="monitor_action[]" class="form-control dcmanage-input"><option value="none"' . ($monitorAction === 'none' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_none', $lang)) . '</option><option value="email"' . ($monitorAction === 'email' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_email', $lang)) . '</option><option value="sms"' . ($monitorAction === 'sms' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_sms', $lang)) . '</option><option value="email_sms"' . ($monitorAction === 'email_sms' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_email_sms', $lang)) . '</option><option value="ticket"' . ($monitorAction === 'ticket' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_ticket', $lang)) . '</option></select></div>';
-                    echo '<div class="form-group col-md-1 dcmanage-action-buttons"><button type="button" class="btn btn-sm btn-outline-info dcmanage-monitor-load">' . htmlspecialchars(I18n::t('server_sensors_load', $lang)) . '</button><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-monitor-row">&times;</button></div>';
+                    echo '<div class="form-group col-md-2"><label>' . htmlspecialchars(I18n::t('server_monitor_action', $lang)) . '</label><select name="monitor_action[]" class="form-control dcmanage-input"><option value="none"' . ($monitorAction === 'none' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_none', $lang)) . '</option><option value="email"' . ($monitorAction === 'email' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_email', $lang)) . '</option><option value="sms"' . ($monitorAction === 'sms' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_sms', $lang)) . '</option><option value="email_sms"' . ($monitorAction === 'email_sms' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_email_sms', $lang)) . '</option><option value="ticket"' . ($monitorAction === 'ticket' ? ' selected' : '') . '>' . htmlspecialchars(I18n::t('monitor_action_ticket', $lang)) . '</option></select></div>';
+                    echo '<div class="form-group col-md-3"><label class="d-none d-md-block">&nbsp;</label><div class="d-flex" style="gap:5px;"><button type="button" class="btn btn-sm btn-outline-info dcmanage-monitor-load w-100">' . htmlspecialchars(I18n::t('server_sensors_load', $lang)) . '</button><button type="button" class="btn btn-sm btn-outline-danger dcmanage-remove-monitor-row w-100">&times; Remove</button></div></div>';
                     echo '</div>';
                 }
                 echo '</div>';
@@ -4400,9 +4400,9 @@ function dcmanage_render_servers(string $lang): void
             echo '</div>';
             echo '</div>'; // end card
 
-            echo '<div class="dcmanage-form-actions">';
-            echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
+            echo '<div class="dcmanage-form-actions d-flex justify-content-end w-100 mt-4" style="gap: 10px;">';
             echo '<a class="btn btn-outline-secondary" href="' . htmlspecialchars($moduleLink . '&server_id=' . $selectedId . '&server_mode=view') . '">' . htmlspecialchars(I18n::t('action_view', $lang)) . '</a>';
+            echo '<button class="btn btn-primary" type="submit">' . htmlspecialchars(I18n::t('save_settings', $lang)) . '</button>';
             echo '</div>';
             echo '</form>';
         }

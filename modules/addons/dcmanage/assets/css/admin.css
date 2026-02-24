@@ -550,7 +550,7 @@
   background: linear-gradient(180deg, #fcfdff 0%, #f6f9fd 100%);
   border-radius: 14px;
   padding: 18px 18px 16px;
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .dcmanage-centered-form {
@@ -957,9 +957,6 @@
 }
 
 .dcmanage-port-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
   background: #eef3fb;
   border-bottom: 2px solid #d4dfef;
   white-space: nowrap;
@@ -1155,6 +1152,11 @@
   box-shadow: 0 14px 30px rgba(16, 31, 56, .2);
 }
 
+.modal.dcmanage-modal .modal-xl {
+  max-width: 1140px !important;
+  width: 95% !important;
+}
+
 .modal.dcmanage-modal .modal-header {
   border-bottom: 1px solid #e4e9f2;
   background: #f6f8fc;
@@ -1202,6 +1204,12 @@
   background: linear-gradient(180deg, #f9fbfd 0%, #f4f7fb 100%);
   padding: 16px;
   overflow: hidden;
+}
+
+.dcmanage-server-details-card .modal-body,
+.dcmanage-server-map {
+  direction: ltr !important;
+  text-align: left !important;
 }
 
 .dcmanage-server-details-head {
@@ -1253,7 +1261,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 10px;
-  margin: 20px 0;
+  margin: 10px 0;
 }
 
 .dcmanage-server-item td {
