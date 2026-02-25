@@ -29,8 +29,19 @@
 ### Fixed
 - Fixed Traffic Graph 400 Bad Request error by passing `server_id` instead of `service_id`.
 
-## [Unreleased]
+## [0.2.2] - 2026-02-25
+### Added
+- Created 4 separate PRTG Monitoring layout boxes (Traffic, Hardware, Public, Client Discovery) inside the Server Edit workflow.
+- Implemented AJAX cascaded PRTG Device to Multi-Select Checkboxes for complex sensor assignments.
+- Introduced a Master Traffic Summation graph rendering dynamically in the Server View above individual sensor graphs.
 
+### Changed
+- Refined the Switch Ports filter bar styling to use distinct Green/Yellow/Red status pills.
+- Realigned the Server View iLO buttons to stack the icon above the text for an improved UI touch target.
+- Replaced the native `datetime-local` input with the Flatpickr library.
+
+### Fixed
+- Fixed Switch Ports "Server" column center alignment CSS offset.
 ## [0.1.98] - 2024-05-30
 ### Added
 - Schema Migration V17
