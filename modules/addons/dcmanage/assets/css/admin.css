@@ -282,21 +282,98 @@ table.dcmanage-port-table th:nth-child(8) {
   min-width: 220px;
 }
 
+table.dcmanage-port-table th:nth-child(5),
 table.dcmanage-port-table td:nth-child(5) {
-  text-align: center;
+  text-align: center !important;
+  vertical-align: middle !important;
 }
 
 .dcmanage-port-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .dcmanage-port-filters .btn {
-  font-size: 0.8rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  font-size: 0.95rem;
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dcmanage-port-filters .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dcmanage-filter-btn[data-filter="all"] {
+  background-color: #f8f9fa;
+  color: #495057;
+  border: 1px solid #dee2e6;
+}
+
+.dcmanage-filter-btn[data-filter="all"].active {
+  background-color: #0d6efd;
+  color: #fff;
+  border-color: #0d6efd;
+}
+
+.dcmanage-filter-btn[data-filter="active"] {
+  background-color: #fdfdfd;
+  color: #198754;
+  border: 1px solid #198754;
+}
+
+.dcmanage-filter-btn[data-filter="active"].active {
+  background-color: #198754;
+  color: #fff;
+}
+
+.dcmanage-filter-btn[data-filter="suspended"] {
+  background-color: #fdfdfd;
+  color: #fd7e14;
+  border: 1px solid #fd7e14;
+}
+
+.dcmanage-filter-btn[data-filter="suspended"].active {
+  background-color: #fd7e14;
+  color: #fff;
+}
+
+.dcmanage-filter-btn[data-filter="lock"] {
+  background-color: #fdfdfd;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+}
+
+.dcmanage-filter-btn[data-filter="lock"].active {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.dcmanage-filter-btn[data-filter="unlock"] {
+  background-color: #fdfdfd;
+  color: #0dcaf0;
+  border: 1px solid #0dcaf0;
+}
+
+.dcmanage-filter-btn[data-filter="unlock"].active {
+  background-color: #0dcaf0;
+  color: #fff;
+}
+
+.dcmanage-filter-btn[data-filter="without-server"] {
+  background-color: #fdfdfd;
+  color: #6c757d;
+  border: 1px solid #6c757d;
+}
+
+.dcmanage-filter-btn[data-filter="without-server"].active {
+  background-color: #6c757d;
+  color: #fff;
 }
 
 .dcmanage-hero-band {

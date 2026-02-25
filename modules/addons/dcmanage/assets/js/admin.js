@@ -694,7 +694,7 @@
   }
 
   (function initServerGraph() {
-    var graphContainers = document.querySelectorAll('.dcmanage-graph-container canvas');
+    var graphContainers = document.querySelectorAll('.dcmanage-traffic-canvas-ind, .dcmanage-traffic-canvas-sum');
     if (graphContainers.length === 0 || typeof Chart === 'undefined') {
       return;
     }
@@ -703,43 +703,64 @@
     if (!baseApi) { return; }
     baseApi = baseApi.getAttribute('data-url');
 
-    var currentChart = null;
+    var currentCharts = [];
 
-    function renderServerGraph(serverId, canvasId, fromRange, toRange) {
+    function renderServerGraph(serverId, fromRange, toRange) {
       toRange = toRange || 'now';
-      var canvas = document.getElementById(canvasId);
-      var loader = canvas ? canvas.nextElementSibling : null;
-      if (!canvas) { return; }
 
-      if (loader) { loader.style.display = 'block'; }
-      if (currentChart) { currentChart.destroy(); }
+      // Clear existing charts
+      currentCharts.forEach(function (c) {
+        if (c && typeof c.destroy === 'function') {
+          c.destroy();
+        }
+      });
+      currentCharts = [];
 
-      getJson(apiUrl(baseApi, 'graphs/get', { server_id: serverId, from: fromRange, to: toRange, avg: 300 })).then(function (res) {
-        if (loader) { loader.style.display = 'none'; }
-        if (!res.ok) { return; }
+      var indCanvases = document.querySelectorAll('.dcmanage-traffic-canvas-ind');
+      var sumCanvas = document.querySelector('.dcmanage-traffic-canvas-sum');
 
-        var hist = ((res.data || {}).payload || {}).histdata || [];
-        var labels = [];
-        var values = [];
+      var sumDataMap = {}; // Maps ISO datetime -> { in: 0, out: 0 }
+      var activeRequests = 0;
 
-        hist.forEach(function (item) {
-          labels.push(item.datetime || '');
-          values.push(Number(item.value_raw || 0));
+      function renderSumChart() {
+        if (!sumCanvas) return;
+        var loader = sumCanvas.parentElement.querySelector('.dcmanage-graph-loader');
+        if (loader) loader.style.display = 'none';
+
+        var labels = Object.keys(sumDataMap).sort();
+        if (labels.length === 0) return;
+
+        var inData = [];
+        var outData = [];
+        labels.forEach(function (l) {
+          inData.push(Number((sumDataMap[l].in / 1024 / 1024).toFixed(2)));   // Display in Mbps
+          outData.push(Number((sumDataMap[l].out / 1024 / 1024).toFixed(2))); // Display in Mbps
         });
 
-        currentChart = new Chart(canvas, {
+        var chart = new Chart(sumCanvas, {
           type: 'line',
           data: {
             labels: labels,
-            datasets: [{
-              label: 'Traffic',
-              data: values,
-              borderColor: '#2f6fed',
-              backgroundColor: 'rgba(47,111,237,0.12)',
-              tension: 0.25,
-              pointRadius: 0,
-              fill: true,
-            }],
+            datasets: [
+              {
+                label: 'Traffic In (Mbps)',
+                data: inData,
+                borderColor: '#2f6fed',
+                backgroundColor: 'rgba(47,111,237,0.12)',
+                tension: 0.25,
+                pointRadius: 0,
+                fill: true,
+              },
+              {
+                label: 'Traffic Out (Mbps)',
+                data: outData,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16,185,129,0.12)',
+                tension: 0.25,
+                pointRadius: 0,
+                fill: true,
+              }
+            ],
           },
           options: {
             responsive: true,
@@ -747,19 +768,154 @@
             interaction: { mode: 'index', intersect: false },
             scales: {
               x: { display: true },
-              y: { display: true, beginAtZero: true },
+              y: { display: true, beginAtZero: true, title: { display: true, text: 'Mbps' } },
             },
           },
         });
-      }).catch(function () {
-        if (loader) { loader.style.display = 'none'; }
-      });
+        currentCharts.push(chart);
+      }
+
+      function fetchInd(canvas) {
+        var prtgId = canvas.getAttribute('data-prtg-id');
+        var sensorId = canvas.getAttribute('data-sensor-id');
+        var loader = canvas.parentElement.querySelector('.dcmanage-graph-loader');
+        if (loader) { loader.style.display = 'block'; }
+
+        activeRequests++;
+
+        getJson(apiUrl(baseApi, 'graphs/get', { server_id: serverId, prtg_id: prtgId, sensor_id: sensorId, from: fromRange, to: toRange, avg: 300 }))
+          .then(function (res) {
+            if (loader) { loader.style.display = 'none'; }
+            if (!res.ok) { return; }
+
+            var hist = ((res.data || {}).payload || {}).histdata || [];
+            var labels = [];
+            var inData = [];
+            var outData = [];
+
+            hist.forEach(function (item) {
+              var dt = item.datetime || '';
+              labels.push(dt);
+
+              // Assume PRTG gives traffic channel (value_raw usually total, but let's parse)
+              // Since PRTG response might vary by channel, we'll try to extract in/out if available, else use total as 'In' for visualization
+              var tIn = Number(item.value_raw || 0);
+              var tOut = item.channel_1_raw !== undefined ? Number(item.channel_1_raw || 0) : 0; // Customize if PRTG channels vary
+
+              if (item.value_raw === undefined && item.coverage !== undefined) {
+                // If it's pure custom XML from PRTG
+                var keys = Object.keys(item);
+                keys.forEach(function (k) {
+                  if (k.toLowerCase().indexOf('traffic in') !== -1) tIn = Number(item[k] || 0);
+                  if (k.toLowerCase().indexOf('traffic out') !== -1) tOut = Number(item[k] || 0);
+                });
+              }
+
+              inData.push(Number((tIn / 1024 / 1024).toFixed(2))); // Mbps
+              outData.push(Number((tOut / 1024 / 1024).toFixed(2))); // Mbps
+
+              if (sumCanvas) {
+                if (!sumDataMap[dt]) sumDataMap[dt] = { in: 0, out: 0 };
+                sumDataMap[dt].in += tIn;
+                sumDataMap[dt].out += tOut;
+              }
+            });
+
+            var ds = [
+              {
+                label: 'Traffic In (Mbps)',
+                data: inData,
+                borderColor: '#2f6fed',
+                backgroundColor: 'rgba(47,111,237,0.12)',
+                tension: 0.25,
+                pointRadius: 0,
+                fill: true,
+              }
+            ];
+
+            // Only add Out dataset if we detected Out traffic Data
+            var hasOut = outData.some(function (v) { return v > 0; });
+            if (hasOut) {
+              ds.push({
+                label: 'Traffic Out (Mbps)',
+                data: outData,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16,185,129,0.12)',
+                tension: 0.25,
+                pointRadius: 0,
+                fill: true,
+              });
+            }
+
+            var chart = new Chart(canvas, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: ds,
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                  x: { display: true },
+                  y: { display: true, beginAtZero: true, title: { display: true, text: 'Mbps' } },
+                },
+              },
+            });
+            currentCharts.push(chart);
+          })
+          .catch(function () {
+            if (loader) { loader.style.display = 'none'; }
+          })
+          .finally(function () {
+            activeRequests--;
+            if (activeRequests === 0 && sumCanvas) {
+              renderSumChart();
+            }
+          });
+      }
+
+      if (sumCanvas) {
+        var loader = sumCanvas.parentElement.querySelector('.dcmanage-graph-loader');
+        if (loader) loader.style.display = 'block';
+      }
+
+      if (indCanvases.length === 0 && sumCanvas) {
+        // Fallback for single legacy graph layout
+        getJson(apiUrl(baseApi, 'graphs/get', { server_id: serverId, from: fromRange, to: toRange, avg: 300 }))
+          .then(function (res) {
+            var loader = sumCanvas.parentElement.querySelector('.dcmanage-graph-loader');
+            if (loader) loader.style.display = 'none';
+            if (!res.ok) return;
+            // legacy single rendering
+            var hist = ((res.data || {}).payload || {}).histdata || [];
+            var labels = [];
+            var inData = [];
+            hist.forEach(function (item) {
+              labels.push(item.datetime || '');
+              inData.push(Number((Number(item.value_raw || 0) / 1024 / 1024).toFixed(2)));
+            });
+            var chart = new Chart(sumCanvas, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [{ label: 'Traffic (Mbps)', data: inData, borderColor: '#2f6fed', backgroundColor: 'rgba(47,111,237,0.12)', tension: 0.25, pointRadius: 0, fill: true }]
+              },
+              options: { responsive: true, maintainAspectRatio: false }
+            });
+            currentCharts.push(chart);
+          });
+      } else {
+        indCanvases.forEach(function (canvas) {
+          fetchInd(canvas);
+        });
+      }
     }
 
     var btnsContainers = document.querySelectorAll('.dcmanage-graph-range-btns');
     btnsContainers.forEach(function (container) {
       var serverId = container.getAttribute('data-server-id');
-      var canvasId = 'dcmanage-server-graph-' + serverId;
       var buttons = container.querySelectorAll('.dcmanage-graph-range');
       var customToggle = container.querySelector('.dcmanage-graph-custom-toggle');
       var customRange = container.closest('.dcmanage-form-card').querySelector('.dcmanage-graph-custom-range');
@@ -774,7 +930,7 @@
           this.classList.add('active');
           if (customRange) customRange.style.display = 'none';
           var range = this.getAttribute('data-range');
-          renderServerGraph(serverId, canvasId, range);
+          renderServerGraph(serverId, range);
         });
       });
 
@@ -803,14 +959,14 @@
           else toVal = toVal.replace('T', ' '); // Make it look nicer for PHP strtotime
 
           fromVal = fromVal.replace('T', ' ');
-          renderServerGraph(serverId, canvasId, fromVal, toVal);
+          renderServerGraph(serverId, fromVal, toVal);
         });
       }
 
       // Init first active
       var activeBtn = container.querySelector('.dcmanage-graph-range.active') || buttons[0];
       if (activeBtn) {
-        renderServerGraph(serverId, canvasId, activeBtn.getAttribute('data-range') || '-2h');
+        renderServerGraph(serverId, activeBtn.getAttribute('data-range') || '-2h');
       }
     });
   })();
@@ -960,6 +1116,19 @@
         applyPortFilters(g.getAttribute('data-target-table'));
       });
     }, 200);
+  })();
+
+  // --- Flatpickr Initialization ---
+  (function initDatePickers() {
+    if (typeof flatpickr !== 'undefined') {
+      flatpickr('input[type="datetime-local"]', {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+        time_24hr: true,
+        allowInput: true,
+        theme: "light"
+      });
+    }
   })();
 
 })();
