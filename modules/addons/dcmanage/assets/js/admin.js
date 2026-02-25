@@ -1118,6 +1118,107 @@
     }, 200);
   })();
 
+  // --- Server Filters ---
+  (function initServerFilters() {
+    function applyServerFilters(containerId) {
+      var container = document.getElementById(containerId);
+      if (!container) return;
+
+      var filterDiv = document.querySelector('.dcmanage-server-filters[data-target-table="' + containerId + '"]');
+      if (!filterDiv) return;
+
+      var activeFilters = [];
+      var filterBtns = filterDiv.querySelectorAll('.dcmanage-server-filter-btn');
+      filterBtns.forEach(function (btn) {
+        if (btn.classList.contains('active')) {
+          activeFilters.push(btn.getAttribute('data-filter'));
+        }
+      });
+
+      var rows = container.querySelectorAll('tbody tr.dcmanage-server-item');
+      rows.forEach(function (row) {
+        // Skip filtering if search input has value
+        var searchInput = document.getElementById('dcmanage-server-table-search');
+        if (searchInput && searchInput.value.trim() !== '') {
+          return;
+        }
+
+        var isAct = String(row.getAttribute('data-active') || '0') === '1';
+        var isSusp = String(row.getAttribute('data-suspended') || '0') === '1';
+        var noPort = String(row.getAttribute('data-port') || '0') === '0';
+        var noIlo = String(row.getAttribute('data-ilo') || '0') === '0';
+        var noHw = String(row.getAttribute('data-hardware') || '0') === '0';
+        var noPub = String(row.getAttribute('data-public') || '0') === '0';
+
+        var vis = false;
+        if (activeFilters.indexOf('all') !== -1) {
+          vis = true;
+        } else {
+          // Check states against active filters
+          if (activeFilters.indexOf('active') !== -1 && isAct) vis = true;
+          if (activeFilters.indexOf('suspended') !== -1 && isSusp) vis = true;
+          if (activeFilters.indexOf('without-port') !== -1 && noPort) vis = true;
+          if (activeFilters.indexOf('without-ilo') !== -1 && noIlo) vis = true;
+          if (activeFilters.indexOf('without-hardware') !== -1 && noHw) vis = true;
+          if (activeFilters.indexOf('without-public') !== -1 && noPub) vis = true;
+
+          if (activeFilters.length > 0 && !vis) {
+            vis = false;
+          }
+        }
+
+        row.dataset.filtered = vis ? '0' : '1';
+      });
+
+      var pager = document.getElementById('dcmanage-server-table-pager');
+      if (pager) { pager._page = 1; }
+      if (typeof window.applyServerPager === 'function') {
+        window.applyServerPager();
+      } else {
+        // trigger standard pager refresh or dispatch event if global function not found
+        var evt = new Event('input');
+        var searchInp = document.getElementById('dcmanage-server-table-search');
+        if (searchInp) searchInp.dispatchEvent(evt); // cheat code to trigger standard search filter application
+      }
+    }
+
+    document.addEventListener('click', function (e) {
+      if (e.target && e.target.classList && e.target.classList.contains('dcmanage-server-filter-btn')) {
+        var btn = e.target;
+        var filterVal = btn.getAttribute('data-filter');
+        var group = btn.closest('.dcmanage-server-filters');
+
+        if (filterVal === 'all') {
+          var siblingBtns = group.querySelectorAll('.dcmanage-server-filter-btn');
+          siblingBtns.forEach(function (sib) {
+            if (sib !== btn) sib.classList.remove('active');
+          });
+          btn.classList.add('active');
+        } else {
+          btn.classList.toggle('active');
+          var allBtn = group.querySelector('.dcmanage-server-filter-btn[data-filter="all"]');
+          if (allBtn && allBtn.classList.contains('active')) {
+            allBtn.classList.remove('active');
+          }
+          var activeCount = group.querySelectorAll('.dcmanage-server-filter-btn.active').length;
+          if (activeCount === 0 && allBtn) {
+            allBtn.classList.add('active');
+          }
+        }
+
+        var tableId = group.getAttribute('data-target-table');
+        applyServerFilters(tableId);
+      }
+    });
+
+    setTimeout(function () {
+      var groups = document.querySelectorAll('.dcmanage-server-filters');
+      groups.forEach(function (g) {
+        applyServerFilters(g.getAttribute('data-target-table'));
+      });
+    }, 300);
+  })();
+
   // --- Flatpickr Initialization ---
   (function initDatePickers() {
     if (typeof flatpickr !== 'undefined') {
