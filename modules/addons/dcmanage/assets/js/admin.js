@@ -694,16 +694,11 @@
   }
 
   (function initServerGraph() {
-    var graphContainers = document.querySelectorAll('.dcmanage-traffic-canvas-ind, .dcmanage-traffic-canvas-sum');
-    if (graphContainers.length === 0 || typeof Chart === 'undefined') {
-      return;
-    }
-
     var baseApi = document.getElementById('dcmanage-api-base');
     if (!baseApi) { return; }
     baseApi = baseApi.getAttribute('data-url');
-
     var currentCharts = [];
+    var graphContainers = document.querySelectorAll('.dcmanage-traffic-canvas-ind, .dcmanage-traffic-canvas-sum');
 
     function renderServerGraph(serverId, fromRange, toRange) {
       toRange = toRange || 'now';
@@ -911,6 +906,11 @@
           fetchInd(canvas);
         });
       }
+    }
+
+    if (graphContainers.length === 0 || typeof Chart === 'undefined') {
+      // We still need to bind UI buttons, but we won't try to render charts.
+      renderServerGraph = function () { }; // No-op
     }
 
     var btnsContainers = document.querySelectorAll('.dcmanage-graph-range-btns');

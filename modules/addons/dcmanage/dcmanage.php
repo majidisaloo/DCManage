@@ -4386,10 +4386,15 @@ function dcmanage_render_servers(string $lang): void
         $viewUrl = $moduleLink . '&server_id=' . $serverId . '&server_mode=view';
         $editUrl = $moduleLink . '&server_id=' . $serverId . '&server_mode=edit';
         
-        $ds = strtolower(trim((string) ($row->domainstatus ?? '')));
-        $isActive = ($ds === 'active' || $ds === 'completed') ? '1' : '0';
-        $isSuspended = ($ds === 'suspended') ? '1' : '0';
-        $hasPort = $ports === [] ? '0' : '1';
+        $portStatuses = [];
+        if (isset($serverTrafficDefaults[$serverId])) {
+            foreach ($serverTrafficDefaults[$serverId] as $pDef) {
+                $portStatuses[] = strtolower(trim((string) ($pDef['oper_status'] ?? '')));
+            }
+        }
+        $isActive = in_array('up', $portStatuses, true) ? '1' : '0';
+        $isSuspended = ($portStatuses !== [] && !in_array('up', $portStatuses, true)) ? '1' : '0';
+        $hasPort = $portStatuses === [] ? '0' : '1';
         $hasIlo = trim((string) ($row->ilo_host ?? '')) !== '' ? '1' : '0';
         $hasHardware = !empty($serverMonitoringByType[$serverId]['hardware']) ? '1' : '0';
         $hasPublic = !empty($serverMonitoringByType[$serverId]['public']) ? '1' : '0';
@@ -4604,15 +4609,18 @@ function dcmanage_render_servers(string $lang): void
             echo '<div class="dcmanage-form-card mb-3 text-center">';
             echo '<h6 class="mb-3">' . htmlspecialchars(I18n::t('server_ilo', $lang)) . ' Management <span class="text-muted small ml-2">(' . htmlspecialchars((string) $selectedServer->ilo_host) . ')</span></h6>';
             if (trim((string) ($selectedServer->ilo_host ?? '')) !== '') {
-                echo '<div class="dcmanage-action-buttons mt-3 d-flex justify-content-center flex-wrap gap-2">';
-                echo '<button type="button" class="btn btn-sm btn-success dcmanage-ilo-action-btn m-1 d-flex flex-column align-items-center justify-content-center" data-server-id="' . $selectedId . '" data-action="On" style="min-width: 110px; padding: 12px 10px;"><i class="fas fa-power-off fa-2x mb-2"></i> <span style="font-weight: 500;">Power On</span></button>';
-                echo '<button type="button" class="btn btn-sm btn-secondary dcmanage-ilo-action-btn m-1 d-flex flex-column align-items-center justify-content-center" data-server-id="' . $selectedId . '" data-action="GracefulRestart" style="min-width: 110px; padding: 12px 10px;"><i class="fas fa-sync fa-2x mb-2"></i> <span style="font-weight: 500;">Graceful Restart</span></button>';
-                echo '<button type="button" class="btn btn-sm btn-warning dcmanage-ilo-action-btn text-dark m-1 d-flex flex-column align-items-center justify-content-center" data-server-id="' . $selectedId . '" data-action="ForceRestart" style="min-width: 110px; padding: 12px 10px;"><i class="fas fa-bolt fa-2x mb-2"></i> <span style="font-weight: 500;">Force Restart</span></button>';
-                echo '<button type="button" class="btn btn-sm btn-danger dcmanage-ilo-action-btn m-1 d-flex flex-column align-items-center justify-content-center" data-server-id="' . $selectedId . '" data-action="ForceOff" style="min-width: 110px; padding: 12px 10px;"><i class="fas fa-power-off fa-2x mb-2"></i> <span style="font-weight: 500;">Power Off</span></button>';
+                $btnStyle = 'display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-width: 120px; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: all 0.2s ease; border: 1px solid transparent;';
+                $iconStyle = 'margin-bottom: 8px; margin-right: 0 !important;';
+                
+                echo '<div class="dcmanage-action-buttons mt-3 d-flex justify-content-center flex-wrap" style="gap: 12px;">';
+                echo '<button type="button" class="btn btn-sm btn-success dcmanage-ilo-action-btn m-1" data-server-id="' . $selectedId . '" data-action="On" style="' . $btnStyle . '"><i class="fas fa-power-off fa-2x" style="' . $iconStyle . '"></i> <span style="font-weight: 500;">Power On</span></button>';
+                echo '<button type="button" class="btn btn-sm btn-secondary dcmanage-ilo-action-btn m-1" data-server-id="' . $selectedId . '" data-action="GracefulRestart" style="' . $btnStyle . '"><i class="fas fa-sync fa-2x" style="' . $iconStyle . '"></i> <span style="font-weight: 500;">Graceful Restart</span></button>';
+                echo '<button type="button" class="btn btn-sm btn-warning dcmanage-ilo-action-btn text-dark m-1" data-server-id="' . $selectedId . '" data-action="ForceRestart" style="' . $btnStyle . '"><i class="fas fa-bolt fa-2x" style="' . $iconStyle . '"></i> <span style="font-weight: 500;">Force Restart</span></button>';
+                echo '<button type="button" class="btn btn-sm btn-danger dcmanage-ilo-action-btn m-1" data-server-id="' . $selectedId . '" data-action="ForceOff" style="' . $btnStyle . '"><i class="fas fa-power-off fa-2x" style="' . $iconStyle . '"></i> <span style="font-weight: 500;">Power Off</span></button>';
                 
                 // HTML5 Console via WHMCS iframe
                 $consoleHref = $moduleLink . '&action=ilo_console&server_id=' . $selectedId;
-                echo '<a href="' . htmlspecialchars($consoleHref) . '" class="btn btn-sm btn-primary dcmanage-ilo-console-btn m-1 d-flex flex-column align-items-center justify-content-center" target="_blank" style="min-width: 110px; padding: 12px 10px;"><i class="fas fa-desktop fa-2x mb-2"></i> <span style="font-weight: 500;">HTML5 Console</span></a>';
+                echo '<a href="' . htmlspecialchars($consoleHref) . '" class="btn btn-sm btn-primary dcmanage-ilo-console-btn m-1" target="_blank" style="' . $btnStyle . '"><i class="fas fa-desktop fa-2x" style="' . $iconStyle . '"></i> <span style="font-weight: 500;">HTML5 Console</span></a>';
                 echo '</div>';
                 echo '<div class="small text-muted mt-3 dcmanage-ilo-action-result text-center"></div>';
             } else {
@@ -4805,7 +4813,10 @@ function dcmanage_render_servers(string $lang): void
             };
 
             // Fetch all sensors for this server up front to pass into the closure
-            $serverSensors = Capsule::table('mod_dcmanage_server_traffic_sensors')->where('server_id', $selectedId)->get();
+            $serverSensors = [];
+            if (Capsule::schema()->hasTable('mod_dcmanage_server_traffic_sensors')) {
+                $serverSensors = Capsule::table('mod_dcmanage_server_traffic_sensors')->where('server_id', $selectedId)->get();
+            }
 
             $renderMonitorSection('traffic', 'server_traffic_sensors', (int) $selectedServer->dc_id, $serverSensors, $lang);
             $renderMonitorSection('hardware', 'server_hardware_sensors', (int) $selectedServer->dc_id, $serverSensors, $lang);

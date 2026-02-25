@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.4] - 2026-02-26
+### Fixed
+- Fixed an issue where the Server Edit modal would crash if the traffic sensors database table was missing or malformed.
+- Resolved a bug where Flatpickr "Custom" date toggles were not bound if no traffic graphs were present.
+- Updated the Server View Action Buttons to use flex-column styling.
+- Prevented `mod_dcmanage_server_ports` deletion when re-saving a server without new ports mapped.
+- Changed the "Active" and "Suspended" server table filters to look at the link state of connected switch ports instead of the WHMCS domain status.
+- Addressed minor alignment styling in the Server, Switch, and Port tables by enforcing explicit text-centering.
 ## [0.2.1] - 2024-05-31
 ### Added
 - Added Advanced Filters bar to the Switch Ports table (All, Active, Suspended, Lock, Unlock, Without Server) for real-time visibility control.

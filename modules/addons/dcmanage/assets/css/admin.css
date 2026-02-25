@@ -52,6 +52,21 @@
   padding: 8px 10px;
 }
 
+.dcmanage-switch-table th,
+.dcmanage-switch-table td,
+.dcmanage-server-table th,
+.dcmanage-server-table td,
+.dcmanage-port-table th,
+.dcmanage-port-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+tr.dcmanage-server-item[data-filtered="1"],
+tr.dcmanage-switch-port-row[data-filtered="1"] {
+  display: none !important;
+}
+
 .dcmanage-shell .dcmanage-tabs .nav-link {
   border: 0;
   border-radius: 12px;
