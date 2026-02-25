@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.2.5] - 2026-02-26
+### Fixed
+- Fixed an Uncaught TypeError in the Server Edit modal specifically triggered by the "Client Discovery" monitoring template lacking a PRTG Action dropdown.
 ## [0.2.4] - 2026-02-26
 ### Fixed
 - Fixed an issue where the Server Edit modal would crash if the traffic sensors database table was missing or malformed.
